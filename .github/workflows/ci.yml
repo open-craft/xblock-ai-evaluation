@@ -1,0 +1,48 @@
+name: Python CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04]
+        python-version: [3.8, 3.11, 3.12]
+        toxenv: [django42, quality, translations]
+
+    steps:
+    - name: checkout repo
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: setup python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install translations dependencies
+      if: ${{ startsWith(matrix.toxenv, 'translations') }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gettext
+
+    - name: Install Dependencies
+      run: make requirements
+
+    - name: Run Tests
+      env:
+        TOXENV: ${{ matrix.toxenv }}
+      run: tox
