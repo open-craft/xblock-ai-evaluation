@@ -1,0 +1,116 @@
+.used-prog-language {
+  width: 10%;
+  border: 1px solid gray;
+  border-radius: 5px;
+  padding: 5px 10px;
+  margin-top: 5px;
+}
+
+.eval-ai-container {
+  display: flex;
+  max-height: 600px;
+}
+
+.eval-ai-container .eval-ai-code-editor {
+  flex: 5;
+}
+
+.eval-ai-container #monaco {
+  min-height: 500px;
+  width: 100%;
+  border-bottom: 1.5px solid #546d70;
+}
+
+.eval-ai-container .result {
+  flex: 3;
+  background-color: #f5f5f5;
+  overflow-y: auto;
+}
+
+.eval-ai-container .eval-ai-buttons {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.eval-ai-container .submit-loader {
+  margin-left: 5px;
+}
+
+.eval-ai-container .eval-ai-buttons .eval-ai-button {
+  cursor: pointer;
+  margin: 10px;
+  text-align: center;
+  height: fit-content;
+  padding: 10px 10px;
+}
+
+.eval-ai-container .eval-ai-buttons .disabled-btn {
+  opacity: 0.8;
+  cursor: not-allowed !important;
+}
+
+.eval-ai-container .eval-ai-buttons #submit-button {
+  background-color: #00262b;
+  color: white;
+  border-radius: 5px;
+  border: none;
+}
+
+.eval-ai-container .eval-ai-buttons #reset-button:hover {
+  background-color: #edeae9;
+}
+
+
+
+.eval-ai-container .stderr {
+  margin-top: 10px;
+  color: red;
+  white-space: pre-wrap;
+}
+
+.eval-ai-container .stdout {
+  white-space: pre-wrap;
+}
+
+/* tabs */
+.tab {
+  display: flex;
+  border-bottom: 1px solid #edeae9;
+}
+
+.tab .result-tab-btn {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 1.2em;
+  line-height: normal;
+}
+
+.tab .result-tab-btn:hover {
+  background-color: #ddd;
+}
+
+.tab .result-tab-btn.active {
+  border-bottom: 2px solid #546d70;
+}
+
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  border-top: none;
+  animation: fadeEffect 1s;
+}
+
+@keyframes fadeEffect {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

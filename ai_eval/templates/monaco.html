@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- <meta name="viewport" content="width=device-width, initial-scale=1.0"> -->
+    <title>Monaco Editor</title>
+  </head>
+
+  <body>
+    <div class="monaco" style="width: 100vh; height: 100vh"></div>
+    <script type="module">
+      import * as monaco from "https://cdn.jsdelivr.net/npm/monaco-editor@0.49.0/+esm";
+
+      window.editor = monaco.editor.create(document.querySelector(".monaco"), {
+        value: ["function x() {", '\tconsole.log("Hello world!");', "}"].join(
+          "\n",
+        ),
+        language: "{{ monaco_language }}",
+        minimap: { enabled: false },
+        // theme: 'vs-dark'
+      });
+
+      window.parent.postMessage('__USAGE_ID_PLACEHOLDER__', '*');
+    </script>
+  </body>
+</html>

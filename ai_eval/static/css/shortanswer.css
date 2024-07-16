@@ -1,0 +1,132 @@
+/* CSS for ShortAnswerAIEvalXBlock */
+
+.shortanswer_block .count {
+  font-weight: bold;
+}
+
+.shortanswer_block p {
+  cursor: pointer;
+}
+
+.chat-history {
+  min-height: 250px;
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  padding: 0px 2em;
+}
+
+.chat-message-container {
+  display: flex;
+}
+.chat-message-container .chat-message {
+  /* flex: 0 1 80%;  */
+  flex: 0 1 auto;
+  max-width: 80%;
+  padding: 10px 10px 5px 10px;
+  /* 10px 0 10px; */
+  margin-bottom: 10px;
+  /* border: 1px solid gray; */
+  border-radius: 5px;
+}
+
+.user-answer {
+  text-align: right;
+  margin-left: auto;
+  background-color: #f0f3f5;
+  color: #44586c;
+}
+
+.ai-eval,
+.message-spinner {
+  text-align: left;
+  color: white;
+  margin-right: auto;
+  background-color: #476480;
+}
+.ai-eval * {
+  color: white !important;
+}
+
+.submit-row {
+  display: flex;
+  margin-bottom: 1em;
+  font-size: 16px;
+  padding: 10px;
+}
+
+.submit-row .user-input {
+  /* width: 80%; */
+  flex: 8;
+  height: auto;
+  /* padding: 10px; */
+  margin-right: 10px;
+  border: 1px solid gray;
+  border-radius: 5px;
+  overflow: auto;
+  max-height: 200px;
+  resize: none;
+}
+
+.submit-row #submit-button {
+  flex: 1;
+  height: fit-content;
+  text-align: center;
+  padding: 10px 0;
+  margin-left: auto;
+  background-color: #00262b;
+  color: white;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+}
+.submit-row .disabled-btn {
+  opacity: 0.8;
+  cursor: not-allowed !important;
+}
+/* spinner animation */
+.chat-message-container .message-spinner > div {
+  width: 4px;
+  height: 4px;
+  margin-right: 2px;
+  background-color: white;
+
+  border-radius: 100%;
+  display: inline-block;
+  -webkit-animation: chat-block-sk-bouncedelay 1.4s infinite ease-in-out both;
+  animation: chat-block-sk-bouncedelay 1.4s infinite ease-in-out both;
+}
+
+.chat-message-container.message-spinner .bounce1 {
+  -webkit-animation-delay: -0.32s;
+  animation-delay: -0.32s;
+}
+
+.chat-message-container .message-spinner .bounce2 {
+  -webkit-animation-delay: -0.16s;
+  animation-delay: -0.16s;
+}
+
+@-webkit-keyframes chat-block-sk-bouncedelay {
+  0%,
+  80%,
+  100% {
+    -webkit-transform: scale(0);
+  }
+  40% {
+    -webkit-transform: scale(1);
+  }
+}
+
+@keyframes chat-block-sk-bouncedelay {
+  0%,
+  80%,
+  100% {
+    -webkit-transform: scale(0);
+    transform: scale(0);
+  }
+  40% {
+    -webkit-transform: scale(1);
+    transform: scale(1);
+  }
+}

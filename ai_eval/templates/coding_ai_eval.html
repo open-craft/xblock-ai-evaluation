@@ -1,0 +1,36 @@
+<div>
+  <div id="question-text"></div>
+</div>
+<div class="used-prog-language">
+  {{ self.language }}
+</div>
+<div class="eval-ai-container">
+  <div class="eval-ai-code-editor">
+    <iframe id="monaco" frameborder="0" scrolling="no"></iframe>
+    <div class="eval-ai-buttons">
+      <span id="reset-button" class="eval-ai-button">Reset</span>
+      <span id="submit-button" class="eval-ai-button">Submit Code</span>
+    </div>
+  </div>
+
+  <div class="result">
+    <div class="tab">
+      <span class="tablinks result-tab-btn" data-id="output" id="defaultOpen"
+        >Output</span
+      >
+      <span
+        class="tablinks result-tab-btn"
+        data-id="ai-feedback"
+        id="ai-feedback-tab"
+        >AI feedback</span
+      >
+    </div>
+
+    <div id="output" class="tabcontent">
+      <div class="stdout"></div>
+      <div class="stderr"></div>
+    </div>
+
+    <div id="ai-feedback" class="tabcontent"></div>
+  </div>
+</div>
