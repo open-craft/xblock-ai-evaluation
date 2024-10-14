@@ -1,14 +1,14 @@
 """Short answers Xblock with AI evaluation."""
 
+import json
 import logging
 import traceback
-
 
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
-from xblock.fields import Integer, String, Scope
+from xblock.fields import Dict, Integer, String, Scope
 from xblock.validation import ValidationMessage
 
 from .llm import get_llm_response
@@ -37,7 +37,17 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         default=3,
     )
 
-    editable_fields = AIEvalXBlock.editable_fields + ("max_responses",)
+    attachments = Dict(
+        display_name=_("Attachments"),
+        help=_("Attachments to include with the evaluation prompt"),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
+    editable_fields = AIEvalXBlock.editable_fields + (
+        "max_responses",
+        "attachments",
+    )
 
     def validate_field_data(self, validation, data):
         """
@@ -89,15 +99,29 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
+
+        attachments = []
+        for filename, contents in self.attachments.items():
+            # TODO: escape
+            attachments.append(f"""
+                <attachment>
+                    <filename>{filename}</filename>
+                    <contents>{contents}</contents>
+                </attachment>
+            """)
+        attachments = '\n'.join(attachments)
+
         system_msg = {
             "role": "system",
             "content": f"""
-               {self.evaluation_prompt}
+                {self.evaluation_prompt}
+                
+                {attachments}
 
-               {self.question}.
+                {self.question}.
 
-               Evaluation must be in Makrdown format.
-               """,
+                Evaluation must be in Markdown format.
+            """,
         }
         messages = [system_msg]
         # add previous messages
@@ -131,6 +155,35 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             return {"response": response}
 
         raise JsonHandlerError(500, "A probem occured. The LLM sent an empty response.")
+
+    def studio_view(self, context):
+        """
+        Render a form for editing this XBlock
+        """
+        fragment = super().studio_view(context)
+        fragment.add_javascript(self.resource_string("static/js/src/shortanswer_edit.js"))
+        # ShortAnswerAIEvalXBlock() in base.js will call StudioEditableXBlockMixin().
+        fragment.initialize_js("ShortAnswerAIEvalXBlock")
+        return fragment
+
+    # Optimisation: don't send file contents to the edit view,
+    # and use null value as flag to keep same contents.
+
+    def _make_field_info(self, field_name, field):
+        info = super()._make_field_info(field_name, field)
+        if field_name == "attachments":
+            info["value"] = json.dumps(
+                {f: None for f in field.read_from(self).keys()}
+            )
+        return info
+
+    @XBlock.json_handler
+    def submit_studio_edits(self, data, suffix=''):
+        if "attachments" in data["values"]:
+            for key, value in list(data["values"]["attachments"].items()):
+                if value is None:
+                    data["values"]["attachments"][key] = self.attachments[key]
+        return super().submit_studio_edits.__wrapped__(self, data, suffix)
 
     @staticmethod
     def workbench_scenarios():
