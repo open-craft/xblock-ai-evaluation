@@ -6,6 +6,7 @@ import traceback
 
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
+from webob import Response
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Dict, Integer, String, Scope
@@ -184,6 +185,24 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 if value is None:
                     data["values"]["attachments"][key] = self.attachments[key]
         return super().submit_studio_edits.__wrapped__(self, data, suffix)
+
+    @XBlock.handler
+    def view_attachment(self, request, suffix=''):
+        # TODO: restrict to studio
+        key = request.GET['key']
+        try:
+            data = self.attachments[key]
+        except KeyError:
+            # TODO: 404
+            raise
+        return Response(
+            body=data.encode(),
+            headerlist=[
+                ("Content-Type", "application/octet-stream"),
+                # TODO: escape and encode filename
+                ("Content-Disposition", f'attachment; filename="{key}"'),
+            ]
+        )
 
     @staticmethod
     def workbench_scenarios():

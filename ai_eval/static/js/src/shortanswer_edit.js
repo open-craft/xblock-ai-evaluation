@@ -4,6 +4,8 @@ function ShortAnswerAIEvalXBlock(runtime, element) {
 
     StudioEditableXBlockMixin(runtime, element);
 
+    var viewAttachmentUrl = runtime.handlerUrl(element, "view_attachment");
+
     var $input = $('#xb-field-edit-attachments');
 
     var buildFileInput = function() {
@@ -13,7 +15,18 @@ function ShortAnswerAIEvalXBlock(runtime, element) {
         var files = JSON.parse($input.val() || "{}");
         for (var filename of Object.keys(files)) {
             var $fileItem = $('<li class="list-settings-item"/>');
-            $fileItem.append(filename);
+            var $fileLink;
+            if (files[filename] === null) {
+                /* File that already exists. */
+                $fileLink = $('<a/>');
+                $fileLink.attr("target", "_blank");
+                var fileLinkQuery = new URLSearchParams({key: filename}).toString();
+                $fileLink.attr('href', `${viewAttachmentUrl}?${fileLinkQuery}`);
+            } else {
+                $fileLink = $('<span/>');
+            }
+            $fileLink.append(filename);
+            $fileItem.append($fileLink);
             var $deleteButton = $('<button class="action" type="button"/>');
             $deleteButton.append($('<i class="icon fa fa-trash"/>'));
             var $deleteButtonText = $('<span class="sr"/>');
