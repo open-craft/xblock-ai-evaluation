@@ -87,6 +87,16 @@ class TestShortAnswerAIEvalXBlock(unittest.TestCase):
             block.reset.__wrapped__(block, data={})
         self.assertEqual(block.messages, {"USER": ["Hello"], "LLM": ["Hello"]})
 
+    def test_character_image(self):
+        """Test the character image."""
+        data = {
+            **self.data,
+            "character_image": "/static/image.jpg",
+        }
+        block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+        frag = block.student_view()
+        self.assertIn('<img src="/static/image.jpg" />', frag.content)
+
     @patch('ai_eval.shortanswer.get_llm_response')
     def test_attachments(self, get_llm_response):
         """Test the attachments."""
