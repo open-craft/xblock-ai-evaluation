@@ -30,6 +30,15 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
+    character_image = String(
+        display_name=_("Character Image URL"),
+        help=_(
+            "URL for an image to be shown to the left of the chat box; "
+            "leave empty to disable"
+        ),
+        scope=Scope.settings,
+    )
+
     max_responses = Integer(
         display_name=_("Max Responses"),
         help=_("The maximum number of response messages the student can submit"),
@@ -47,6 +56,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     editable_fields = AIEvalXBlock.editable_fields + (
         "max_responses",
         "allow_reset",
+        "character_image",
     )
 
     def validate_field_data(self, validation, data):

@@ -1,5 +1,15 @@
 /* CSS for ShortAnswerAIEvalXBlock */
 
+.shortanswer_image {
+  float: left;
+  margin-right: 4rem;
+  width: 30%;
+}
+
+.shortanswer_image > img {
+  max-width: 100%;
+}
+
 .shortanswer_block .count {
   font-weight: bold;
 }
