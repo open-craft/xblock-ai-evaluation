@@ -25,7 +25,7 @@ setup(
     name="xblock-ai-eval",
     version="0.1",
     description="XBlocks to write short text and code entries with AI-driven evaluation",
-    license="AGPL v3",
+    license="Apache 2.0",
     packages=[
         "ai_eval",
     ],
