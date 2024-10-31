@@ -55,7 +55,6 @@
 .submit-row .user-input {
   flex: 8;
   height: auto;
-  margin-right: 10px;
   border: 1px solid gray;
   border-radius: 5px;
   overflow: auto;
@@ -63,18 +62,29 @@
   resize: none;
 }
 
-.submit-row #submit-button {
+#submit-button, #reset-button {
   flex: 1;
   height: fit-content;
   text-align: center;
   padding: 10px 0;
   margin-left: auto;
-  background-color: #00262b;
-  color: white;
   border-radius: 5px;
   border: none;
   cursor: pointer;
 }
+
+#submit-button {
+  background-color: #00262b;
+  color: white;
+  margin-left: 10px;
+}
+
+#reset-button {
+  border: 1px solid;
+  color: #00262b;
+  margin-right: 10px;
+}
+
 .submit-row .disabled-btn {
   opacity: 0.8;
   cursor: not-allowed !important;

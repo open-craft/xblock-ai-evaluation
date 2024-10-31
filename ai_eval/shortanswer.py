@@ -8,7 +8,7 @@ from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
-from xblock.fields import Integer, String, Scope
+from xblock.fields import Boolean, Integer, String, Scope
 from xblock.validation import ValidationMessage
 
 from .llm import get_llm_response
@@ -37,7 +37,17 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         default=3,
     )
 
-    editable_fields = AIEvalXBlock.editable_fields + ("max_responses",)
+    allow_reset = Boolean(
+        display_name=_("Allow reset"),
+        help=_("Allow the learner to reset the chat"),
+        scope=Scope.settings,
+        default=False,
+    )
+
+    editable_fields = AIEvalXBlock.editable_fields + (
+        "max_responses",
+        "allow_reset",
+    )
 
     def validate_field_data(self, validation, data):
         """
@@ -131,6 +141,16 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             return {"response": response}
 
         raise JsonHandlerError(500, "A probem occured. The LLM sent an empty response.")
+
+    @XBlock.json_handler
+    def reset(self, data, suffix=""):
+        """
+        Reset the Xblock.
+        """
+        if not self.allow_reset:
+            raise JsonHandlerError(403, "Reset is disabled.")
+        self.messages = {self.USER_KEY: [], self.LLM_KEY: []}
+        return {}
 
     @staticmethod
     def workbench_scenarios():

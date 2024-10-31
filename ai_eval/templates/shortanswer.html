@@ -19,6 +19,9 @@
             </div>
         </div>
         <div class="submit-row">
+            {% if self.allow_reset %}
+                <span id="reset-button" class="disabled-btn">Reset chat</span>
+            {% endif %}
             <textarea class="user-input" rows="1" placeholder="Type your answer here" maxlength="1000"></textarea>
             <span id="submit-button">Submit <i class="fa fa-paper-plane"></i></span>
         </div>
