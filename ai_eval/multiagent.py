@@ -93,6 +93,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
     )
 
     scenario_data = Dict(
+        default={"scenario": {"title": "", "initial_message": ""}},
         scope=Scope.settings,
     )
 
