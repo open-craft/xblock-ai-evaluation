@@ -1,0 +1,30 @@
+<div class="shortanswer_block">
+    <div>
+        <div id="question-text">
+            <h3><b>{{self.scenario_data.scenario.title}}</b></h3>
+        </div>
+    </div>
+
+    <div>
+        <div class="chat-history">
+            <div class="chat-message-container" id="chat-spinner-container">
+                <div class="chat-message message-spinner" style="display: none;">
+                    <div class="bounce1">
+                    </div>
+                    <div class="bounce2">
+                    </div>
+                    <div class="bounce3">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="submit-row">
+            {% if self.allow_reset %}
+                <span id="reset-button">Reset chat</span>
+            {% endif %}
+            <span id="finish-button">Submit for evaluation</span>
+            <textarea class="user-input" rows="1" placeholder="Type your answer here" maxlength="1000"></textarea>
+            <span id="submit-button">Submit <i class="fa fa-paper-plane"></i></span>
+        </div>
+    </div>
+</div>
