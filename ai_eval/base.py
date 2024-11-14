@@ -95,6 +95,12 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         "model_api_url",
     )
 
+    def _chat_history(self):
+        for user_msg, assistant_msg in zip(self.messages[self.USER_KEY],
+                                           self.messages[self.LLM_KEY]):
+            yield {"content": user_msg, "role": "user"}
+            yield {"content": assistant_msg, "role": "assistant"}
+
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
         data = pkg_resources.resource_string(__name__, path)
@@ -138,9 +144,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                 )
             )
 
-        if not data.question:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR, _("Question field is mandatory")
-                )
-            )
+        # if not data.question:
+        #     validation.add(
+        #         ValidationMessage(
+        #             ValidationMessage.ERROR, _("Question field is mandatory")
+        #         )
+        #     )

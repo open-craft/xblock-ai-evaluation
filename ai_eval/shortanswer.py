@@ -110,17 +110,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                """,
         }
         messages = [system_msg]
-        # add previous messages
-        # the first AI role is 'system' which defines the LLM's personnality and behavior.
-        # subsequent roles are 'assistant' and 'user'
-        for i in range(len(self.messages[self.USER_KEY])):
-            messages.append(
-                {"content": self.messages[self.USER_KEY][i], "role": "user"}
-            )
-            messages.append(
-                {"content": self.messages[self.LLM_KEY][i], "role": "assistant"}
-            )
-
+        messages.extend(self._chat_history())
         messages.append({"role": "user", "content": user_submission})
 
         try:
