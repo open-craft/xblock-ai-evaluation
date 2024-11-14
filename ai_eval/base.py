@@ -4,11 +4,10 @@ import pkg_resources
 
 from django.utils.translation import gettext_noop as _
 from xblock.core import XBlock
-from xblock.fields import String, Scope, Dict
+from xblock.fields import String, Scope
 from xblock.validation import ValidationMessage
 
-
-from .llm import SupportedModels
+from .llm import SupportedModels, get_llm_response
 
 try:
     from xblock.utils.studio_editable import StudioEditableXBlockMixin
@@ -27,9 +26,6 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     """
     Base class for Xblocks with AI evaluation
     """
-
-    USER_KEY = "USER"
-    LLM_KEY = "LLM"
 
     loader = ResourceLoader(__name__)
 
@@ -59,37 +55,8 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         default=SupportedModels.GPT4O.value,
     )
 
-    evaluation_prompt = String(
-        display_name=_("Evaluation prompt"),
-        help=_(
-            "Enter the evaluation prompt given to the model."
-            " The question will be inserted right after it."
-            " The student's answer would then follow the question. Markdown format can be used."
-        ),
-        default="You are a teacher. Evaluate the student's answer for the following question:",
-        multiline_editor=True,
-        scope=Scope.settings,
-    )
-    question = String(
-        display_name=_("Question"),
-        help=_(
-            "Enter the question you would like the students to answer."
-            " Markdown format can be used."
-        ),
-        default="",
-        multiline_editor=True,
-        scope=Scope.settings,
-    )
-
-    messages = Dict(
-        help=_("Dictionary with chat messages"),
-        scope=Scope.user_state,
-        default={USER_KEY: [], LLM_KEY: []},
-    )
     editable_fields = (
         "display_name",
-        "evaluation_prompt",
-        "question",
         "model",
         "model_api_key",
         "model_api_url",
@@ -138,9 +105,6 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                 )
             )
 
-        if not data.question:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR, _("Question field is mandatory")
-                )
-            )
+    def get_llm_response(self, messages):
+        return get_llm_response(self.model, self.model_api_key, messages,
+                                self.model_api_url)
