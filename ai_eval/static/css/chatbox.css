@@ -1,5 +1,3 @@
-/* CSS for ShortAnswerAIEvalXBlock */
-
 .shortanswer_image {
   float: left;
   margin-right: 4rem;
@@ -18,7 +16,7 @@
   cursor: pointer;
 }
 
-.chat-history {
+#chat-history {
   min-height: 250px;
   max-height: 400px;
   overflow-y: auto;
@@ -29,6 +27,7 @@
 .chat-message-container {
   display: flex;
 }
+
 .chat-message-container .chat-message {
   flex: 0 1 auto;
   max-width: 80%;
@@ -45,12 +44,13 @@
 }
 
 .ai-eval,
-.message-spinner {
+#message-spinner {
   text-align: left;
   color: white;
   margin-right: auto;
   background-color: #476480;
 }
+
 .ai-eval * {
   color: white !important;
 }
@@ -62,7 +62,7 @@
   padding: 10px;
 }
 
-.submit-row .user-input {
+.submit-row textarea {
   flex: 8;
   height: auto;
   border: 1px solid gray;
@@ -72,15 +72,16 @@
   resize: none;
 }
 
-#submit-button, #reset-button {
+.submit-row .chat-button {
   flex: 1;
   height: fit-content;
   text-align: center;
-  padding: 10px 0;
+  padding: 10px 5px;
   margin-left: auto;
   border-radius: 5px;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 #submit-button {
@@ -89,18 +90,20 @@
   margin-left: 10px;
 }
 
-#reset-button {
+#reset-button,
+#finish-button {
   border: 1px solid;
   color: #00262b;
   margin-right: 10px;
 }
 
-.submit-row .disabled-btn {
+.submit-row .disabled {
   opacity: 0.8;
   cursor: not-allowed !important;
 }
+
 /* spinner animation */
-.chat-message-container .message-spinner > div {
+.chat-message-container #message-spinner > div {
   width: 4px;
   height: 4px;
   margin-right: 2px;
@@ -112,12 +115,12 @@
   animation: chat-block-sk-bouncedelay 1.4s infinite ease-in-out both;
 }
 
-.chat-message-container.message-spinner .bounce1 {
+.chat-message-container #message-spinner .bounce1 {
   -webkit-animation-delay: -0.32s;
   animation-delay: -0.32s;
 }
 
-.chat-message-container .message-spinner .bounce2 {
+.chat-message-container #message-spinner .bounce2 {
   -webkit-animation-delay: -0.16s;
   animation-delay: -0.16s;
 }
