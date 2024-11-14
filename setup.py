@@ -37,6 +37,7 @@ setup(
         "xblock.v1": [
             "shortanswer_ai_eval = ai_eval:ShortAnswerAIEvalXBlock",
             "coding_ai_eval = ai_eval:CodingAIEvalXBlock",
+            "multiagent_ai_eval = ai_eval:MultiAgentAIEvalXBlock",
         ]
     },
     package_data=package_data("ai_eval", ["static", "public", "templates"]),
