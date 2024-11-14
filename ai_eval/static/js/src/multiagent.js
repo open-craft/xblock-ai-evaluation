@@ -113,9 +113,19 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
     }
 
     function insertAIMessage(role, name, msg) {
+      if (role == "FINISH") {
+        name = "Evaluator:"
+      } else {
+        if (role) {
+          name = name + ` <i>(${role})</i>`;
+        }
+        if (name) {
+          name = name + ":"
+        }
+      }
       $(`<div class="chat-message-container">
         <div class="chat-message ai-eval">
-          <b>${name} <i>(${role})</i>:</b>
+          <b>${name}</b>
           ${MarkdownToHTML(msg)}
         </div>
       </div>`).insertBefore(spinnnerContainer);

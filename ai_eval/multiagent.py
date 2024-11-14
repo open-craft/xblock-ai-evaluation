@@ -93,7 +93,6 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
     )
 
     scenario_data = Dict(
-        default={"scenario": {"title": "", "initial_message": ""}},
         scope=Scope.settings,
     )
 
@@ -147,6 +146,11 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         frag.add_javascript(self.resource_string("static/js/src/multiagent.js"))
 
         marked_html = self.resource_string("static/html/marked-iframe.html")
+
+        try:
+            initial_message = self.scenario_data["scenario"]["initial_message"]
+        except KeyError:
+            initial_message = ""
 
         js_data = {
             "messages": self.messages,
