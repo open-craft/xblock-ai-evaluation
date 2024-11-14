@@ -3,6 +3,7 @@ Testing module.
 """
 
 import unittest
+from unittest.mock import patch
 from xblock.exceptions import JsonHandlerError
 from xblock.field_data import DictFieldData
 from xblock.test.toy_runtime import ToyRuntime
@@ -95,3 +96,18 @@ class TestShortAnswerAIEvalXBlock(unittest.TestCase):
         block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
         frag = block.student_view()
         self.assertIn('<img src="/static/image.jpg" />', frag.content)
+
+    @patch('ai_eval.shortanswer.get_llm_response')
+    def test_attachments(self, get_llm_response):
+        """Test the attachments."""
+        data = {
+            **self.data,
+            "attachments": {"test.json": '{"test": "test"}'},
+        }
+        block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+        get_llm_response.return_value = "Hello"
+        block.get_response.__wrapped__(block, data={"user_input": "Hello"})
+        system_msg = get_llm_response.call_args.args[2][0]["content"]
+        self.assertIn("<filename>test.json</filename>", system_msg)
+        self.assertIn('<contents>{"test": "test"}</contents>', system_msg)
+        self.assertEqual(block.messages, {"USER": ["Hello"], "LLM": ["Hello"]})
