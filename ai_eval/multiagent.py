@@ -156,7 +156,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
             "messages": self.messages,
             "agents": self.agents,
             "marked_html": marked_html,
-            "initial_message": self.scenario_data["scenario"]["initial_message"]
+            "initial_message": initial_message
         }
         frag.initialize_js("MultiAgentAIEvalXBlock", js_data)
         return frag
