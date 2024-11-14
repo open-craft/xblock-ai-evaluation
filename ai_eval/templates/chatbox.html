@@ -7,14 +7,14 @@
 <div class="shortanswer_block">
     <div>
         <div id="question-text">
-            Loading ..
+            {{ question_text | safe }}
         </div>
     </div>
 
     <div>
-        <div class="chat-history">
+        <div id="chat-history">
             <div class="chat-message-container" id="chat-spinner-container">
-                <div class="chat-message message-spinner" style="display: none;">
+                <div class="chat-message" id="message-spinner" style="display: none;">
                     <div class="bounce1">
                     </div>
                     <div class="bounce2">
@@ -26,10 +26,13 @@
         </div>
         <div class="submit-row">
             {% if self.allow_reset %}
-                <span id="reset-button" class="disabled-btn">Reset chat</span>
+                <span class="chat-button" id="reset-button">Reset chat</span>
             {% endif %}
-            <textarea class="user-input" rows="1" placeholder="Type your answer here" maxlength="1000"></textarea>
-            <span id="submit-button">Submit <i class="fa fa-paper-plane"></i></span>
+            {% if has_finish_button %}
+                <span class="chat-button" id="finish-button">Submit for evaluation</span>
+            {% endif %}
+            <textarea id="user-input" rows="1" placeholder="Type your answer here" maxlength="1000"></textarea>
+            <span class="chat-button" id="submit-button">Submit <i class="fa fa-paper-plane"></i></span>
         </div>
     </div>
 </div>
