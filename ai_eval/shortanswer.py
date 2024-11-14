@@ -8,10 +8,9 @@ from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
-from xblock.fields import Boolean, Integer, String, Scope
+from xblock.fields import Boolean, Dict, Integer, String, Scope
 from xblock.validation import ValidationMessage
 
-from .llm import get_llm_response
 from .base import AIEvalXBlock
 
 
@@ -23,10 +22,36 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     Short Answer Xblock.
     """
 
+    USER_KEY = "USER"
+    LLM_KEY = "LLM"
+
     display_name = String(
         display_name=_("Display Name"),
         help=_("Name of the component in the studio"),
         default="Short answer with AI Evaluation",
+        scope=Scope.settings,
+    )
+
+    evaluation_prompt = String(
+        display_name=_("Evaluation prompt"),
+        help=_(
+            "Enter the evaluation prompt given to the model."
+            " The question will be inserted right after it."
+            " The student's answer would then follow the question. Markdown format can be used."
+        ),
+        default="You are a teacher. Evaluate the student's answer for the following question:",
+        multiline_editor=True,
+        scope=Scope.settings,
+    )
+
+    question = String(
+        display_name=_("Question"),
+        help=_(
+            "Enter the question you would like the students to answer."
+            " Markdown format can be used."
+        ),
+        default="",
+        multiline_editor=True,
         scope=Scope.settings,
     )
 
@@ -53,7 +78,15 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         default=False,
     )
 
+    messages = Dict(
+        help=_("Dictionary with chat messages"),
+        scope=Scope.user_state,
+        default={USER_KEY: [], LLM_KEY: []},
+    )
+
     editable_fields = AIEvalXBlock.editable_fields + (
+        "question",
+        "evaluation_prompt",
         "max_responses",
         "allow_reset",
         "character_image",
@@ -65,6 +98,13 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         """
 
         super().validate_field_data(validation, data)
+
+        if not data.question:
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR, _("Question field is mandatory")
+                )
+            )
 
         if not data.max_responses or data.max_responses <= 0 or data.max_responses > 9:
             validation.add(
@@ -83,15 +123,18 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         frag = Fragment()
         frag.add_content(
             self.loader.render_django_template(
-                "/templates/shortanswer.html",
+                "/templates/chatbox.html",
                 {
                     "self": self,
+                    "has_finish_button": False,
+                    "question_text": _("Loading..."),
                 },
             )
         )
 
-        frag.add_css(self.resource_string("static/css/shortanswer.css"))
+        frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript(self.resource_string("static/js/src/utils.js"))
+        frag.add_javascript(self.resource_string("static/js/src/chatbox.js"))
         frag.add_javascript(self.resource_string("static/js/src/shortanswer.js"))
 
         marked_html = self.resource_string("static/html/marked-iframe.html")
@@ -123,21 +166,14 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         # add previous messages
         # the first AI role is 'system' which defines the LLM's personnality and behavior.
         # subsequent roles are 'assistant' and 'user'
-        for i in range(len(self.messages[self.USER_KEY])):
-            messages.append(
-                {"content": self.messages[self.USER_KEY][i], "role": "user"}
-            )
-            messages.append(
-                {"content": self.messages[self.LLM_KEY][i], "role": "assistant"}
-            )
-
+        for user_msg, assistant_msg in zip(self.messages[self.USER_KEY],
+                                           self.messages[self.LLM_KEY]):
+            messages.append({"content": user_msg or ".", "role": "user"})
+            messages.append({"content": assistant_msg, "role": "assistant"})
         messages.append({"role": "user", "content": user_submission})
 
         try:
-            response = get_llm_response(
-                self.model, self.get_model_api_key(), messages, self.get_model_api_url()
-            )
-
+            response = self.get_llm_response(messages)
         except Exception as e:
             traceback.print_exc()
             logger.error(
