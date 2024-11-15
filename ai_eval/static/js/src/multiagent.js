@@ -54,7 +54,7 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
           url: resetHandlerURL,
           method: "POST",
           data: JSON.stringify({}),
-          success: function (data) {
+          success: function () {
             spinnnerContainer.prevAll('.chat-message-container').remove();
             insertAIMessage("", "", data.initial_message);
             resetButton.addClass("disabled-btn");

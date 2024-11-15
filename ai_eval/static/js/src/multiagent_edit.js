@@ -25,13 +25,13 @@ function MultiAgentAIEvalXBlock(runtime, element) {
     var loadFile = function() {
         var $button = $(this);
         var $fileInput = $button.prev('input[type="file"]');
-        var $input = $button.closest('.wrapper-comp-setting').children('textarea');
+        var $field = $button.closest('.wrapper-comp-setting').children('textarea');
         var file = $fileInput[0].files[0];
-
         if (file !== undefined) {
             var reader = new FileReader();
             reader.onload = function(e) {
-                $input.val(e.target.result);
+                $field.val(JSON.stringify(JSON.parse(e.target.result), null, 2));
+                $field.trigger("change");
             }
             reader.readAsText(file);
         }
@@ -39,7 +39,9 @@ function MultiAgentAIEvalXBlock(runtime, element) {
 
     $inputs.each(function() {
         var $input = $(this);
-        $input.val(JSON.stringify(JSON.parse($input.val()), null, 2));
+        try {
+            $input.val(JSON.stringify(JSON.parse($input.val()), null, 2));
+        } catch (e) {}
     })
 
     $inputs.each(addFileInput);
