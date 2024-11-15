@@ -12,7 +12,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_response
 
 
-DEFAULT_SUPERVISOR_PROMPT = (
+DEFAULT_SUPERVISOR_PROMPT_1 = (
     "You are a supervisor managing an interaction between the following "
     "agents: Coach, Character. "
     "Based on the conversation, decide which agent should respond next. "
@@ -37,6 +37,10 @@ DEFAULT_SUPERVISOR_PROMPT = (
     "achieve the learning objectives after multiple attempts. "
     "Do not choose any other options. "
     "If the interaction is complete, return 'FINISH'."
+)
+
+DEFAULT_SUPERVISOR_PROMPT_2 = (
+    "Who should act next? Choose from: ['Character', 'Coach', 'FINISH']"
 )
 
 DEFAULT_AGENT_PROMPT = (
@@ -101,8 +105,13 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
-    supervisor_prompt = String(
-        default=DEFAULT_SUPERVISOR_PROMPT,
+    supervisor_prompt_1 = String(
+        default=DEFAULT_SUPERVISOR_PROMPT_1,
+        scope=Scope.settings,
+    )
+
+    supervisor_prompt_2 = String(
+        default=DEFAULT_SUPERVISOR_PROMPT_2,
         scope=Scope.settings,
     )
 
@@ -190,7 +199,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         except KeyError as e:
             validation.add(ValidationMessage(ValidationMessage.ERROR, str(e)))
 
-        for character in data.character_data["characters"]:
+        for character in data.character_data.get("characters", []):
             try:
                 self.agent_personality_prompt.format(**character)
             except KeyError as e:
@@ -221,38 +230,29 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         frag.add_content(
             self.loader.render_django_template(
                 "/templates/multiagent.html",
-                {
-                    "self": self,
-                },
+                {"self": self},
             )
         )
-
-        frag.add_css(self.resource_string("static/css/shortanswer.css"))
-        frag.add_javascript(self.resource_string("static/js/src/utils.js"))
         frag.add_javascript(self.resource_string("static/js/src/multiagent.js"))
-
-        marked_html = self.resource_string("static/html/marked-iframe.html")
 
         try:
             initial_message = self.scenario_data["scenario"]["initial_message"]
         except KeyError:
             initial_message = ""
-
         js_data = {
             "messages": self.messages,
             "agents": self.agents,
-            "marked_html": marked_html,
             "initial_message": initial_message
         }
         frag.initialize_js("MultiAgentAIEvalXBlock", js_data)
         return frag
 
     def _get_next_agent(self, user_input):
-        system_msg = {"content": self.supervisor_prompt, "role": "system"}
-        messages = [system_msg]
+        messages = []
+        messages.append({"role": "system", "content": self.supervisor_prompt_1})
         messages.extend(self._chat_history())
         messages.append({"role": "user", "content": user_input})
-        messages.append({"role": "system", "content": "Who should act next? Choose from: ['Character', 'Coach', 'FINISH']"})
+        messages.append({"role": "system", "content": self.supervisor_prompt_2})
         response = get_llm_response(
             self.model, self.model_api_key, messages, self.model_api_url
         )
