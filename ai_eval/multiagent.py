@@ -1,7 +1,11 @@
+import typing
+
+import pydantic
 from django.utils.translation import gettext_noop as _
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, List, Scope, Set, String
+from xblock.validation import ValidationMessage
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
@@ -58,6 +62,36 @@ DEFAULT_AGENT_EVALUATION_PROMPT = (
     "Learning Objectives: {learning_objectives}. "
     "Evaluation Criteria: {evaluation_criteria}. "
 )
+
+
+class Scenario(pydantic.BaseModel):
+    initial_message: str
+    title: str
+
+
+class CharacterNames(pydantic.BaseModel):
+    main_character: str
+    coach: str
+    user_character: str
+
+
+class EvaluationCriterion(pydantic.BaseModel):
+    name: str
+
+
+class ScenarioData(pydantic.BaseModel):
+    scenario: Scenario
+    characters: CharacterNames
+    evaluation_criteria: typing.List[EvaluationCriterion]
+
+
+class Character(pydantic.BaseModel):
+    name: str
+
+
+class CharacterData(pydantic.BaseModel):
+    characters: typing.List[Character]
+
 
 class MultiAgentAIEvalXBlock(AIEvalXBlock):
     display_name = String(
@@ -125,9 +159,61 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
     )
     editable_fields = tuple(editable_fields)
 
+    def validate_field_data(self, validation, data):
+        super().validate_field_data(validation, data)
+
+        try:
+            ScenarioData(**data.scenario_data)
+        except pydantic.ValidationError as e:
+            for error in e.errors():
+                field = error["loc"][0]
+                msg = error["msg"]
+                validation.add(ValidationMessage(
+                    ValidationMessage.ERROR, f"Scenario data: {field!r}: {msg}"
+                ))
+        try:
+            CharacterData(**data.character_data)
+        except pydantic.ValidationError as e:
+            for error in e.errors():
+                field = error["loc"][0]
+                validation.add(ValidationMessage(
+                    ValidationMessage.ERROR, f"Character data: {field!r}: {msg}"
+                ))
+
+        try:
+            self.agent_prompt.format(
+                character_name="",
+                user_character_name="",
+                user_character_info="",
+                **data.scenario_data.get("scenario", {}),
+            )
+        except KeyError as e:
+            validation.add(ValidationMessage(ValidationMessage.ERROR, str(e)))
+
+        for character in data.character_data["characters"]:
+            try:
+                self.agent_personality_prompt.format(**character)
+            except KeyError as e:
+                validation.add(
+                    ValidationMessage(ValidationMessage.ERROR, str(e))
+                )
+
+        # TODO: check if all characters are provided
+
+    def studio_view(self, context):
+        """
+        Render a form for editing this XBlock
+        """
+        fragment = super().studio_view(context)
+        fragment.add_javascript(self.resource_string("static/js/src/multiagent_edit.js"))
+        # MultiAgentAIEvalXBlock() in multiagent_edit.js will call
+        # StudioEditableXBlockMixin().
+        fragment.initialize_js("MultiAgentAIEvalXBlock")
+        return fragment
+
     def student_view(self, context=None):
         """
-        The primary view of the ShortAnswerAIEvalXBlock, shown to students
+        The primary view of the MultiAgentAIEvalXBlock, shown to students
         when viewing courses.
         """
 
