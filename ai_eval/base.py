@@ -98,7 +98,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     def _chat_history(self):
         for user_msg, assistant_msg in zip(self.messages[self.USER_KEY],
                                            self.messages[self.LLM_KEY]):
-            yield {"content": user_msg, "role": "user"}
+            yield {"content": user_msg or ".", "role": "user"}
             yield {"content": assistant_msg, "role": "assistant"}
 
     def resource_string(self, path):

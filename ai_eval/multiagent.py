@@ -36,9 +36,11 @@ DEFAULT_SUPERVISOR_PROMPT_1 = textwrap.dedent("""
     Evaluation Criteria: {evaluation_criteria}
 """).strip()
 
+
 DEFAULT_SUPERVISOR_PROMPT_2 = textwrap.dedent("""
     Who should act next? Choose from: ['Character', 'Coach', 'FINISH']
 """).strip()
+
 
 DEFAULT_AGENT_PROMPT = textwrap.dedent("""
     You are {character_name}.
@@ -50,16 +52,19 @@ DEFAULT_AGENT_PROMPT = textwrap.dedent("""
     Output only dialogue.
 """).strip()
 
+
 DEFAULT_AGENT_PROMPT_EXTRA = textwrap.dedent("""
     Learning Objectives: {learning_objectives}
     Evaluation Criteria: {evaluation_criteria}
 """).strip()
+
 
 DEFAULT_AGENT_PROMPT_PERSONALITY = textwrap.dedent("""
     Personality details: {professional_summary}
     Key competencies: {key_competencies}
     Behavioral profile: {behavioral_profile}
 """).strip()
+
 
 DEFAULT_EVALUATOR_PROMPT = textwrap.dedent("""
     You are an evaluator responsible for generating an evaluation report after the conversation has concluded.
@@ -74,6 +79,7 @@ DEFAULT_EVALUATOR_PROMPT = textwrap.dedent("""
     Your response must adhere to this exact structure, and each score must have a detailed rationale that includes at least one direct quote from the chat history.
     If you cannot find a direct quote, mention this explicitly and provide an explanation.
 """).strip()
+
 
 DEFAULT_CRITERION_TEMPLATE = textwrap.dedent("""
     ## {name}
@@ -230,7 +236,10 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
     editable_fields = tuple(editable_fields)
 
     def _chat_history(self):
-        yield {"role": "assistant", "content": self.initial_message}
+        yield {
+            "role": "assistant",
+            "content": "[Character] " + self.initial_message,
+        }
         yield from super()._chat_history()
 
     def validate_field_data(self, validation, data):
@@ -313,6 +322,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
             "messages": self.messages,
             "agents": self.agents,
             "initial_message": self.initial_message,
+            "finished": self.finished,
             "marked_html": marked_html,
         }
         frag.initialize_js("MultiAgentAIEvalXBlock", js_data)
@@ -365,7 +375,6 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
                 return character_data
 
     def _get_agent_response(self, role, user_input):
-        """Create a personality-based agent with prompts from JSON data."""
         if role == "FINISH":
             criteria = "\n\n".join(map(
                 self.criteria_template.format_map,
@@ -403,7 +412,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
             messages.append({"role": "user", "content": "."})
         messages.extend(self._chat_history())
         messages.append({"role": "user", "content": user_input})
-        if self.model == SupportedModels.CLAUDE_SONNET.value:
+        if role == "FINISH" and self.model == SupportedModels.CLAUDE_SONNET.value:
             messages.append({"role": "assistant", "content": "[Evaluator]"})
         response = get_llm_response(
             self.model, self.model_api_key, messages, self.model_api_url
@@ -415,19 +424,27 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         """Get LLM feedback"""
         # We use the LLM twice here: one time to decide which character to use,
         # and one time to act as that character.
-        user_input = str(data["user_input"])
 
         if self.finished:
             raise JsonHandlerError(403, "The session has ended.")
 
-        role = self._get_next_agent(user_input)
-        message = self._get_agent_response(role, user_input)
+        force_finish = data.get("force_finish", False)
+        if force_finish:
+            user_input = ""
+            role = "FINISH"
+        else:
+            user_input = str(data["user_input"])
+            role = self._get_next_agent(user_input)
+
+        message = self._get_agent_response(role, user_input or ".")
         self.messages[self.USER_KEY].append(user_input)
         self.messages[self.LLM_KEY].append(message)
-        character_name = self._get_character_name(role)
-        self.agents.append({"role": role, "character_name": character_name})
         if role == "FINISH":
             self.finished = True
+            character_name = None
+        else:
+            character_name = self._get_character_name(role)
+        self.agents.append({"role": role, "character_name": character_name})
         return {
             "role": role,
             "message": message,

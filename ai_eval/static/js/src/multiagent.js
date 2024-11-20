@@ -1,7 +1,8 @@
 /* Javascript for MultiAgentAIEvalXBlock. */
 function MultiAgentAIEvalXBlock(runtime, element, data) {
   const handlerUrl = runtime.handlerUrl(element, "get_response");
-  const resetHandlerURL = runtime.handlerUrl(element, "reset");
+  const resetHandlerUrl = runtime.handlerUrl(element, "reset");
+  const finishHandlerUrl = runtime.handlerUrl(element, "reset");
 
   loadMarkedInIframe(data.marked_html);
 
@@ -9,27 +10,25 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
     const spinner = $(".message-spinner", element);
     const spinnnerContainer = $("#chat-spinner-container", element);
     const resetButton = $("#reset-button", element);
+    const finishButton = $("#finish-button", element);
     const submitButton = $("#submit-button", element);
     const userInput = $(".user-input", element);
     const userInputElem = userInput[0];
     let initDone = false;
 
-    runFuncAfterLoading(init);
-
-    function getResponse() {
-      if (!userInput.val().length) return;
-
+    var getResponse = function(data) {
       disableInput();
       spinner.show();
-      insertUserMessage(userInput.val());
       $.ajax({
         url: handlerUrl,
         method: "POST",
-        data: JSON.stringify({ user_input: userInput.val() }),
+        data: JSON.stringify(data),
         success: function (response) {
           spinner.hide();
           insertAIMessage(response.role, response.character_name, response.message);
-          userInput.val("");
+          if (data.user_input?.length) {
+            userInput.val("");
+          }
           if (response.finished) {
             disableInput();
           } else {
@@ -39,19 +38,29 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
         error: function (jqXHR, textStatus, errorThrown) {
           spinner.hide();
           alert(errorThrown);
-
-          deleteLastMessage();
+          if (data.user_input?.length) {
+            deleteLastMessage();
+          }
           enableInput();
         },
       });
     }
 
-    submitButton.click(getResponse);
+    submitButton.click(() => {
+      if (!userInput.val().length) {
+        return;
+      }
+      getResponse({ user_input: userInput.val() });
+    });
+
+    finishButton.click(() => {
+      getResponse({ force_finish: true });
+    });
 
     resetButton.click(() => {
       if (!resetButton.hasClass("disabled-btn")) {
         $.ajax({
-          url: resetHandlerURL,
+          url: resetHandlerUrl,
           method: "POST",
           data: JSON.stringify({}),
           success: function () {
@@ -68,20 +77,24 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
       }
     });
 
-    function disableInput() {
+    var disableInput = function() {
       userInput.prop("disabled", true);
       userInput.removeAttr("placeholder");
       submitButton.prop("disabled", true);
       submitButton.addClass("disabled-btn");
+      finishButton.prop("disabled", true);
+      finishButton.addClass("disabled-btn");
     }
 
-    function enableInput() {
+    var enableInput = function() {
       userInput.prop("disabled", false);
       submitButton.prop("disabled", false);
       submitButton.removeClass("disabled-btn");
+      finishButton.prop("disabled", false);
+      finishButton.removeClass("disabled-btn");
     }
 
-    function adjustTextareaHeight(element) {
+    var adjustTextareaHeight = function(element) {
       element.style.height = "";
       element.style.height = element.scrollHeight + "px";
     }
@@ -89,7 +102,7 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
       adjustTextareaHeight(userInputElem);
     });
 
-    function init() {
+    var init = function() {
       if (initDone) return;
       initDone = true;
       insertAIMessage("", "", data.initial_message);
@@ -103,18 +116,18 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
       }
     }
 
-    function insertUserMessage(msg) {
+    var insertUserMessage = function(msg) {
       if (msg?.length) {
-        $(` <div class="chat-message-container">
-                <div class="chat-message user-answer">${MarkdownToHTML(msg)}</div>
-      </div>`).insertBefore(spinnnerContainer);
+        $(`<div class="chat-message-container">
+          <div class="chat-message user-answer">${MarkdownToHTML(msg)}</div>
+        </div>`).insertBefore(spinnnerContainer);
         resetButton.removeClass("disabled-btn");
       }
     }
 
-    function insertAIMessage(role, name, msg) {
+    var insertAIMessage = function(role, name, msg) {
       if (role == "FINISH") {
-        name = "Evaluator:"
+        name = `${gettext("Evaluator")}:`
       } else {
         if (role) {
           name = name + ` <i>(${role})</i>`;
@@ -132,8 +145,10 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
       resetButton.removeClass("disabled-btn");
     }
 
-    function deleteLastMessage() {
+    var deleteLastMessage = function() {
       spinnnerContainer.prev().remove();
     }
+
+    runFuncAfterLoading(init);
   });
 }
