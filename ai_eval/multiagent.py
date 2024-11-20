@@ -1,3 +1,4 @@
+import re
 import textwrap
 import typing
 
@@ -10,7 +11,7 @@ from xblock.validation import ValidationMessage
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
-from .llm import get_llm_response
+from .llm import SupportedModels, get_llm_response
 
 
 DEFAULT_SUPERVISOR_PROMPT_1 = textwrap.dedent("""
@@ -25,18 +26,19 @@ DEFAULT_SUPERVISOR_PROMPT_1 = textwrap.dedent("""
     (3) The learner gets **significantly off topic** and is no longer addressing the learning objectives or the project.
     If the learner shows minor deviations or uncertainty, let the Character continue interacting with the learner.
     Your goal is to provide enough opportunities for the learner to self-correct and progress naturally without premature intervention.
-    Call the conversation complete only under the following conditions:
+    Call the conversation complete and choose FINISH only under the following conditions:
     (1) The **learning objectives and evaluation criteria are fully met**,
     (2) The learner explicitly indicates they are done with the conversation, or
     (3) Progress **stalls** and it becomes evident that the learner cannot achieve the learning objectives after multiple attempts.
-    Do not choose any other options. If the interaction is complete, return 'FINISH'.
+    Always finish the conversation when the learner requests.
+    If the interaction is complete, choose 'FINISH'.
     Learning Objectives: {learning_objectives}
     Evaluation Criteria: {evaluation_criteria}
 """).strip()
 
-DEFAULT_SUPERVISOR_PROMPT_2 = (
-    "Who should act next? Choose from: ['Character', 'Coach', 'FINISH']"
-)
+DEFAULT_SUPERVISOR_PROMPT_2 = textwrap.dedent("""
+    Who should act next? Choose from: ['Character', 'Coach', 'FINISH']
+""").strip()
 
 DEFAULT_AGENT_PROMPT = textwrap.dedent("""
     You are {character_name}.
@@ -45,6 +47,7 @@ DEFAULT_AGENT_PROMPT = textwrap.dedent("""
     Speak in a dialogue fashion, naturally and succinctly.
     Do not do the work for the student. If the student tries to get you to answer the questions you are asking them to supply information on, redirect them to the task.
     Do not present tables, lists, or detailed written explanations. For instance, do not say 'the main goals include: 1. ...'
+    Output only dialogue.
 """).strip()
 
 DEFAULT_AGENT_PROMPT_EXTRA = textwrap.dedent("""
@@ -56,6 +59,26 @@ DEFAULT_AGENT_PROMPT_PERSONALITY = textwrap.dedent("""
     Personality details: {professional_summary}
     Key competencies: {key_competencies}
     Behavioral profile: {behavioral_profile}
+""").strip()
+
+DEFAULT_EVALUATOR_PROMPT = textwrap.dedent("""
+    You are an evaluator responsible for generating an evaluation report after the conversation has concluded.
+    Use the provided chat history to evaluate the learner based on the evaluation criteria.
+    Do not engage in any conversation or provide feedback directly to the learner.
+    Your task is to produce a well-structured markdown report in the following format:
+
+    # Evaluation Report
+
+    {criteria}
+
+    Your response must adhere to this exact structure, and each score must have a detailed rationale that includes at least one direct quote from the chat history.
+    If you cannot find a direct quote, mention this explicitly and provide an explanation.
+""").strip()
+
+DEFAULT_CRITERION_TEMPLATE = textwrap.dedent("""
+    ## {name}
+    ### Score: (0-5)/5
+    **Rationale**: Provide a rationale for the score, using specific direct quotes from the conversation as evidence.
 """).strip()
 
 
@@ -97,27 +120,68 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
     )
 
     supervisor_prompt_1 = String(
+        display_name=_("Supervisor prompt part 1"),
+        help=_(
+            "Prompt used to instruct the model how to choose the next agent."
+        ),
+        multiline_editor=True,
         default=DEFAULT_SUPERVISOR_PROMPT_1,
         scope=Scope.settings,
     )
 
     supervisor_prompt_2 = String(
+        display_name=_("Supervisor prompt part 2"),
+        help=_(
+            "Second part of the prompt used to instruct the model how to "
+            "choose the next agent. This is either concatenated with the "
+            "first prompt or given as a separate system prompt depending "
+            "on support by the model in use."
+        ),
+        multiline_editor=True,
         default=DEFAULT_SUPERVISOR_PROMPT_2,
         scope=Scope.settings,
     )
 
     agent_prompt = String(
+        display_name=_("Agent prompt"),
+        help=_(
+            "Prompt used to instruct the model how to act as an agent."
+        ),
+        multiline_editor=True,
         default=DEFAULT_AGENT_PROMPT,
         scope=Scope.settings,
     )
 
     agent_prompt_personality = String(
+        multiline_editor=True,
         default=DEFAULT_AGENT_PROMPT_PERSONALITY,
         scope=Scope.settings,
     )
 
     agent_prompt_extra = String(
+        multiline_editor=True,
         default=DEFAULT_AGENT_PROMPT_EXTRA,
+        scope=Scope.settings,
+    )
+
+    evaluator_prompt = String(
+        display_name=_("Evaluator prompt"),
+        help=_(
+            "Prompt used to instruct the model how to evaluate the learner."
+        ),
+        multiline_editor=True,
+        default=DEFAULT_EVALUATOR_PROMPT,
+        scope=Scope.settings,
+    )
+
+    criteria_template = String(
+        display_name=_("Evaluation criteria template"),
+        help=_(
+            "Template for formatting evaluation criteria. "
+            "Will replace '{criteria}' in Evaluator prompt."
+        ),
+        multiline_editor=True,
+        default=DEFAULT_CRITERION_TEMPLATE,
         scope=Scope.settings,
     )
 
@@ -157,6 +221,11 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
     editable_fields += (
         "scenario_data",
         "character_data",
+        "supervisor_prompt_1",
+        "supervisor_prompt_2",
+        "agent_prompt",
+        "evaluator_prompt",
+        "criteria_template",
     )
     editable_fields = tuple(editable_fields)
 
@@ -250,30 +319,45 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         return frag
 
     def _get_next_agent(self, user_input):
-        messages = []
         prompt_1 = self.supervisor_prompt_1.format(
             **self.scenario_data,
             **self.scenario_data["scenario"],
         )
-        messages.append({"role": "system", "content": prompt_1})
-        messages.extend(self._chat_history())
-        messages.append({"role": "user", "content": user_input})
         prompt_2 = self.supervisor_prompt_2.format(
             **self.scenario_data,
             **self.scenario_data["scenario"],
         )
-        messages.append({"role": "system", "content": prompt_2})
+        messages = []
+        if self.model == SupportedModels.CLAUDE_SONNET.value:
+            prompt = prompt_1 + "\n" + prompt_2
+            messages.append({"role": "system", "content": prompt})
+            messages.append({"role": "user", "content": "."})
+            messages.extend(self._chat_history())
+            messages.append({"role": "user", "content": user_input})
+            messages.append({"role": "assistant", "content": "[Supervisor]"})
+        else:
+            messages.append({"role": "system", "content": prompt_1})
+            messages.extend(self._chat_history())
+            messages.append({"role": "user", "content": user_input})
+            messages.append({"role": "system", "content": prompt_2})
         response = get_llm_response(
             self.model, self.model_api_key, messages, self.model_api_url
-        )
-        return response
+        ).strip()
+        for choice in ["Character", "Coach", "FINISH"]:
+            if re.search(fr"\b{re.escape(choice)}\b", response, re.I):
+                return choice
+        raise RuntimeError(f"bad response {response!r}")
 
     def _get_character_name(self, role):
         characters_info = self.scenario_data["characters"]
-        if role == "Character":
+        if role == "FINISH":
+            return None
+        elif role == "Character":
             return characters_info["main_character"]
         elif role == "Coach":
             return characters_info["coach"]
+        else:
+            raise ValueError(f"unknown role {role!r}")
 
     def _get_character_data(self, character_name):
         for character_data in self.character_data["characters"]:
@@ -283,24 +367,11 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
     def _get_agent_response(self, role, user_input):
         """Create a personality-based agent with prompts from JSON data."""
         if role == "FINISH":
-            # TODO: refactor, make configurable.
-            prompt = (
-                "You are an evaluator responsible for generating an evaluation report after the conversation has concluded. "
-                "Use the provided chat history to evaluate the learner based on the evaluation criteria. "
-                "Do not engage in any conversation or provide feedback directly to the learner. "
-                "Your task is to produce a well-structured markdown report in the following format:\n\n"
-                "# Evaluation Report\n\n"
-            )
-            for criterion in self.scenario_data["evaluation_criteria"]:
-                prompt += (
-                    f"## {criterion['name']}\n"
-                    f"### Score: (0-5)/5 \n"
-                    f"**Rationale**: Provide a rationale for the score, using specific direct quotes from the conversation as evidence.\n\n"
-                )
-            prompt += (
-                "Your response must adhere to this exact structure, and each score must have a detailed rationale that includes at least one direct quote from the chat history. "
-                "If you cannot find a direct quote, mention this explicitly and provide an explanation."
-            )
+            criteria = "\n\n".join(map(
+                self.criteria_template.format_map,
+                self.scenario_data["evaluation_criteria"],
+            ))
+            prompt = self.evaluator_prompt.format(criteria=criteria)
         else:
             scenario = self.scenario_data["scenario"]
             characters_info = self.scenario_data["characters"]
@@ -328,8 +399,12 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
 
         system_msg = {"content": prompt, "role": "system"}
         messages = [system_msg]
+        if self.model == SupportedModels.CLAUDE_SONNET.value:
+            messages.append({"role": "user", "content": "."})
         messages.extend(self._chat_history())
         messages.append({"role": "user", "content": user_input})
+        if self.model == SupportedModels.CLAUDE_SONNET.value:
+            messages.append({"role": "assistant", "content": "[Evaluator]"})
         response = get_llm_response(
             self.model, self.model_api_key, messages, self.model_api_url
         )
