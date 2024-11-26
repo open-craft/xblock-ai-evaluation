@@ -2,7 +2,6 @@
 function MultiAgentAIEvalXBlock(runtime, element, data) {
   const handlerUrl = runtime.handlerUrl(element, "get_response");
   const resetHandlerUrl = runtime.handlerUrl(element, "reset");
-  const finishHandlerUrl = runtime.handlerUrl(element, "reset");
 
   loadMarkedInIframe(data.marked_html);
 
@@ -50,6 +49,7 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
       if (!userInput.val().length) {
         return;
       }
+      insertUserMessage(userInput.val());
       getResponse({ user_input: userInput.val() });
     });
 
