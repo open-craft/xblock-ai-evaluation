@@ -302,6 +302,21 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         "blacklist",
     )
 
+    def studio_view(self, context):
+        """
+        Render a form for editing this XBlock
+        """
+        fragment = super().studio_view(context)
+        fragment.add_javascript(self.resource_string("static/js/src/multiagent_edit.js"))
+        jsoneditor_html = self.resource_string("static/html/jsoneditor-iframe.html")
+        js_data = {
+            'jsoneditor_html': jsoneditor_html,
+        }
+        # MultiAgentAIEvalXBlock() in multiagent_edit.js will call
+        # StudioEditableXBlockMixin().
+        fragment.initialize_js("MultiAgentAIEvalXBlock", js_data)
+        return fragment
+
     def _render_template(self, template, **context):
         return self._jinja_env.from_string(template).render(context)
 
