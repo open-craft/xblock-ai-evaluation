@@ -68,7 +68,10 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
         });
 
         $field.on('change', function() {
-            editor.setText($field.val());
+            var value = $field.val();
+            if (value !== editor.getText()) {
+                editor.setText(value);
+            }
         });
     }
 
