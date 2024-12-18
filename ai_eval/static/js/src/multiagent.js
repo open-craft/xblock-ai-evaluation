@@ -6,6 +6,7 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
   loadMarkedInIframe(data.marked_html);
 
   $(function () {
+    const chatContainer = $(".chat-history", element);
     const spinner = $(".message-spinner", element);
     const spinnerContainer = $("#chat-spinner-container", element);
     const resetButton = $("#reset-button", element);
@@ -142,6 +143,7 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
       if (data.finished) {
         disableInput();
       }
+      scrollToBottom();
     }
 
     var insertInitialMessage = function() {
@@ -154,6 +156,7 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
         $(`<div class="chat-message-container">
           <div class="chat-message user-answer">${MarkdownToHTML(content)}</div>
         </div>`).insertBefore(spinnerContainer);
+        scrollToBottom();
       }
     }
 
@@ -188,10 +191,15 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
           ${MarkdownToHTML(content)}
         </div>
       </div>`).insertBefore(spinnerContainer);
+      scrollToBottom();
     }
 
     var deleteLastMessage = function() {
       spinnerContainer.prev().remove();
+    }
+
+    var scrollToBottom = function() {
+      chatContainer.scrollTop(chatContainer.prop("scrollHeight"));
     }
 
     runFuncAfterLoading(init);
