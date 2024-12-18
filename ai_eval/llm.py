@@ -12,6 +12,7 @@ class SupportedModels(Enum):
     """
 
     GPT4O = "gpt-4o"
+    GPT4O_MINI = "gpt-4o-mini"
     GEMINI_PRO = "gemini/gemini-pro"
     CLAUDE_SONNET = "claude-3-5-sonnet-20240620"
     LLAMA = "ollama/llama2"
