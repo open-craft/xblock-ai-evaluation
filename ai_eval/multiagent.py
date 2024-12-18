@@ -392,37 +392,38 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
                 ValidationMessage.ERROR,
                 f"{self._get_field_display_name('agent_prompt')}: {e}",
             ))
-
-        for i, character_data in enumerate(data.character_data.get("characters", [])):
-            # Character name is validated above but may be missing yet.
-            character_name = character_data.get("name", "")
-            role = ""
-            for key, name in data.scenario_data.get("characters", {}).items():
-                if name == character_name:
-                    for r, k in data.role_characters.items():
-                        if k == key:
-                            role = r
-                            break
-                    break
-            try:
-                self._render_template(
-                    data.agent_prompt,
-                    role=role,
-                    character_name=character_name,
-                    character_data=character_data,
-                    user_character_name="",
-                    user_character_data="",
-                    scenario_data=data.scenario_data,
-                )
-            except jinja2.TemplateError as e:
-                validation.add(ValidationMessage(
-                    ValidationMessage.ERROR,
-                    (
-                        f"{self._get_field_display_name('agent_prompt')}/"
-                        f"{self._get_field_display_name('character_data')}[{i}]: "
-                        f"{e}"
-                    ),
-                ))
+        else:
+            chars = data.character_data.get("characters", [])
+            for i, char_data in enumerate(chars):
+                # Character name is validated above but may be missing yet.
+                char_name = char_data.get("name", "")
+                role = ""
+                for key, name in data.scenario_data.get("characters", {}).items():
+                    if name == char_name:
+                        for r, k in data.role_characters.items():
+                            if k == key:
+                                role = r
+                                break
+                        break
+                try:
+                    self._render_template(
+                        data.agent_prompt,
+                        role=role,
+                        character_name=char_name,
+                        character_data=char_data,
+                        user_character_name="",
+                        user_character_data="",
+                        scenario_data=data.scenario_data,
+                    )
+                except jinja2.TemplateError as e:
+                    validation.add(ValidationMessage(
+                        ValidationMessage.ERROR,
+                        (
+                            f"{self._get_field_display_name('agent_prompt')}/"
+                            f"{self._get_field_display_name('character_data')}[{i}]: "
+                            f"{e}"
+                        ),
+                    ))
 
     def student_view(self, context=None):
         """
