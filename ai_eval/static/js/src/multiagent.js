@@ -49,6 +49,20 @@ function MultiAgentAIEvalXBlock(runtime, element, data) {
       });
     }
 
+    userInput.keypress((e) => {
+      if (e.keyCode == 13 && !e.shiftKey) {
+        e.preventDefault();
+        if (submitButton.hasClass("disabled-btn")) {
+          return;
+        }
+        if (!userInput.val().length) {
+          return;
+        }
+        getResponse({ user_input: userInput.val() });
+        return false;
+      }
+    });
+
     submitButton.click(() => {
       if (submitButton.hasClass("disabled-btn")) {
         return;
