@@ -516,7 +516,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         messages.extend(self._chat_history_for_llm(user_input))
         response = self.get_llm_response(messages)
         response = re.sub((fr'^({re.escape(role)}|{re.escape(character_name)})'
-                           fr'\s*0(\([^\)]*\))?:\s*'),
+                           fr'\s*(\([^\)]*\))?:\s*'),
                           '', response, count=1)
         return response
 
