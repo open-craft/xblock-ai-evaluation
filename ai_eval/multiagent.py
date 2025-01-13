@@ -324,7 +324,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
             if k == key:
                 name = self.scenario_data["characters"].get(key)
                 data = self._get_character_data(name)
-                return agent, data or {}
+                return agent, data
         return "", {}
 
     def _llm_input(self, prompt, user_input):
@@ -550,6 +550,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         for character_data in self.character_data["characters"]:
             if character_data["name"] == character_name:
                 return character_data
+        return {}
 
     def _get_agent_response(self, agent, user_input):
         """
@@ -617,7 +618,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         else:
             message = self._get_agent_response(agent, user_input)
             character_name = self._get_character_name(agent)
-            character_data = self._get_character_data(character_name) or {}
+            character_data = self._get_character_data(character_name)
             character_data = character_data.copy()
             character_data.setdefault("name", character_name)
 
