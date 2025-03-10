@@ -4,7 +4,7 @@
 #
 #    make upgrade
 #
-aiohappyeyeballs==2.4.6
+aiohappyeyeballs==2.5.0
     # via aiohttp
 aiohttp==3.11.13
     # via litellm
@@ -25,9 +25,9 @@ attrs==25.1.0
     #   aiohttp
     #   jsonschema
     #   referencing
-boto3==1.37.1
+boto3==1.37.9
     # via fs-s3fs
-botocore==1.37.1
+botocore==1.37.9
     # via
     #   boto3
     #   s3transfer
@@ -42,7 +42,7 @@ click==8.1.8
     # via litellm
 distro==1.9.0
     # via openai
-django==4.2.19
+django==4.2.20
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   django-appconf
@@ -65,7 +65,7 @@ fs==2.4.16
     #   xblock
 fs-s3fs==1.1.1
     # via openedx-django-pyfs
-fsspec==2025.2.0
+fsspec==2025.3.0
     # via huggingface-hub
 h11==0.14.0
     # via httpcore
@@ -75,7 +75,7 @@ httpx==0.28.1
     # via
     #   litellm
     #   openai
-huggingface-hub==0.29.1
+huggingface-hub==0.29.2
     # via tokenizers
 idna==3.10
     # via
@@ -85,8 +85,10 @@ idna==3.10
     #   yarl
 importlib-metadata==8.6.1
     # via litellm
-jinja2==3.1.5
-    # via litellm
+jinja2==3.1.6
+    # via
+    #   -r requirements/base.in
+    #   litellm
 jiter==0.8.2
     # via openai
 jmespath==1.0.1
@@ -99,7 +101,7 @@ jsonschema-specifications==2024.10.1
     # via jsonschema
 lazy==1.6
     # via xblock
-litellm==1.61.17
+litellm==1.63.3
     # via -r requirements/base.in
 lxml==5.3.1
     # via xblock
@@ -114,7 +116,7 @@ multidict==6.1.0
     # via
     #   aiohttp
     #   yarl
-openai==1.64.0
+openai==1.65.5
     # via litellm
 openedx-django-pyfs==3.7.0
     # via xblock
@@ -156,7 +158,7 @@ rpds-py==0.23.1
     # via
     #   jsonschema
     #   referencing
-s3transfer==0.11.2
+s3transfer==0.11.4
     # via boto3
 simplejson==3.20.1
     # via xblock
@@ -196,10 +198,8 @@ web-fragments==2.2.0
     # via xblock
 webob==1.8.9
     # via xblock
-xblock[django]==4.0.1
-    # via
-    #   -c requirements/constraints.txt
-    #   -r requirements/base.in
+xblock[django]==5.1.2
+    # via -r requirements/base.in
 yarl==1.18.3
     # via aiohttp
 zipp==3.21.0
