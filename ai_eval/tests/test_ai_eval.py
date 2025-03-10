@@ -126,6 +126,25 @@ def test_character_image(shortanswer_block_data):
     assert '<img src="/static/image.jpg" />' in frag.content
 
 
+def test_shortanswer_attachments(shortanswer_block_data):
+    """Test attachments for ShortAnswerAIEvalXBlock."""
+    data = {
+        **shortanswer_block_data,
+        "attachment_urls": [
+            "http://example.com/1.txt",
+            "http://example.com/2.txt",
+        ],
+    }
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    block._download_attachment = Mock(return_value="file contents <&>")
+    block.get_llm_response = Mock(return_value=".")
+    block.get_response.__wrapped__(block, data={"user_input": "."})
+    messages = block.get_llm_response.call_args.args[0]
+    prompt = messages[0]["content"]
+    assert "<filename>1.txt</filename>" in prompt
+    assert "<contents>file contents &lt;&amp;&gt;</contents>" in prompt
+
+
 def test_multiagent_block_finished():
     """Test the MultiAgentAIEvalXBlock for not allowing input after finished."""
     data = {

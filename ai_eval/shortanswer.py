@@ -2,13 +2,16 @@
 
 import logging
 import traceback
-
+import urllib.parse
+import urllib.request
+from multiprocessing.dummy import Pool
+from xml.sax import saxutils
 
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
-from xblock.fields import Boolean, Dict, Integer, String, Scope
+from xblock.fields import Boolean, Dict, Integer, List, String, Scope
 from xblock.validation import ValidationMessage
 
 from .base import AIEvalXBlock
@@ -24,6 +27,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
     USER_KEY = "USER"
     LLM_KEY = "LLM"
+    ATTACHMENT_PARALLEL_DOWNLOADS = 5
 
     display_name = String(
         display_name=_("Display Name"),
@@ -84,12 +88,20 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         default={USER_KEY: [], LLM_KEY: []},
     )
 
+    attachment_urls = List(
+        display_name=_("Attachment URLs"),
+        help=_("Attachments to include with the evaluation prompt"),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
     editable_fields = AIEvalXBlock.editable_fields + (
         "question",
         "evaluation_prompt",
         "max_responses",
         "allow_reset",
         "character_image",
+        "attachment_urls",
     )
 
     def validate_field_data(self, validation, data):
@@ -148,19 +160,45 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         frag.initialize_js("ShortAnswerAIEvalXBlock", js_data)
         return frag
 
+    def _download_attachment(self, url):
+        with urllib.request.urlopen(url) as f:
+            return f.read().decode('utf-8')
+
+    def _filename_for_url(self, url):
+        return urllib.parse.urlparse(url).path.split('/')[-1]
+
+    def _get_attachments(self):
+        pool = Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS)
+        attachments = pool.map(self._download_attachment, self.attachment_urls)
+        filenames = map(self._filename_for_url, self.attachment_urls)
+        return zip(filenames, attachments)
+
     @XBlock.json_handler
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
+
+        attachments = []
+        for filename, contents in self._get_attachments():
+            attachments.append(f"""
+                <attachment>
+                    <filename>{saxutils.escape(filename)}</filename>
+                    <contents>{saxutils.escape(contents)}</contents>
+                </attachment>
+            """)
+        attachments = '\n'.join(attachments)
+
         system_msg = {
             "role": "system",
             "content": f"""
-               {self.evaluation_prompt}
+                {self.evaluation_prompt}
 
-               {self.question}.
+                {attachments}
 
-               Evaluation must be in Makrdown format.
-               """,
+                {self.question}.
+
+                Evaluation must be in Markdown format.
+            """,
         }
         messages = [system_msg]
         # add previous messages
