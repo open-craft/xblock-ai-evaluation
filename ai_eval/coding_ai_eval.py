@@ -4,7 +4,6 @@ import logging
 import traceback
 import pkg_resources
 
-
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
@@ -12,7 +11,6 @@ from xblock.exceptions import JsonHandlerError
 from xblock.fields import Dict, Scope, String
 from xblock.validation import ValidationMessage
 
-from .llm import get_llm_response
 from .base import AIEvalXBlock
 from .utils import (
     submit_code,
@@ -62,13 +60,42 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         default=LanguageLabels.Python,
         Scope=Scope.settings,
     )
+
+    evaluation_prompt = String(
+        display_name=_("Evaluation prompt"),
+        help=_(
+            "Enter the evaluation prompt given to the model."
+            " The question will be inserted right after it."
+            " The student's answer would then follow the question. Markdown format can be used."
+        ),
+        default="You are a teacher. Evaluate the student's answer for the following question:",
+        multiline_editor=True,
+        scope=Scope.settings,
+    )
+
+    question = String(
+        display_name=_("Question"),
+        help=_(
+            "Enter the question you would like the students to answer."
+            " Markdown format can be used."
+        ),
+        default="",
+        multiline_editor=True,
+        scope=Scope.settings,
+    )
+
     messages = Dict(
         help=_("Dictionary with messages"),
         scope=Scope.user_state,
         default={USER_RESPONSE: "", AI_EVALUATION: "", CODE_EXEC_RESULT: {}},
     )
 
-    editable_fields = AIEvalXBlock.editable_fields + ("judge0_api_key", "language")
+    editable_fields = AIEvalXBlock.editable_fields + (
+        "question",
+        "evaluation_prompt",
+        "judge0_api_key",
+        "language",
+    )
 
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
@@ -134,6 +161,13 @@ class CodingAIEvalXBlock(AIEvalXBlock):
 
         super().validate_field_data(validation, data)
 
+        if not data.question:
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR, _("Question field is mandatory")
+                )
+            )
+
         if data.language != LanguageLabels.HTML_CSS and not data.judge0_api_key:
             validation.add(
                 ValidationMessage(
@@ -185,13 +219,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         ]
 
         try:
-            response = get_llm_response(
-                self.model,
-                self.get_model_api_key(),
-                messages,
-                self.get_model_api_url(),
-            )
-
+            response = self.get_llm_response(messages)
         except Exception as e:
             traceback.print_exc()
             logger.error(
