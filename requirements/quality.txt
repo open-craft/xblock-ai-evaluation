@@ -4,7 +4,7 @@
 #
 #    make upgrade
 #
-aiohappyeyeballs==2.4.6
+aiohappyeyeballs==2.5.0
     # via
     #   -r requirements/test.txt
     #   aiohttp
@@ -37,7 +37,7 @@ asgiref==3.8.1
     # via
     #   -r requirements/test.txt
     #   django
-astroid==3.3.8
+astroid==3.3.9
     # via
     #   pylint
     #   pylint-celery
@@ -51,11 +51,11 @@ binaryornot==0.4.4
     # via
     #   -r requirements/test.txt
     #   cookiecutter
-boto3==1.37.1
+boto3==1.37.9
     # via
     #   -r requirements/test.txt
     #   fs-s3fs
-botocore==1.37.1
+botocore==1.37.9
     # via
     #   -r requirements/test.txt
     #   boto3
@@ -102,7 +102,7 @@ distro==1.9.0
     # via
     #   -r requirements/test.txt
     #   openai
-django==4.2.19
+django==4.2.20
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/test.txt
@@ -141,7 +141,7 @@ fs-s3fs==1.1.1
     #   -r requirements/test.txt
     #   openedx-django-pyfs
     #   xblock-sdk
-fsspec==2025.2.0
+fsspec==2025.3.0
     # via
     #   -r requirements/test.txt
     #   huggingface-hub
@@ -158,7 +158,7 @@ httpx==0.28.1
     #   -r requirements/test.txt
     #   litellm
     #   openai
-huggingface-hub==0.29.1
+huggingface-hub==0.29.2
     # via
     #   -r requirements/test.txt
     #   tokenizers
@@ -177,9 +177,9 @@ iniconfig==2.0.0
     # via
     #   -r requirements/test.txt
     #   pytest
-isort==6.0.0
+isort==6.0.1
     # via pylint
-jinja2==3.1.5
+jinja2==3.1.6
     # via
     #   -r requirements/test.txt
     #   code-annotations
@@ -206,7 +206,7 @@ lazy==1.6
     # via
     #   -r requirements/test.txt
     #   xblock
-litellm==1.61.17
+litellm==1.63.3
     # via -r requirements/test.txt
 lxml[html-clean]==5.3.1
     # via
@@ -239,14 +239,14 @@ mdurl==0.1.2
     # via
     #   -r requirements/test.txt
     #   markdown-it-py
-mock==5.1.0
+mock==5.2.0
     # via -r requirements/test.txt
 multidict==6.1.0
     # via
     #   -r requirements/test.txt
     #   aiohttp
     #   yarl
-openai==1.64.0
+openai==1.65.5
     # via
     #   -r requirements/test.txt
     #   litellm
@@ -295,7 +295,7 @@ pygments==2.19.1
     # via
     #   -r requirements/test.txt
     #   rich
-pylint==3.3.4
+pylint==3.3.5
     # via
     #   edx-lint
     #   pylint-celery
@@ -313,7 +313,7 @@ pypng==0.20220715.0
     # via
     #   -r requirements/test.txt
     #   xblock-sdk
-pytest==8.3.4
+pytest==8.3.5
     # via
     #   -r requirements/test.txt
     #   pytest-cov
@@ -374,7 +374,7 @@ rpds-py==0.23.1
     #   -r requirements/test.txt
     #   jsonschema
     #   referencing
-s3transfer==0.11.2
+s3transfer==0.11.4
     # via
     #   -r requirements/test.txt
     #   boto3
@@ -449,9 +449,8 @@ webob==1.8.9
     #   -r requirements/test.txt
     #   xblock
     #   xblock-sdk
-xblock[django]==4.0.1
+xblock[django]==5.1.2
     # via
-    #   -c requirements/constraints.txt
     #   -r requirements/test.txt
     #   xblock-sdk
 xblock-sdk==0.12.0

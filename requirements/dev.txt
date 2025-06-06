@@ -4,7 +4,7 @@
 #
 #    make upgrade
 #
-aiohappyeyeballs==2.4.6
+aiohappyeyeballs==2.5.0
     # via
     #   -r requirements/quality.txt
     #   aiohttp
@@ -37,7 +37,7 @@ asgiref==3.8.1
     # via
     #   -r requirements/quality.txt
     #   django
-astroid==3.3.8
+astroid==3.3.9
     # via
     #   -r requirements/quality.txt
     #   pylint
@@ -52,11 +52,11 @@ binaryornot==0.4.4
     # via
     #   -r requirements/quality.txt
     #   cookiecutter
-boto3==1.37.1
+boto3==1.37.9
     # via
     #   -r requirements/quality.txt
     #   fs-s3fs
-botocore==1.37.1
+botocore==1.37.9
     # via
     #   -r requirements/quality.txt
     #   boto3
@@ -129,7 +129,7 @@ distro==1.9.0
     # via
     #   -r requirements/quality.txt
     #   openai
-django==4.2.19
+django==4.2.20
     # via
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/quality.txt
@@ -171,7 +171,7 @@ fs-s3fs==1.1.1
     #   -r requirements/quality.txt
     #   openedx-django-pyfs
     #   xblock-sdk
-fsspec==2025.2.0
+fsspec==2025.3.0
     # via
     #   -r requirements/quality.txt
     #   huggingface-hub
@@ -188,7 +188,7 @@ httpx==0.28.1
     #   -r requirements/quality.txt
     #   litellm
     #   openai
-huggingface-hub==0.29.1
+huggingface-hub==0.29.2
     # via
     #   -r requirements/quality.txt
     #   tokenizers
@@ -207,11 +207,11 @@ iniconfig==2.0.0
     # via
     #   -r requirements/quality.txt
     #   pytest
-isort==6.0.0
+isort==6.0.1
     # via
     #   -r requirements/quality.txt
     #   pylint
-jinja2==3.1.5
+jinja2==3.1.6
     # via
     #   -r requirements/quality.txt
     #   code-annotations
@@ -238,7 +238,7 @@ lazy==1.6
     # via
     #   -r requirements/quality.txt
     #   xblock
-litellm==1.61.17
+litellm==1.63.3
     # via -r requirements/quality.txt
 lxml[html-clean]==5.3.1
     # via
@@ -273,14 +273,14 @@ mdurl==0.1.2
     # via
     #   -r requirements/quality.txt
     #   markdown-it-py
-mock==5.1.0
+mock==5.2.0
     # via -r requirements/quality.txt
 multidict==6.1.0
     # via
     #   -r requirements/quality.txt
     #   aiohttp
     #   yarl
-openai==1.64.0
+openai==1.65.5
     # via
     #   -r requirements/quality.txt
     #   litellm
@@ -345,7 +345,7 @@ pygments==2.19.1
     # via
     #   -r requirements/quality.txt
     #   rich
-pylint==3.3.4
+pylint==3.3.5
     # via
     #   -r requirements/quality.txt
     #   edx-lint
@@ -378,7 +378,7 @@ pyproject-hooks==1.2.0
     #   -r requirements/pip-tools.txt
     #   build
     #   pip-tools
-pytest==8.3.4
+pytest==8.3.5
     # via
     #   -r requirements/quality.txt
     #   pytest-cov
@@ -439,7 +439,7 @@ rpds-py==0.23.1
     #   -r requirements/quality.txt
     #   jsonschema
     #   referencing
-s3transfer==0.11.2
+s3transfer==0.11.4
     # via
     #   -r requirements/quality.txt
     #   boto3
@@ -484,7 +484,7 @@ tomlkit==0.13.2
     # via
     #   -r requirements/quality.txt
     #   pylint
-tox==4.24.1
+tox==4.24.2
     # via -r requirements/ci.txt
 tqdm==4.67.1
     # via
@@ -510,7 +510,7 @@ urllib3==2.2.3
     #   -r requirements/quality.txt
     #   botocore
     #   requests
-virtualenv==20.29.2
+virtualenv==20.29.3
     # via
     #   -r requirements/ci.txt
     #   tox
@@ -528,9 +528,8 @@ wheel==0.45.1
     # via
     #   -r requirements/pip-tools.txt
     #   pip-tools
-xblock[django]==4.0.1
+xblock[django]==5.1.2
     # via
-    #   -c requirements/constraints.txt
     #   -r requirements/quality.txt
     #   xblock-sdk
 xblock-sdk==0.12.0
