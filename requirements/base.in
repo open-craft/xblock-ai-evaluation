@@ -3,5 +3,5 @@
 
 django-statici18n
 XBlock[django]
-litellm
+litellm==0.14.0
 Jinja2

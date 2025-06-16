@@ -31,7 +31,7 @@ setup(
     ],
     install_requires=[
         "XBlock",
-        "litellm>=1.42",
+        "litellm>=0.14,<1.0",
     ],
     entry_points={
         "xblock.v1": [
