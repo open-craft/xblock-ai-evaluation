@@ -126,7 +126,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             llm_service = get_llm_service()
             available_models = llm_service.get_available_models()
             choices = [{"display_name": m, "value": m} for m in available_models]
-            self.fields["model"].values = choices
+            model_field = self.fields["model"]
+            model_field.values.clear()
+            model_field.values.extend(choices)
 
             # Set default if no model is selected
             if available_models and not getattr(data, "model", None):
@@ -135,7 +137,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             # Fallback to default models if service fails
             fallback_models = SupportedModels.list()
             choices = [{"display_name": m, "value": m} for m in fallback_models]
-            self.fields["model"].values = choices
+            model_field = self.fields["model"]
+            model_field.values.clear()
+            model_field.values.extend(choices)
             if not getattr(data, "model", None):
                 data.model = fallback_models[0]
             available_models = fallback_models
