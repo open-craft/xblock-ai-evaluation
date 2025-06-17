@@ -33,9 +33,14 @@ class CustomLLMService(LLMServiceBase):
         self._expires_at     = 0
 
     def _fetch_token(self):
-        data = {'grant_type': 'client_credentials'}
-        auth = (self.client_id, self.client_secret)
-        response = requests.post(self.token_url, data=data, auth=auth)
+        data = {
+            'grant_type': 'client_credentials',
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+            'scope': 'ml.chatbot.query'
+        }
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        response = requests.post(self.token_url, data=data, headers=headers)
         response.raise_for_status()
         token_data = response.json()
         self._access_token = token_data['access_token']
