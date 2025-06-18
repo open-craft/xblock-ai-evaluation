@@ -14,6 +14,10 @@ from .compat import get_site_configuration_value
 from .llm import SupportedModels, get_llm_response, get_llm_service
 from .llm_services import DefaultLLMService
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @XBlock.wants("settings")
 class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
@@ -133,8 +137,11 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             # Set default if no model is selected
             if available_models and not getattr(data, "model", None):
                 data.model = available_models[0]
-        except Exception:
-            # Fallback to default models if service fails
+        except Exception as e:
+            logger.error(
+                f"Failed to populate model choices dynamically; falling back to default models. Error: {e}",
+                exc_info=True,
+            )
             fallback_models = SupportedModels.list()
             choices = [{"display_name": m, "value": m} for m in fallback_models]
             model_field = self.fields["model"]

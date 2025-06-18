@@ -1,6 +1,10 @@
 import requests
+import logging
+
 from litellm import completion
 from .llm import SupportedModels
+
+logger = logging.getLogger(__name__)
 
 class LLMServiceBase:
     def get_response(self, model, api_key, messages, api_base):
@@ -77,7 +81,7 @@ class CustomLLMService(LLMServiceBase):
         response = requests.post(url, json=payload, headers=self._get_headers())
         response.raise_for_status()
         data = response.json()
-        # TODO: Adjust this if custom API returns the response differently
+        # Adjust this if custom API returns the response differently
         return data.get("response")
 
     def get_available_models(self):
@@ -94,5 +98,9 @@ class CustomLLMService(LLMServiceBase):
             elif isinstance(data, list):
                 return [str(m) for m in data]
             return []
-        except Exception:
+        except Exception as e:
+            logger.error(
+                f"Failed to fetch available models from custom LLM service. Error: {e}",
+                exc_info=True,
+            )
             return []
