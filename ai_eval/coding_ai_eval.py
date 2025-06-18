@@ -221,9 +221,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         try:
             response = self.get_llm_response(messages)
         except Exception as e:
-            traceback.print_exc()
             logger.error(
-                f"Failed while making LLM request using model {self.model}. Eaised error type: {type(e)}, Error: {e}"
+                f"Failed while making LLM request using model {self.model}. Error: {e}",
+                exc_info=True,
             )
             raise JsonHandlerError(500, "A probem occured. Please retry.") from e
 

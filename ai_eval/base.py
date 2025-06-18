@@ -11,7 +11,12 @@ from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
 
 from .compat import get_site_configuration_value
-from .llm import SupportedModels, get_llm_response
+from .llm import SupportedModels, get_llm_response, get_llm_service
+from .llm_services import DefaultLLMService
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @XBlock.wants("settings")
@@ -32,7 +37,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     model_api_url = String(
         display_name=_("Set your API URL"),
         help=_(
-            "Fill this only for LLama. This required with models that don't have an official provider."
+            "Fill this only for LLama. This is required with models that don't have an official provider."
             " Example URL: https://model-provider-example/llama3_70b"
         ),
         default=None,
@@ -41,11 +46,8 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     model = String(
         display_name=_("AI model"),
         help=_("Select the AI language model to use."),
-        values=[
-            {"display_name": model, "value": model} for model in SupportedModels.list()
-        ],
-        Scope=Scope.settings,
-        default=SupportedModels.GPT4O.value,
+        values=[],
+        scope=Scope.settings,
     )
 
     editable_fields = (
@@ -88,7 +90,14 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         obj = obj or self
         field_name = f"model_{config_parameter}"
-        config_key = f"{SupportedModels(obj.model).name}_{config_parameter.upper()}"
+
+        # For custom models, use the model name directly; for supported models, use the enum name
+        try:
+            model_name = SupportedModels(obj.model).name
+        except ValueError:
+            model_name = obj.model.replace("/", "_").replace("-", "_").upper()
+
+        config_key = f"{model_name}_{config_parameter.upper()}"
 
         # XBlock field
         if value := getattr(obj, field_name, None):
@@ -114,44 +123,69 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     def validate_field_data(self, validation, data):
         """
-        Validate fields.
+        Validate fields and populate model choices dynamically.
         """
+        # Populate model choices dynamically before validation
+        try:
+            llm_service = get_llm_service()
+            available_models = llm_service.get_available_models()
+            choices = [{"display_name": m, "value": m} for m in available_models]
+            model_field = self.fields["model"]
+            model_field.values.clear()
+            model_field.values.extend(choices)
 
-        if not data.model or data.model not in SupportedModels.list():
+            # Set default if no model is selected
+            if available_models and not getattr(data, "model", None):
+                data.model = available_models[0]
+        except Exception as e:
+            logger.error(
+                f"Failed to populate model choices dynamically; falling back to default models. Error: {e}",
+                exc_info=True,
+            )
+            fallback_models = SupportedModels.list()
+            choices = [{"display_name": m, "value": m} for m in fallback_models]
+            model_field = self.fields["model"]
+            model_field.values.clear()
+            model_field.values.extend(choices)
+            if not getattr(data, "model", None):
+                data.model = fallback_models[0]
+            available_models = fallback_models
+
+        if not data.model or data.model not in available_models:
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR,
-                    _(  # pylint: disable=translation-of-non-string
-                        f"Model field is mandatory and must be one of {', '.join(SupportedModels.list())}"
-                    ),
+                    _(f"Model field is mandatory and must be one of {', '.join(available_models)}")
                 )
             )
 
-        if not self.get_model_api_key(data):
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR, _("Model API key is mandatory, if not set globally by your administrator.")
+        # Only run these checks for the default service
+        if isinstance(llm_service, DefaultLLMService):
+            if not self.get_model_api_key(data):
+                validation.add(
+                    ValidationMessage(
+                        ValidationMessage.ERROR, _("Model API key is mandatory, if not set globally by your administrator.")
+                    )
                 )
-            )
 
-        if data.model == SupportedModels.LLAMA.value and not self.get_model_api_url(data):
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    _(
-                        "API URL field is mandatory when using ollama/llama2, "
-                        "if not set globally by your administrator."
-                    ),
+            if data.model == SupportedModels.LLAMA.value and not self.get_model_api_url(data):
+                validation.add(
+                    ValidationMessage(
+                        ValidationMessage.ERROR,
+                        _(
+                            "API URL field is mandatory when using ollama/llama2, "
+                            "if not set globally by your administrator."
+                        ),
+                    )
                 )
-            )
 
-        if data.model != SupportedModels.LLAMA.value and data.model_api_url:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    _("API URL field can be set only when using ollama/llama2."),
+            if data.model != SupportedModels.LLAMA.value and data.model_api_url:
+                validation.add(
+                    ValidationMessage(
+                        ValidationMessage.ERROR,
+                        _("API URL field can be set only when using ollama/llama2."),
+                    )
                 )
-            )
 
     def get_llm_response(self, messages):
         return get_llm_response(self.model, self.get_model_api_key(), messages,
