@@ -253,8 +253,8 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         text, new_thread_id = get_llm_response(
             self.model,
             self.get_model_api_key(),
-            messages,
-            self.get_model_api_url(),
+
+            list(messages), self.get_model_api_url(),
             thread_id=prior_thread_id,
         )
         if tag and new_thread_id:

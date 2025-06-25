@@ -1,0 +1,417 @@
+"""Multi-agent AI XBlock."""
+
+import itertools
+import re
+import textwrap
+
+import jinja2
+from django.utils.translation import gettext_noop as _
+from jinja2.sandbox import SandboxedEnvironment
+from xblock.core import XBlock
+from xblock.exceptions import JsonHandlerError
+from xblock.fields import Boolean, Dict, List, Scope, String
+from xblock.validation import ValidationMessage
+from web_fragments.fragment import Fragment
+
+from .base import AIEvalXBlock
+from .supported_models import SupportedModels
+
+
+SAMPLE_CHARACTER_PROMPT = textwrap.dedent("""
+    You are {{ character_data.name }}.
+    In the given conversation, you are speaking to USER, who is described as: USER_DATA.
+
+    Personality details:
+    Key competencies:
+    Behavioral profile:
+
+    Case Details: {{ scenario_data.case_details }}
+    Learning Objectives: {{ scenario_data.learning_objectives }}
+    Evaluation Criteria: {{ scenario_data.evaluation_criteria }}
+
+    Speak in a dialogue fashion, naturally and succinctly.
+    Do not do the work for the student. If the student tries to get you to answer the questions you are asking them to supply information on, redirect them to the task.
+    Do not present tables, lists, or detailed written explanations. For instance, do not say 'the main goals include: 1. ...'
+    Output only the text content of the next message from {{ character_data.name }}.
+""").strip()  # noqa
+
+
+DEFAULT_EVALUATOR_PROMPT = textwrap.dedent("""
+    You are an evaluator agent responsible for generating an evaluation report of the conversation after the conversation has concluded.
+    Use the provided chat history to evaluate the learner based on the evaluation criteria.
+    You are evaluating the user based on their input, not the reactions by the other characters (such as the main character or the coach).
+    **Important**: Your only job is to give an evaluation report in well-structured markdown. You are not to chat with the learner. Do not engage in any conversation or provide feedback directly to the user. Do not ask questions, give advice or encouragement, or continue the conversation. Your only job is to produce the evaluation report.
+    Your task is to produce a well-structured markdown report in the following format:
+
+    # Evaluation Report
+
+    {% for criterion in scenario_data.evaluation_criteria %}
+        ## {{ criterion.name }}
+        ### Score: (0-5)/5
+        **Rationale**: Provide a rationale for the score, using specific direct quotes from the conversation as evidence.
+    {% endfor %}
+
+    Your response must adhere to this exact structure, and each score must have a detailed rationale that includes at least one direct quote from the chat history.
+    If you cannot find a direct quote, mention this explicitly and provide an explanation.
+""").strip()  # noqa
+
+
+DEFAULT_CONVERSATION_FORMAT = textwrap.dedent("""
+    <conversation>
+        {% for message in messages %}
+            <message>
+                <agent>{{ message.character.name }}</agent>
+                <role>{{ message.character.role }}</role>
+                <content>{{ message.content | escape }}</content>
+            </message>
+        {% endfor %}
+    </conversation>
+""")
+
+
+class CoachAIEvalXBlock(AIEvalXBlock):
+    """
+
+    AI-powered XBlock for simulated conversations with
+    two simulated characters.
+
+    """
+
+    _jinja_env = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
+
+    display_name = String(
+        display_name=_("Display Name"),
+        help=_("Name of the component in the studio"),
+        default="Coached AI Evaluation",
+        scope=Scope.settings,
+    )
+
+    evaluator_prompt = String(
+        display_name=_("Evaluator prompt"),
+        help=_(
+            "Prompt used to instruct the model how to evaluate the learner"
+        ),
+        multiline_editor=True,
+        default=DEFAULT_EVALUATOR_PROMPT,
+        scope=Scope.settings,
+    )
+
+    scenario_title = String(
+        display_name=_("Scenario title"),
+        default="",
+        scope=Scope.settings,
+    )
+
+    initial_message = String(
+        display_name=_("Initial message"),
+        default="",
+        scope=Scope.settings,
+    )
+
+    scenario_data = Dict(
+        display_name=_("Scenario data"),
+        help=_("Arbitrary data accessible in prompt templates"),
+        default={
+            "case_details": "",
+            "learning_objectives": [],
+            "evaluation_criteria": [],
+        },
+        scope=Scope.settings,
+    )
+
+    character_1_name = String(
+        display_name=_("Character #1 name"),
+        help=_("Name of character #1"),
+        scope=Scope.settings,
+        default="",
+    )
+
+    character_1_role = String(
+        display_name=_("Character #1 role"),
+        help=_("Role of character #1"),
+        scope=Scope.settings,
+        default="Main character",
+    )
+
+    character_1_prompt = String(
+        display_name=_("Character #1 prompt"),
+        help=_("Prompt to instruct the AI model to act as character #1"),
+        scope=Scope.settings,
+        default=SAMPLE_CHARACTER_PROMPT,
+    )
+
+    character_2_name = String(
+        display_name=_("Character #2 name"),
+        help=_("Name of character #2"),
+        scope=Scope.settings,
+        default="",
+    )
+
+    character_2_role = String(
+        display_name=_("Character #2 role"),
+        help=_("Role of character #2"),
+        scope=Scope.settings,
+        default="Coach",
+    )
+
+    character_2_prompt = String(
+        display_name=_("Character #2 prompt"),
+        help=_("Prompt to instruct the AI model to act as character #2"),
+        scope=Scope.settings,
+        default=SAMPLE_CHARACTER_PROMPT,
+    )
+
+    allow_reset = Boolean(
+        display_name=_("Allow reset"),
+        help=_("Allow the learner to reset the chat"),
+        scope=Scope.settings,
+        default=True,
+    )
+
+    conversation_format = String(
+        display_name=_("Conversation format template"),
+        help=_(
+            "Template used to format the conversation, appended to all prompts"
+        ),
+        multiline_editor=True,
+        default=DEFAULT_CONVERSATION_FORMAT,
+        scope=Scope.settings,
+    )
+
+    message_content_tag = String(
+        display_name=_("Message content tag"),
+        help=_("Tag for finding message content in the model's response"),
+        default="content",
+        scope=Scope.settings,
+    )
+
+    blacklist = List(
+        display_name=_("Output blacklist"),
+        help=_(
+            "List of words that, if present in the AI response, "
+            "will cause the message to not be shown to the learner, "
+            "displaying an error instead"
+        ),
+        scope=Scope.settings,
+        # Prevent the LLM from breaking character and calling itself an AI
+        # assistant if the user tries to subvert the plot.
+        default=["AI assistant"],
+    )
+
+    finished = Boolean(
+        scope=Scope.user_state,
+        default=False,
+    )
+
+    chat_history = List(
+        scope=Scope.user_state,
+    )
+
+    editable_fields = AIEvalXBlock.editable_fields + (
+        "initial_message",
+        "scenario_data",
+        "character_1_name",
+        "character_1_role",
+        "character_1_prompt",
+        "character_2_name",
+        "character_2_role",
+        "character_2_prompt",
+        "evaluator_prompt",
+        "allow_reset",
+        "blacklist",
+    )
+
+    # def studio_view(self, context):
+    #     """
+    #     Render a form for editing this XBlock
+    #     """
+    #     fragment = super().studio_view(context)
+    #     # fragment.add_javascript(self.resource_string("static/js/src/coach_edit.js"))
+    #     # CoachAIEvalXBlock() in coach_edit.js will call
+    #     # StudioEditableXBlockMixin().
+    #     # fragment.initialize_js("")
+    #     return fragment
+
+    def _render_template(self, template, **context):
+        return self._jinja_env.from_string(template).render(context)
+
+    def _get_character_data(self, character_index):
+        # Hardcoded at 2 characters but extensible.
+        return [
+            {
+                "name": self.character_1_name,
+                "role": self.character_1_role,
+            },
+            {
+                "name": self.character_2_name,
+                "role": self.character_2_role,
+            },
+        ][character_index]
+
+    def _get_chat_fragment_messages(self, fragment):
+        character_index = fragment["character_index"]
+        return [
+            {
+                "character": {"name": "", "role": "user"},
+                "content": fragment["user_message"],
+            },
+            {
+                "character": self._get_character_data(character_index),
+                "content": fragment["character_message"],
+            },
+        ]
+
+    def _get_chat_histories(self):
+        """Get chat histories separated by character."""
+        chat_histories = [[], []]
+        for fragment in self.chat_history:
+            character_index = fragment["character_index"]
+            chat_history = chat_histories[character_index]
+            chat_history.extend(self._get_chat_fragment_messages(fragment))
+        return chat_histories
+
+    def _llm_input(self, prompt, user_input=None):
+        """Append the chat history to the given system prompt."""
+        chat_history = []
+        if self.initial_message:
+            chat_history.append({
+                "character": self._get_character_data(0),
+                "content": self.initial_message,
+            })
+        for fragment in self.chat_history:
+            chat_history.extend(self._get_chat_fragment_messages(fragment))
+        if user_input is not None:
+            chat_history.append({
+                "character": {"name": "", "role": "user"},
+                "content": user_input,
+            })
+
+        prompt += "\n\n" + self._render_template(
+            self.conversation_format,
+            messages=chat_history,
+        )
+        yield {"role": "system", "content": prompt}
+        if self.model == SupportedModels.CLAUDE_SONNET.value:
+            # Claude needs a dummy user reply before the first
+            # assistant reply.
+            yield {"role": "user", "content": "."}
+
+    def _get_field_display_name(self, field_name):
+        return self.fields[field_name].display_name
+
+    def student_view(self, context=None):
+        """
+        The primary view of the MultiAgentAIEvalXBlock, shown to students
+        when viewing courses.
+        """
+
+        characters = list(map(self._get_character_data, range(2)))
+
+        frag = Fragment()
+        frag.add_content(
+            self.loader.render_django_template(
+                "/templates/chatbox_multi.html",
+                {
+                    "self": self,
+                    "has_finish_button": True,
+                    "question_text": f"<h3><b>{self.scenario_title}</b></h3>",
+                    "characters": characters,
+                },
+            )
+        )
+        frag.add_css(self.resource_string("static/css/chatbox.css"))
+        frag.add_javascript(self.resource_string("static/js/src/utils.js"))
+        frag.add_javascript(self.resource_string("static/js/src/chatbox_multi.js"))
+        frag.add_javascript(self.resource_string("static/js/src/coach.js"))
+        marked_html = self.resource_string("static/html/marked-iframe.html")
+        js_data = {
+            "chat_histories": self._get_chat_histories(),
+            "initial_message": {
+                "character": self._get_character_data(0),
+                "content": self.initial_message,
+            },
+            "characters": characters,
+            "finished": self.finished,
+            "allow_reset": self.allow_reset,
+            "marked_html": marked_html,
+        }
+        frag.initialize_js("CoachAIEvalXBlock", js_data)
+        return frag
+
+    @XBlock.json_handler
+    def get_character_response(self, data, suffix=""):  # pylint: disable=unused-argument
+        """Generate the next message in the interaction."""
+        if self.finished:
+            raise JsonHandlerError(403, "The session has ended.")
+
+        user_input = data["user_input"]
+        character_index = data["character_index"]
+
+        # Hardcoded at 2 characters for now but designed to be extensible.
+        template = [
+            self.character_1_prompt,
+            self.character_2_prompt,
+        ][character_index]
+        prompt = self._render_template(
+            template,
+            scenario_data=self.scenario_data,
+            character_data=self._get_character_data(character_index),
+        )
+        message = self.get_llm_response(self._llm_input(prompt, user_input))
+        if self.blacklist:
+            if re.search(fr"\b({'|'.join(map(re.escape, self.blacklist))})\b",
+                         message, re.I):
+                raise JsonHandlerError(500, "Internal error.")
+        if self.message_content_tag:
+            m = re.search((fr'<{re.escape(self.message_content_tag)}>(.*)'
+                           fr'</{re.escape(self.message_content_tag)}>'),
+                          message)
+            if m:
+                message = m.group(1)
+
+        self.chat_history.append({
+            "character_index": character_index,
+            "user_message": user_input,
+            "character_message": message,
+        })
+        return {
+            "message": {
+                "character": self._get_character_data(character_index),
+                "content": message,
+            },
+        }
+
+    @XBlock.json_handler
+    def reset(self, data, suffix=""):
+        """Reset the chat history."""
+        if not self.allow_reset:
+            raise JsonHandlerError(403, "Reset is disabled.")
+        self.chat_history = []
+        self.finished = False
+        return {}
+
+    @XBlock.json_handler
+    def get_evaluator_response(self):
+        """
+
+        Get the response from the AI model acting to evaluate the learner's
+        activity.
+
+        """
+        prompt = self._render_template(
+            self.evaluator_prompt,
+            scenario_data=self.scenario_data,
+        )
+        message = self.get_llm_response(self._llm_input(prompt))
+        self.chat_history.append({
+            "character_index": 0,
+            "user_message": "",
+            "character_message": message,
+        })
+        self.finished = True
+        return {
+            "message": {
+                "character": {"name": "", "role": "evaluator"},
+                "content": message,
+            },
+        }
