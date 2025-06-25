@@ -16,7 +16,7 @@ from xblock.validation import ValidationMessage
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
-from .llm import SupportedModels
+from .supported_models import SupportedModels
 
 
 DEFAULT_SUPERVISOR_PROMPT = textwrap.dedent("""

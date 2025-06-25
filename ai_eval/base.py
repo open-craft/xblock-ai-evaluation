@@ -1,6 +1,7 @@
 """Base Xblock with AI evaluation."""
 from typing import Self
 
+import logging
 import pkg_resources
 
 from django.utils.translation import gettext_noop as _
@@ -11,10 +12,9 @@ from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
 
 from .compat import get_site_configuration_value
-from .llm import SupportedModels, get_llm_response, get_llm_service
-from .llm_services import DefaultLLMService
+from .supported_models import SupportedModels
+from .llm import get_llm_response, get_llm_service
 
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             # Set default if no model is selected
             if available_models and not getattr(data, "model", None):
                 data.model = available_models[0]
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(
                 f"Failed to populate model choices dynamically; falling back to default models. Error: {e}",
                 exc_info=True,
@@ -155,16 +155,19 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR,
-                    _(f"Model field is mandatory and must be one of {', '.join(available_models)}")
+                    _("Model field is mandatory and must be one of %s")
+                    % ", ".join(available_models)
                 )
             )
 
         # Only run these checks for the default service
+        from .llm_services import DefaultLLMService  # pylint: disable=import-outside-toplevel
         if isinstance(llm_service, DefaultLLMService):
             if not self.get_model_api_key(data):
                 validation.add(
                     ValidationMessage(
-                        ValidationMessage.ERROR, _("Model API key is mandatory, if not set globally by your administrator.")
+                        ValidationMessage.ERROR,
+                        _("Model API key is mandatory, if not set globally by your administrator.")
                     )
                 )
 

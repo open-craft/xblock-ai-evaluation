@@ -1,7 +1,6 @@
 """Short answers Xblock with AI evaluation."""
 
 import logging
-import traceback
 import urllib.parse
 import urllib.request
 from multiprocessing.dummy import Pool

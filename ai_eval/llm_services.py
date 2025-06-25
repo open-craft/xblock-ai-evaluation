@@ -1,19 +1,30 @@
-import requests
+"""LLM Services Module"""
+
 import logging
+import time
+import requests
 
 from litellm import completion
-from .llm import SupportedModels
+from .supported_models import SupportedModels
 
 logger = logging.getLogger(__name__)
 
+
 class LLMServiceBase:
+    """
+    Base class for llm service.
+    """
     def get_response(self, model, api_key, messages, api_base):
         raise NotImplementedError
 
     def get_available_models(self):
         raise NotImplementedError
 
+
 class DefaultLLMService(LLMServiceBase):
+    """
+    Default llm service.
+    """
     def get_response(self, model, api_key, messages, api_base):
         kwargs = {}
         if api_base:
@@ -23,20 +34,26 @@ class DefaultLLMService(LLMServiceBase):
             .choices[0]
             .message.content
         )
+
     def get_available_models(self):
         return [str(m.value) for m in SupportedModels]
 
-class CustomLLMService(LLMServiceBase):
-    def __init__(self, models_url, completions_url, token_url, client_id, client_secret):
-        self.models_url      = models_url
-        self.completions_url = completions_url
-        self.token_url       = token_url
-        self.client_id       = client_id
-        self.client_secret   = client_secret
-        self._access_token   = None
-        self._expires_at     = 0
 
-    def _fetch_token(self):
+class CustomLLMService(LLMServiceBase):
+    """
+    Custom llm service.
+    """
+    # pylint: disable=too-many-positional-arguments
+    def __init__(self, models_url, completions_url, token_url, client_id, client_secret):
+        self.models_url = models_url
+        self.completions_url = completions_url
+        self.token_url = token_url
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self._access_token = None
+        self._expires_at = 0
+
+    def _fetch_token(self):  # pylint: disable=missing-function-docstring
         data = {
             'grant_type': 'client_credentials',
             'client_id': self.client_id,
@@ -44,19 +61,17 @@ class CustomLLMService(LLMServiceBase):
             'scope': 'ml.chatbot.query'
         }
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        response = requests.post(self.token_url, data=data, headers=headers)
+        response = requests.post(self.token_url, data=data, headers=headers, timeout=10)
         response.raise_for_status()
         token_data = response.json()
         self._access_token = token_data['access_token']
         expires_in = token_data.get('expires_in')
-        import time
         if expires_in:
             self._expires_at = time.time() + expires_in - 60
         else:
             self._expires_at = time.time() + 3300
 
     def _ensure_token(self):
-        import time
         if not self._access_token or time.time() >= self._expires_at:
             self._fetch_token()
 
@@ -78,7 +93,7 @@ class CustomLLMService(LLMServiceBase):
             "model": str(model),
             "prompt": prompt,
         }
-        response = requests.post(url, json=payload, headers=self._get_headers())
+        response = requests.post(url, json=payload, headers=self._get_headers(), timeout=10)
         response.raise_for_status()
         data = response.json()
         # Adjust this if custom API returns the response differently
@@ -98,7 +113,7 @@ class CustomLLMService(LLMServiceBase):
             elif isinstance(data, list):
                 return [str(m) for m in data]
             return []
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(
                 f"Failed to fetch available models from custom LLM service. Error: {e}",
                 exc_info=True,

@@ -1,7 +1,6 @@
 """Coding Xblock with AI evaluation."""
 
 import logging
-import traceback
 import pkg_resources
 
 from django.utils.translation import gettext_noop as _

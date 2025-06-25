@@ -2,35 +2,21 @@
 Integration with LLMs.
 """
 from django.conf import settings
-from enum import Enum
 from .compat import get_site_configuration_value
-
-
-class SupportedModels(Enum):
-    """
-    LLM Models supported by the CodingAIEvalXBlock and ShortAnswerAIEvalXBlock
-    """
-
-    GPT4O = "gpt-4o"
-    GPT4O_MINI = "gpt-4o-mini"
-    GEMINI_PRO = "gemini/gemini-pro"
-    CLAUDE_SONNET = "claude-3-5-sonnet-20240620"
-    LLAMA = "ollama/llama2"
-
-    @staticmethod
-    def list():
-        return [str(m.value) for m in SupportedModels]
+from .llm_services import DefaultLLMService, CustomLLMService
 
 
 def get_llm_service():
-    from .llm_services import DefaultLLMService, CustomLLMService
+    """
+    Get the CustomLLMService if configured otherwise return the default service.
+    """
     use_custom_service = get_site_configuration_value("ai_eval", "USE_CUSTOM_LLM_SERVICE")
     if use_custom_service:
-        models_url     = get_site_configuration_value("ai_eval", "CUSTOM_LLM_MODELS_URL")
+        models_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_MODELS_URL")
         completions_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_COMPLETIONS_URL")
-        token_url      = get_site_configuration_value("ai_eval", "CUSTOM_LLM_TOKEN_URL")
-        client_id      = settings.CUSTOM_LLM_CLIENT_ID
-        client_secret  = settings.CUSTOM_LLM_CLIENT_SECRET
+        token_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_TOKEN_URL")
+        client_id = settings.CUSTOM_LLM_CLIENT_ID
+        client_secret = settings.CUSTOM_LLM_CLIENT_SECRET
         return CustomLLMService(models_url, completions_url, token_url, client_id, client_secret)
     return DefaultLLMService()
 
