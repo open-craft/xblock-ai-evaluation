@@ -13,7 +13,7 @@
 }
 
 
-#chat-history {
+.chat-history {
   max-height: 400px;
   overflow-y: auto;
   margin-bottom: 10px;
@@ -40,7 +40,7 @@
 }
 
 .ai-eval,
-#message-spinner {
+.message-spinner {
   text-align: left;
   color: white;
   margin-right: auto;
@@ -51,14 +51,14 @@
   color: white !important;
 }
 
-.submit-row {
+.chat-submit-row {
   display: flex;
   margin-bottom: 1em;
   font-size: 16px;
   padding: 10px;
 }
 
-.submit-row textarea {
+.chat-submit-row textarea {
   flex: 8;
   height: auto;
   border: 1px solid gray;
@@ -68,7 +68,7 @@
   resize: none;
 }
 
-.submit-row .chat-button {
+.chat-submit-row .chat-button {
   flex: 1;
   height: fit-content;
   text-align: center;
@@ -83,26 +83,26 @@
   white-space: nowrap;
 }
 
-#submit-button {
+.chat-submit-row .chat-submit-button {
   background-color: #00262b;
   color: white;
   margin-left: 10px;
 }
 
-#reset-button,
-#finish-button {
+.chat-submit-row .chat-reset-button,
+.chat-submit-row .chat-finish-button {
   border: 1px solid;
   color: #00262b;
   margin-right: 10px;
 }
 
-.submit-row .disabled {
+.chat-submit-row .disabled {
   opacity: 0.8;
   cursor: not-allowed !important;
 }
 
 /* spinner animation */
-.chat-message-container #message-spinner > div {
+.chat-message-container .message-spinner > div {
   width: 4px;
   height: 4px;
   margin-right: 2px;
@@ -114,12 +114,12 @@
   animation: chat-block-sk-bouncedelay 1.4s infinite ease-in-out both;
 }
 
-.chat-message-container #message-spinner .bounce1 {
+.message-spinner .bounce1 {
   -webkit-animation-delay: -0.32s;
   animation-delay: -0.32s;
 }
 
-.chat-message-container #message-spinner .bounce2 {
+.message-spinner .bounce2 {
   -webkit-animation-delay: -0.16s;
   animation-delay: -0.16s;
 }
@@ -167,4 +167,28 @@
 .chat-instructions p {
   margin: 0;
   font-size: small;
+}
+
+.chat-wrapper {
+  display: flex;
+  min-height: 350px;
+}
+
+.chat-chatbox-half {
+  border-left: 1px solid;
+  display: flex;
+  flex-flow: column;
+  margin-left: 10px;
+  padding-left: 10px;
+  width: 50%;
+}
+
+.chat-chatbox-half .chat-history {
+  flex-grow: 1;
+  min-height: auto;
+  max-height: none;
+}
+
+.chat-chatbox-half:first-child {
+  border-left: none;
 }

@@ -7,16 +7,17 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
   const handlerUrl = runtime.handlerUrl(element, "get_response");
   const resetHandlerUrl = runtime.handlerUrl(element, "reset");
 
-  const $chatContainer = $("#chat-history", element);
-  const $spinner = $("#message-spinner", element);
-  const $spinnerContainer = $("#chat-spinner-container", element);
-  const $resetButton = $("#reset-button", element);
-  const $finishButton = $("#finish-button", element);
-  const $submitButton = $("#submit-button", element);
-  const $userInput = $("#user-input", element);
-  const $status = $("#chat-status", element);
+  const $chatbox = $("#chatbox", element);
+  const $chatContainer = $(".chat-history", $chatbox);
+  const $spinner = $(".message-spinner", $chatbox);
+  const $spinnerContainer = $(".chat-spinner-container", $chatbox);
+  const $resetButton = $(".chat-reset-button", $chatbox);
+  const $finishButton = $(".chat-finish-button", $chatbox);
+  const $submitButton = $(".chat-submit-button", $chatbox);
+  const $userInput = $(".chat-user-input", $chatbox);
+  const $status = $(".chat-status", $chatbox);
   const $characterImage = $(".shortanswer_image img", element);
-  const $question = $("#question-text", element);
+  const $question = $(".question-text", element);
 
   const updateChatMinHeight = function() {
     if (!$characterImage.length) {
