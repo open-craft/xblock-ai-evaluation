@@ -32,10 +32,12 @@ setup(
     ),
     install_requires=[
         "XBlock",
+        "celery",
         "litellm>=0.14,<1.0",
     ],
     entry_points={
         "xblock.v1": [
+            "ai_eval_export = ai_eval:DataExportXBlock",
             "shortanswer_ai_eval = ai_eval:ShortAnswerAIEvalXBlock",
             "coding_ai_eval = ai_eval:CodingAIEvalXBlock",
             "multiagent_ai_eval = ai_eval:MultiAgentAIEvalXBlock",
