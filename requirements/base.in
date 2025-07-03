@@ -1,6 +1,7 @@
 # Core requirements for using this application
 -c constraints.txt
 
+celery
 django-statici18n
 XBlock[django]
 litellm==0.14.0
