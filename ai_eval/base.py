@@ -137,6 +137,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             # Set default if no model is selected
             if available_models and not getattr(data, "model", None):
                 data.model = available_models[0]
+                self.model = available_models[0]
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(
                 f"Failed to populate model choices dynamically; falling back to default models. Error: {e}",
@@ -149,6 +150,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             model_field.values.extend(choices)
             if not getattr(data, "model", None):
                 data.model = fallback_models[0]
+                self.model = fallback_models[0]
             available_models = fallback_models
 
         if not data.model or data.model not in available_models:

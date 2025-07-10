@@ -9,6 +9,8 @@ from .supported_models import SupportedModels
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_TOKEN_EXPIRES_IN = 3300
+
 
 class LLMServiceBase:
     """
@@ -69,7 +71,7 @@ class CustomLLMService(LLMServiceBase):
         if expires_in:
             self._expires_at = time.time() + expires_in - 60
         else:
-            self._expires_at = time.time() + 3300
+            self._expires_at = time.time() + DEFAULT_TOKEN_EXPIRES_IN
 
     def _ensure_token(self):
         if not self._access_token or time.time() >= self._expires_at:
