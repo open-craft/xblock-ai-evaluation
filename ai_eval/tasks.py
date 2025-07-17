@@ -9,11 +9,22 @@ from celery.utils.log import get_task_logger
 from django.contrib.auth import get_user_model
 from xblock.fields import Scope
 
-from . import ShortAnswerAIEvalXBlock
+from . import (
+    coding_ai_eval,
+    CodingAIEvalXBlock,
+    MultiAgentAIEvalXBlock,
+    ShortAnswerAIEvalXBlock,
+)
 
 logger = get_task_logger(__name__)
 
 User = get_user_model()
+
+_BLOCK_CATEGORIES = [
+    'coding_ai_eval',
+    'multiagent_ai_eval',
+    'shortanswer_ai_eval',
+]
 
 
 @shared_task()
@@ -63,9 +74,35 @@ def _extract_all_data(course_id):
     from xmodule.modulestore.django import modulestore
 
     store = modulestore()
-    for block in store.get_items(course_id):
-        if isinstance(block, ShortAnswerAIEvalXBlock):
+    for category in _BLOCK_CATEGORIES:
+        for block in store.get_items(
+            course_id,
+            qualifiers={'category': category},
+        ):
             yield from _extract_data(block)
+
+
+def _get_messages(block, session):
+    """Extract messages for one conversation session of a supported XBlock."""
+    if isinstance(block, CodingAIEvalXBlock):
+        yield ("user", session[coding_ai_eval.USER_RESPONSE])
+        yield ("ai_evaluation", session[coding_ai_eval.AI_EVALUATION])
+        yield ("code_exec_result", session[coding_ai_eval.CODE_EXEC_RESULT])
+    else:
+        for message in session:
+            if isinstance(block, ShortAnswerAIEvalXBlock):
+                source = message["source"]
+                content = message["content"]
+            elif isinstance(block, MultiAgentAIEvalXBlock):
+                source = message['role']
+                if 'extra' in message:
+                    source = (
+                        f"{source},{message['extra'].get('agent', '')}"
+                    )
+                content = message["content"]
+            else:
+                continue
+            yield (source, content)
 
 
 def _extract_data(block):
@@ -84,25 +121,29 @@ def _extract_data(block):
         data.add_blocks_to_cache([block])
 
         try:
-            messages = data.get(DjangoKeyValueStore.Key(
+            sessions = data.get(DjangoKeyValueStore.Key(
                 scope=Scope.user_state,
                 user_id=user.id,
                 block_scope_id=block.location,
-                field_name='messages'
+                field_name='sessions'
             ))
         except KeyError:
             continue
 
-        conversation = 1
-        for user_message, llm_message in zip(messages['USER'], messages['LLM']):
-            yield (section_name, subsection_name, unit_name,
-                   str(block.location), block.display_name,
-                   user.username, user.email or "", conversation,
-                   "user", user_message)
-            yield (section_name, subsection_name, unit_name,
-                   str(block.location), block.display_name,
-                   user.username, user.email or "", conversation,
-                   "llm", llm_message)
+        for idx, session in enumerate(sessions, start=1):
+            for source, content in _get_messages(block, session):
+                yield (
+                    section_name,
+                    subsection_name,
+                    unit_name,
+                    str(block.location),
+                    block.display_name,
+                    user.username,
+                    user.email or "",
+                    idx,
+                    source,
+                    content,
+                )
 
 
 def _get_context(block):
