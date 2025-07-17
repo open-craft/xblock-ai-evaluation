@@ -42,9 +42,7 @@ loader = ResourceLoader(__name__)
 class DataExportXBlock(XBlock):
     icon_class = "problem"
     display_name = String(
-        display_name=_("(Display name)"),
-        help=_("Title to display"),
-        default=_("Data export"),
+        default=_("AI XBlocks data export"),
         scope=Scope.settings
     )
     active_export_task_id = String(
@@ -133,7 +131,6 @@ class DataExportXBlock(XBlock):
         self.last_export_result = {
             'error': message,
         }
-        self.display_data = None
         raise JsonHandlerError(code, message)
 
     @XBlock.json_handler
@@ -146,9 +143,18 @@ class DataExportXBlock(XBlock):
         return self._get_status()
 
     def _delete_export(self):
+        if not self.last_export_result or 'error' in self.last_export_result:
+            return
+        filename = self.last_export_result['report_filename']
+        from lms.djangoapps.instructor_task.models import ReportStore
+        report_store = ReportStore.from_config(config_name='GRADES_DOWNLOAD')
+        course_key = getattr(self.scope_ids.usage_id, 'course_key', None)
+        path = report_store.path_to(course_key, filename)
+        try:
+            report_store.storage.delete(path)
+        except NotImplementedError:
+            pass
         self.last_export_result = None
-        self.display_data = None
-        self.active_export_task_id = ''
 
     @XBlock.json_handler
     def start_export(self, data, suffix=''):

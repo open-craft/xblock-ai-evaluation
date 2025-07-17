@@ -49,7 +49,7 @@ def shortanswer_block_data():
     """Fixture for short answer block test data."""
     return {
         "question": "ca va?",
-        "messages": {"USER": [], "LLM": []},
+        "sessions": [[{"source": "user", "content": "hi"}]],
         "max_responses": 3,
         "marked_html": (
             '<!doctype html>\n<html lang="en">\n<head></head>\n<body>\n'
@@ -90,7 +90,10 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
     """Test the basic view loads for ShortAnswerAIEvalXBlock."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     frag = block.student_view()
-    assert frag.json_init_args == shortanswer_block_data
+    expected_args = shortanswer_block_data.copy()
+    del expected_args["sessions"]
+    expected_args["messages"] = shortanswer_block_data["sessions"][-1]
+    assert frag.json_init_args == expected_args
     assert '<div class="shortanswer_block">' in frag.content
 
 
@@ -99,26 +102,21 @@ def test_shortanswer_reset_allowed(shortanswer_block_data):
     data = {
         **shortanswer_block_data,
         "allow_reset": True,
-        "messages": {"USER": ["Hello"], "LLM": ["Hello"]},
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
     # Pre-populate thread map to verify reset clears it
     block.thread_map = {"provider:model:tag": "abc123"}
     block.reset.__wrapped__(block, data={})
-    assert block.messages == {"USER": [], "LLM": []}
+    assert block.sessions == [shortanswer_block_data["sessions"][0], []]
     assert not block.thread_map
 
 
 def test_shortanswer_reset_forbidden(shortanswer_block_data):
     """Test the reset function when forbidden."""
-    data = {
-        **shortanswer_block_data,
-        "messages": {"USER": ["Hello"], "LLM": ["Hello"]},
-    }
-    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     with pytest.raises(JsonHandlerError):
         block.reset.__wrapped__(block, data={})
-    assert block.messages == {"USER": ["Hello"], "LLM": ["Hello"]}
+    assert block.sessions == shortanswer_block_data["sessions"]
 
 
 def test_character_image(shortanswer_block_data):

@@ -27,8 +27,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     Short Answer Xblock.
     """
 
-    USER_KEY = "USER"
-    LLM_KEY = "LLM"
     ATTACHMENT_PARALLEL_DOWNLOADS = 5
 
     display_name = String(
@@ -84,17 +82,21 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         default=False,
     )
 
-    messages = Dict(
-        help=_("Dictionary with chat messages"),
-        scope=Scope.user_state,
-        default={USER_KEY: [], LLM_KEY: []},
-    )
-
     attachment_urls = List(
         display_name=_("Attachment URLs"),
         help=_("Attachments to include with the evaluation prompt"),
         scope=Scope.settings,
         resettable_editor=False,
+    )
+
+    # XXX: Deprecated.
+    messages = Dict(
+        scope=Scope.user_state,
+    )
+
+    sessions = List(
+        scope=Scope.user_state,
+        default=[[]],
     )
 
     editable_fields = AIEvalXBlock.editable_fields + (
@@ -105,6 +107,22 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         "character_image",
         "attachment_urls",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.messages:
+            for user_msg, assistant_msg in zip(self.messages["USER"],
+                                               self.messages["LLM"]):
+                self.sessions[-1].append({
+                    "source": "user",
+                    "content": user_msg or ".",
+                })
+                self.sessions[-1].append({
+                    "source": "llm",
+                    "content": assistant_msg,
+                })
+            self.messages = {}
+            self.save()
 
     def validate_field_data(self, validation, data):
         """
@@ -155,7 +173,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         js_data = {
             "question": self.question,
-            "messages": self.messages,
+            "messages": self.sessions[-1],
             "max_responses": self.max_responses,
             "marked_html": marked_html,
         }
@@ -224,14 +242,19 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         # add previous messages
         # the first AI role is 'system' which defines the LLM's personnality and behavior.
         # subsequent roles are 'assistant' and 'user'
-        for user_msg, assistant_msg in zip(self.messages[self.USER_KEY],
-                                           self.messages[self.LLM_KEY]):
-            messages.append({"content": user_msg or ".", "role": "user"})
-            messages.append({"content": assistant_msg, "role": "assistant"})
+        for message in self.sessions[-1]:
+            if message["source"] == "user":
+                role = "user"
+            else:
+                role = "assistant"
+            messages.append({
+                "role": role,
+                "content": message["content"] or ".",
+            })
         messages.append({"role": "user", "content": user_submission})
 
         try:
-            text = self.get_llm_response(messages, tag=current_tag)
+            response = self.get_llm_response(messages, tag=current_tag)
         except Exception as e:
             logger.error(
                 f"Failed while making LLM request using model {self.model}. Error: {e}",
@@ -241,10 +264,16 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 raise JsonHandlerError(500, str(e)) from e
             raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
-        if text:
-            self.messages[self.USER_KEY].append(user_submission)
-            self.messages[self.LLM_KEY].append(text)
-            return {"response": text}
+        if response:
+            self.sessions[-1].append({
+                "source": "user",
+                "content": user_submission,
+            })
+            self.sessions[-1].append({
+                "source": "llm",
+                "content": response,
+            })
+            return {"response": response}
 
         raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")
 
@@ -255,8 +284,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         """
         if not self.allow_reset:
             raise JsonHandlerError(403, "Reset is disabled.")
-        self.messages = {self.USER_KEY: [], self.LLM_KEY: []}
         self.thread_map = {}
+        self.sessions.append([])
         return {}
 
     @staticmethod

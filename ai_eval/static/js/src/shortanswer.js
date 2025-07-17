@@ -8,12 +8,18 @@ function ShortAnswerAIEvalXBlock(runtime, element, data) {
 
   const handleInit = function() {
     $("#question-text", element).html(MarkdownToHTML(data.question));
-    for (var i = 0; i < data.messages.USER.length; i++) {
-      this.insertUserMessage(data.messages.USER[i]);
-      this.insertAIMessage(formatAIMessage(data.messages.LLM[i]));
+    var userMessageCount = 0;
+    for (var i = 0; i < data.messages.length; i++) {
+      var message = data.messages[i];
+      if (message.source == "user") {
+        userMessageCount++;
+        this.insertUserMessage(message.content);
+      } else if (message.source == "llm") {
+        this.insertAIMessage(formatAIMessage(message.content));
+      }
     }
-    this.enableInput(data.messages.USER.length < data.max_responses);
-    this.enableReset(data.messages.USER.length > 0);
+    this.enableInput(userMessageCount < data.max_responses);
+    this.enableReset(userMessageCount > 0);
   };
 
   const handleResponse = function(response) {
