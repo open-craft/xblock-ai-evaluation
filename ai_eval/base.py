@@ -19,6 +19,32 @@ from .llm import get_llm_response, get_llm_service
 logger = logging.getLogger(__name__)
 
 
+def _get_model_choices(block):
+    """
+    Return the dropdown entries for the `model` field.
+    If the remote service fails, fall back to SupportedModels.list().
+    """
+    available_models = []
+
+    try:
+        llm_service = get_llm_service()
+        available_models = llm_service.get_available_models()
+
+        # Ensure we have models, fallback if empty
+        if not available_models:
+            logger.warning("Custom service returned empty models list, using defaults")
+            available_models = SupportedModels.list()
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.error(
+            f"Failed to populate model choices dynamically; falling back to default models. Error: {e}",
+            exc_info=True,
+        )
+        available_models = SupportedModels.list()
+
+    return [{"display_name": m, "value": m} for m in available_models]
+
+
 @XBlock.wants("settings")
 class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     """
@@ -46,8 +72,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     model = String(
         display_name=_("AI model"),
         help=_("Select the AI language model to use."),
-        values=[],
         scope=Scope.settings,
+        default="",
+        values_provider=_get_model_choices,
     )
 
     editable_fields = (
@@ -125,45 +152,30 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         Validate fields and populate model choices dynamically.
         """
-        # Populate model choices dynamically before validation
-        try:
-            llm_service = get_llm_service()
-            available_models = llm_service.get_available_models()
-            choices = [{"display_name": m, "value": m} for m in available_models]
-            model_field = self.fields["model"]
-            model_field.values.clear()
-            model_field.values.extend(choices)
-
-            # Set default if no model is selected
-            if available_models and not getattr(data, "model", None):
-                data.model = available_models[0]
-                self.model = available_models[0]
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error(
-                f"Failed to populate model choices dynamically; falling back to default models. Error: {e}",
-                exc_info=True,
+        from .llm_services import DefaultLLMService  # pylint: disable=import-outside-toplevel
+        llm_service = get_llm_service()
+        # Add warning if custom service is configured but using defaults
+        use_custom_service = get_site_configuration_value("ai_eval", "USE_CUSTOM_LLM_SERVICE")
+        if use_custom_service and llm_service and isinstance(llm_service, DefaultLLMService):
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.WARNING,
+                    _(
+                        "Custom LLM service is enabled but using default models due to configuration issues. "
+                        "Check logs for details."
+                    )
+                )
             )
-            fallback_models = SupportedModels.list()
-            choices = [{"display_name": m, "value": m} for m in fallback_models]
-            model_field = self.fields["model"]
-            model_field.values.clear()
-            model_field.values.extend(choices)
-            if not getattr(data, "model", None):
-                data.model = fallback_models[0]
-                self.model = fallback_models[0]
-            available_models = fallback_models
 
-        if not data.model or data.model not in available_models:
+        if not data.model:
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR,
-                    _("Model field is mandatory and must be one of %s")
-                    % ", ".join(available_models)
+                    _("Model field is mandatory - please select one from the dropdown.")
                 )
             )
 
         # Only run these checks for the default service
-        from .llm_services import DefaultLLMService  # pylint: disable=import-outside-toplevel
         if isinstance(llm_service, DefaultLLMService):
             if not self.get_model_api_key(data):
                 validation.add(

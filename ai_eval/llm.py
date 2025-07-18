@@ -1,9 +1,12 @@
 """
 Integration with LLMs.
 """
+import logging
 from django.conf import settings
 from .compat import get_site_configuration_value
 from .llm_services import DefaultLLMService, CustomLLMService
+
+logger = logging.getLogger(__name__)
 
 
 def get_llm_service():
@@ -15,8 +18,33 @@ def get_llm_service():
         models_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_MODELS_URL")
         completions_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_COMPLETIONS_URL")
         token_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_TOKEN_URL")
-        client_id = settings.CUSTOM_LLM_CLIENT_ID
-        client_secret = settings.CUSTOM_LLM_CLIENT_SECRET
+
+        # Validate required configuration
+        missing_configs = []
+        if not models_url:
+            missing_configs.append("CUSTOM_LLM_MODELS_URL")
+        if not completions_url:
+            missing_configs.append("CUSTOM_LLM_COMPLETIONS_URL")
+        if not token_url:
+            missing_configs.append("CUSTOM_LLM_TOKEN_URL")
+
+        try:
+            client_id = settings.CUSTOM_LLM_CLIENT_ID
+            client_secret = settings.CUSTOM_LLM_CLIENT_SECRET
+            if not client_id:
+                missing_configs.append("CUSTOM_LLM_CLIENT_ID")
+            if not client_secret:
+                missing_configs.append("CUSTOM_LLM_CLIENT_SECRET")
+        except AttributeError:
+            missing_configs.extend(["CUSTOM_LLM_CLIENT_ID", "CUSTOM_LLM_CLIENT_SECRET"])
+
+        if missing_configs:
+            logger.warning(
+                f"Custom LLM service requested but missing configuration: {', '.join(missing_configs)}. "
+                f"Falling back to default service."
+            )
+            return DefaultLLMService()
+
         return CustomLLMService(models_url, completions_url, token_url, client_id, client_secret)
     return DefaultLLMService()
 

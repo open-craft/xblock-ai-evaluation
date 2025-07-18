@@ -104,20 +104,52 @@ class CustomLLMService(LLMServiceBase):
     def get_available_models(self):
         url = self.models_url
         try:
+            if not url:
+                logger.warning("CUSTOM_LLM_MODELS_URL not configured")
+                return []
+
             response = requests.get(url, headers=self._get_headers(), timeout=10)
             response.raise_for_status()
             data = response.json()
+
+            models = []
+
             if isinstance(data, dict):
-                if "models" in data and isinstance(data["models"], list):
-                    return [str(m) for m in data["models"]]
+                if "models" in data:
+                    if isinstance(data["models"], list):
+                        models = [str(m) for m in data["models"]]
+                    elif isinstance(data["models"], str):
+                        models = [str(data["models"])]
                 elif "data" in data and isinstance(data["data"], list):
-                    return [str(m.get("id", m)) for m in data["data"]]
+                    models = [str(m.get("id", str(m))) for m in data["data"]]
             elif isinstance(data, list):
-                return [str(m) for m in data]
+                models = [str(m) for m in data]
+            elif isinstance(data, str):
+                models = [str(data)]
+
+            # Filter out non-string model names and empty strings
+            models = [m for m in models if isinstance(m, str) and m.strip()]
+
+            if not models:
+                logger.warning("No valid models found in custom service response")
+
+            return models
+
+        except requests.exceptions.Timeout:
+            logger.error("Timeout fetching models from custom LLM service")
+            return []
+        except requests.exceptions.ConnectionError:
+            logger.error("Connection error fetching models from custom LLM service")
+            return []
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error fetching models: {e}")
+            return []
+        except ValueError as e:
+            logger.error(f"Invalid JSON response from custom LLM service: {e}")
             return []
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error(
-                f"Failed to fetch available models from custom LLM service. Error: {e}",
+                f"Unexpected error fetching models from custom LLM service: {e}",
                 exc_info=True,
             )
             return []
