@@ -42,7 +42,9 @@ def _get_model_choices(block):
         )
         available_models = SupportedModels.list()
 
-    return [{"display_name": m, "value": m} for m in available_models]
+    PLACEHOLDER = {"display_name": "— Select a model —", "value": ""}
+
+    return [PLACEHOLDER] + [{"display_name": m, "value": m} for m in available_models]
 
 
 @XBlock.wants("settings")
