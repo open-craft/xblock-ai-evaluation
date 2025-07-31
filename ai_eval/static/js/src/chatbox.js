@@ -89,7 +89,7 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
         fns.enableReset(true);
         handleResponse.call(fns, response);
       },
-      error: function() {
+      error: function(xhr) {
         $spinner.hide();
         fns.enableReset(resetEnabled);
         fns.enableInput(inputEnabled);
@@ -98,7 +98,12 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
           $userInput.val(inputData.user_input);
           $userInput.trigger("input");
         }
-        alert(gettext("An error has occurred."));
+        try {
+          const response = JSON.parse(xhr.responseText);
+          alert(response.error || gettext("An error has occurred."));
+        } catch (e) {
+          alert(gettext("An error has occurred."));
+        }
       },
     });
   };
@@ -153,11 +158,16 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
         fns.enableInput(true);
         handleReset.call(fns);
       },
-      error: function() {
+      error: function(xhr) {
         $spinner.hide();
         fns.enableReset(resetEnabled);
         fns.enableInput(inputEnabled);
-        alert(gettext("An error has occurred."));
+        try {
+          const response = JSON.parse(xhr.responseText);
+          alert(response.error || gettext("An error has occurred."));
+        } catch (e) {
+          alert(gettext("An error has occurred."));
+        }
       },
     });
   });

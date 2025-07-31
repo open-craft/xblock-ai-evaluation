@@ -133,9 +133,14 @@ function CodingAIEvalXBlock(runtime, element, data) {
             stderr.text("");
           }
         },
-        error: function(xhr, status, error) {
-          console.error('Error:', error);
-          alert("A problem occured during reset.");
+        error: function(xhr) {
+          console.error('Error:', xhr);
+          try {
+            const response = JSON.parse(xhr.responseText);
+            alert(response.error || "A problem occured during reset.");
+          } catch (e) {
+            alert("A problem occured during reset.");
+          }
         }
       });
 
@@ -164,10 +169,15 @@ function CodingAIEvalXBlock(runtime, element, data) {
         .done(function (data) {
           enableSubmitButton();
         })
-        .fail(function (error) {
-          console.log("Error: ", error);
+        .fail(function (xhr) {
+          console.log("Error: ", xhr);
           enableSubmitButton();
-          alert("A problem occured while submitting the code.");
+          try {
+            const response = JSON.parse(xhr.responseText);
+            alert(response.error || "A problem occured while submitting the code.");
+          } catch (e) {
+            alert("A problem occured while submitting the code.");
+          }
         });
     });
 

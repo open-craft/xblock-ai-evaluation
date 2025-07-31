@@ -117,11 +117,11 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 )
             )
 
-        if not data.max_responses or data.max_responses <= 0 or data.max_responses > 9:
+        if not data.max_responses or data.max_responses <= 0 or data.max_responses > 15:
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR,
-                    _("max responses must be an integer between 1 and 9"),
+                    _("max responses must be an integer between 1 and 15"),
                 )
             )
 
@@ -216,6 +216,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 f"Failed while making LLM request using model {self.model}. Error: {e}",
                 exc_info=True,
             )
+            if "connection timed out" in str(e):
+                raise JsonHandlerError(500, str(e)) from e
             raise JsonHandlerError(500, "A probem occured. Please retry.") from e
 
         if response:

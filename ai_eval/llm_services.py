@@ -31,11 +31,16 @@ class DefaultLLMService(LLMServiceBase):
         kwargs = {}
         if api_base:
             kwargs["api_base"] = api_base
-        return (
-            completion(model=model, api_key=api_key, messages=messages, **kwargs)
-            .choices[0]
-            .message.content
-        )
+        try:
+            return (
+                completion(model=model, api_key=api_key, messages=messages, timeout=30, **kwargs)
+                .choices[0]
+                .message.content
+            )
+        except Exception as e:
+            if "timeout" in str(e).lower():
+                raise Exception("We're sorry, but the connection timed out. Please try that request again.")
+            raise
 
     def get_available_models(self):
         return [str(m.value) for m in SupportedModels]
@@ -63,7 +68,7 @@ class CustomLLMService(LLMServiceBase):
             'scope': 'ml.chatbot.query'
         }
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        response = requests.post(self.token_url, data=data, headers=headers, timeout=10)
+        response = requests.post(self.token_url, data=data, headers=headers, timeout=30)
         response.raise_for_status()
         token_data = response.json()
         self._access_token = token_data['access_token']
@@ -95,11 +100,14 @@ class CustomLLMService(LLMServiceBase):
             "model": str(model),
             "prompt": prompt,
         }
-        response = requests.post(url, json=payload, headers=self._get_headers(), timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        # Adjust this if custom API returns the response differently
-        return data.get("response")
+        try:
+            response = requests.post(url, json=payload, headers=self._get_headers(), timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            # Adjust this if custom API returns the response differently
+            return data.get("response")
+        except requests.exceptions.Timeout:
+            raise Exception("We're sorry, but the connection timed out. Please try that request again.")
 
     def get_available_models(self):
         url = self.models_url
@@ -108,7 +116,7 @@ class CustomLLMService(LLMServiceBase):
                 logger.warning("CUSTOM_LLM_MODELS_URL not configured")
                 return []
 
-            response = requests.get(url, headers=self._get_headers(), timeout=10)
+            response = requests.get(url, headers=self._get_headers(), timeout=30)
             response.raise_for_status()
             data = response.json()
 
