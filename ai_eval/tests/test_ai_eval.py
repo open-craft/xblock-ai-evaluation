@@ -16,7 +16,7 @@ from ai_eval import (
     ShortAnswerAIEvalXBlock,
 )
 from ai_eval.base import AIEvalXBlock
-from ai_eval.llm import SupportedModels
+from ai_eval.supported_models import SupportedModels
 
 
 @pytest.fixture

@@ -1,36 +1,63 @@
 """
 Integration with LLMs.
 """
+import logging
+from django.conf import settings
+from .compat import get_site_configuration_value
+from .llm_services import DefaultLLMService, CustomLLMService
 
-from enum import Enum
-from litellm import completion
+logger = logging.getLogger(__name__)
 
 
-class SupportedModels(Enum):
+def get_llm_service():
     """
-    LLM Models supported by the CodingAIEvalXBlock and ShortAnswerAIEvalXBlock
+    Get the CustomLLMService if configured otherwise return the default service.
     """
+    use_custom_service = get_site_configuration_value("ai_eval", "USE_CUSTOM_LLM_SERVICE")
+    if use_custom_service:
+        models_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_MODELS_URL")
+        completions_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_COMPLETIONS_URL")
+        token_url = get_site_configuration_value("ai_eval", "CUSTOM_LLM_TOKEN_URL")
 
-    GPT4O = "gpt-4o"
-    GPT4O_MINI = "gpt-4o-mini"
-    GEMINI_PRO = "gemini/gemini-pro"
-    CLAUDE_SONNET = "claude-3-5-sonnet-20240620"
-    LLAMA = "ollama/llama2"
+        # Validate required configuration
+        missing_configs = []
+        if not models_url:
+            missing_configs.append("CUSTOM_LLM_MODELS_URL")
+        if not completions_url:
+            missing_configs.append("CUSTOM_LLM_COMPLETIONS_URL")
+        if not token_url:
+            missing_configs.append("CUSTOM_LLM_TOKEN_URL")
 
-    @staticmethod
-    def list():
-        return [str(m.value) for m in SupportedModels]
+        try:
+            client_id = settings.CUSTOM_LLM_CLIENT_ID
+            client_secret = settings.CUSTOM_LLM_CLIENT_SECRET
+            if not client_id:
+                missing_configs.append("CUSTOM_LLM_CLIENT_ID")
+            if not client_secret:
+                missing_configs.append("CUSTOM_LLM_CLIENT_SECRET")
+        except AttributeError:
+            missing_configs.extend(["CUSTOM_LLM_CLIENT_ID", "CUSTOM_LLM_CLIENT_SECRET"])
+
+        if missing_configs:
+            logger.warning(
+                f"Custom LLM service requested but missing configuration: {', '.join(missing_configs)}. "
+                f"Falling back to default service."
+            )
+            return DefaultLLMService()
+
+        return CustomLLMService(models_url, completions_url, token_url, client_id, client_secret)
+    return DefaultLLMService()
 
 
 def get_llm_response(
-    model: SupportedModels, api_key: str, messages: list, api_base: str
+    model: str, api_key: str, messages: list, api_base: str
 ) -> str:
     """
-    Get LLm response.
+    Get LLM response, using either the default or custom service based on site configuration.
 
     Args:
-        model (SupportedModels): The model to use for generating the response. This should be an instance of
-            the SupportedModels enum, specifying which LLM model to call.
+        model (str): The model to use for generating the response. This can be either a supported
+            default model or a custom model name depending on the configured service.
         api_key (str): The API key required for authenticating with the LLM service. This key should be kept
             confidential and used to authorize requests to the service.
         messages (list): A list of message objects to be sent to the LLM. Each message should be a dictionary
@@ -56,11 +83,5 @@ def get_llm_response(
         str: The response text from the LLM. This is typically the generated output based on the provided
             messages.
     """
-    kwargs = {}
-    if api_base:
-        kwargs["api_base"] = api_base
-    return (
-        completion(model=model, api_key=api_key, messages=messages, **kwargs)
-        .choices[0]
-        .message.content
-    )
+    llm_service = get_llm_service()
+    return llm_service.get_response(model, api_key, messages, api_base)

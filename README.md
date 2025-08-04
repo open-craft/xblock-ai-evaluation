@@ -67,6 +67,32 @@ API URLs are only required and used with the LLAMA model (`ollama/llama2`). Othe
 For better security, we recommend using site configuration or Django settings instead of configuring API keys at the 
 XBlock level. This prevents API keys from being exposed in course exports.
 
+### Custom LLM Service (advanced)
+
+The XBlocks can optionally route all LLM interactions through a custom LLM service instead of the default provider.
+To enable a custom service, configure the following **Site Configuration** keys under the `ai_eval` namespace:
+
+```json
+{
+  "ai_eval": {
+    "USE_CUSTOM_LLM_SERVICE": true,
+    "CUSTOM_LLM_MODELS_URL": "https://your-custom-service/models",
+    "CUSTOM_LLM_COMPLETIONS_URL": "https://your-custom-service/completions",
+    "CUSTOM_LLM_TOKEN_URL": "https://your-custom-service/oauth/token"
+  }
+}
+```
+
+Additionally, set your client credentials in Django settings (e.g. via Tutor config):
+
+```python
+CUSTOM_LLM_CLIENT_ID = "your-client-id"
+CUSTOM_LLM_CLIENT_SECRET = "your-client-secret"
+```
+
+Your custom service must implement the expected OAuth2 client‑credentials flow and provide JSON endpoints
+for listing models, obtaining completions, and fetching tokens as used by `CustomLLMService`.
+
 ## Dependencies
 - [Judge0 API](https://judge0.com/)
 - [Monaco editor](https://github.com/microsoft/monaco-editor)
