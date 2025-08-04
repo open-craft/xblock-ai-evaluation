@@ -30,6 +30,10 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
     $chatContainer.scrollTop($chatContainer.prop("scrollHeight"));
   };
 
+  const scrollToNewMessage = function($messageContainer) {
+    $chatContainer.scrollTop($messageContainer[0].offsetTop);
+  };
+
   const insertMessage = function(class_, content) {
     const $message = $('<div class="chat-message">');
     $message.addClass(class_);
@@ -37,7 +41,7 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
     const $messageContainer = $('<div class="chat-message-container">');
     $messageContainer.append($message);
     $messageContainer.insertBefore($spinnerContainer);
-    scrollToBottom();
+    scrollToNewMessage($messageContainer);
   };
 
   const deleteLastMessage = function() {

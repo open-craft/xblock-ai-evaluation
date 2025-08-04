@@ -39,7 +39,7 @@ class DefaultLLMService(LLMServiceBase):
             )
         except Exception as e:
             if "timeout" in str(e).lower():
-                raise Exception("We're sorry, but the connection timed out. Please try that request again.")
+                raise Exception("We're sorry, but the connection timed out. Please try that request again.") from e
             raise
 
     def get_available_models(self):
@@ -107,7 +107,9 @@ class CustomLLMService(LLMServiceBase):
             # Adjust this if custom API returns the response differently
             return data.get("response")
         except requests.exceptions.Timeout:
-            raise Exception("We're sorry, but the connection timed out. Please try that request again.")
+            raise Exception(  # pylint: disable=raise-missing-from
+                "We're sorry, but the connection timed out. Please try that request again."
+            )
 
     def get_available_models(self):
         url = self.models_url
