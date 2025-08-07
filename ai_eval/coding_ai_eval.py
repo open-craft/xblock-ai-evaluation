@@ -1,4 +1,5 @@
 """Coding Xblock with AI evaluation."""
+from typing import Self
 
 import logging
 import pkg_resources
@@ -15,7 +16,7 @@ from .llm_services import TIMEOUT_ERROR_MESSAGE
 from .utils import (
     submit_code,
     get_submission_result,
-    SUPPORTED_LANGUAGE_MAP,
+    get_supported_language_map,
     LanguageLabels,
 )
 
@@ -55,7 +56,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         help=_("The programming language used for this Xblock."),
         values=[
             {"display_name": language, "value": language}
-            for language in SUPPORTED_LANGUAGE_MAP
+            for language in get_supported_language_map()
         ],
         default=LanguageLabels.Python,
         Scope=Scope.settings,
@@ -102,6 +103,11 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         data = pkg_resources.resource_string(__name__, path)
         return data.decode("utf8")
 
+    def get_judge0_api_key(self, obj: Self = None) -> str | None:
+        """Get the API key for Judge0."""
+
+        return self._get_model_config_value("judge0_api_key", obj)
+
     def student_view(self, context=None):
         """
         The primary view of the CodingAIEvalXBlock, shown to students
@@ -120,10 +126,11 @@ class CodingAIEvalXBlock(AIEvalXBlock):
 
         frag.add_javascript(self.resource_string("static/js/src/coding_ai_eval.js"))
 
+        language_map = get_supported_language_map()
         monaco_html = self.loader.render_django_template(
             "/templates/monaco.html",
             {
-                "monaco_language": SUPPORTED_LANGUAGE_MAP[self.language].monaco_id,
+                "monaco_language": language_map[self.language].monaco_id,
             },
         )
         marked_html = self.resource_string("static/html/marked-iframe.html")
@@ -168,7 +175,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 )
             )
 
-        if data.language != LanguageLabels.HTML_CSS and not data.judge0_api_key:
+        if data.language != LanguageLabels.HTML_CSS and not self.get_judge0_api_key(data):
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR, _("Judge0 API key is mandatory")
@@ -246,7 +253,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         Submit code to Judge0.
         """
         submission_id = submit_code(
-            self.judge0_api_key, data["user_code"], self.language
+            self.get_judge0_api_key(), data["user_code"], self.language
         )
         return {"submission_id": submission_id}
 
@@ -266,7 +273,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         Get code submission result.
         """
         submission_id = data["submission_id"]
-        return get_submission_result(self.judge0_api_key, submission_id)
+        return get_submission_result(self.get_judge0_api_key(), submission_id)
 
     @staticmethod
     def workbench_scenarios():

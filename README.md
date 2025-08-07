@@ -93,6 +93,51 @@ CUSTOM_LLM_CLIENT_SECRET = "your-client-secret"
 Your custom service must implement the expected OAuth2 client‑credentials flow and provide JSON endpoints
 for listing models, obtaining completions, and fetching tokens as used by `CustomLLMService`.
 
+### Custom Judge0 Service (advanced)
+
+The Short Answer with AI Evaluation can be configured to use a custom Judge0 service (self-hosted or a different provider).
+
+To enable a custom service, configure the following **Site Configuration** keys under the `ai_eval` namespace:
+
+```json
+{
+  "ai_eval": {
+    "JUDGE0_BASE_URL": "https://your-custom-service",
+    "SUPPORTED_LANGUAGES": {
+      "Python": {
+        "monaco_id": "python",
+        "judge0_id": 71
+      },
+      "JavaScript": {
+        "monaco_id": "javascript",
+        "judge0_id": 63
+      },
+      "Java": {
+        "monaco_id": "java",
+        "judge0_id": 62
+      },
+      "C++": {
+        "monaco_id": "cpp",
+        "judge0_id": 76
+      },
+      "HTML/CSS": {
+        "monaco_id": "html",
+        "judge0_id": 1
+      }
+    }
+  }
+}
+```
+
+**Note:** You can get the specific judge0_ids for your installation by calling the `/languages` endpoint. Get the monaco_id from monaco documentation.
+
+Additionally, set your client credentials in Django settings (e.g. via Tutor config):
+
+```python
+JUDGE0_API_KEY = "your-api-key"
+```
+
+
 ## Dependencies
 - [Judge0 API](https://judge0.com/)
 - [Monaco editor](https://github.com/microsoft/monaco-editor)
