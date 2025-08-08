@@ -2,7 +2,7 @@
 
 import os
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def package_data(pkg, roots):
@@ -26,9 +26,10 @@ setup(
     version="0.2.0",
     description="XBlocks to write short text and code entries with AI-driven evaluation",
     license="Apache 2.0",
-    packages=[
-        "ai_eval",
-    ],
+    packages=find_packages(
+        include=["ai_eval", "ai_eval.*"],
+        exclude=["*tests"],
+    ),
     install_requires=[
         "XBlock",
         "litellm>=0.14,<1.0",

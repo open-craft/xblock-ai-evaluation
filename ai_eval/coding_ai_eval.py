@@ -13,11 +13,11 @@ from xblock.validation import ValidationMessage
 from .base import AIEvalXBlock
 from .llm_services import TIMEOUT_ERROR_MESSAGE
 from .utils import (
-    submit_code,
-    get_submission_result,
     SUPPORTED_LANGUAGE_MAP,
     LanguageLabels,
 )
+from .backends.factory import BackendFactory
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +168,14 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 )
             )
 
-        if data.language != LanguageLabels.HTML_CSS and not data.judge0_api_key:
+        # Only enforce Judge0 API key when Judge0 backend is selected (or default)
+        backend_config = getattr(settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', {})
+        backend_name = backend_config.get('backend', 'judge0')
+        if (
+            data.language != LanguageLabels.HTML_CSS
+            and backend_name != 'custom'
+            and not data.judge0_api_key
+        ):
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR, _("Judge0 API key is mandatory")
@@ -243,11 +250,10 @@ class CodingAIEvalXBlock(AIEvalXBlock):
     @XBlock.json_handler
     def submit_code_handler(self, data, suffix=""):  # pylint: disable=unused-argument
         """
-        Submit code to Judge0.
+        Submit code for execution.
         """
-        submission_id = submit_code(
-            self.judge0_api_key, data["user_code"], self.language
-        )
+        backend = BackendFactory.get_backend(self.judge0_api_key)
+        submission_id = backend.submit_code(data["user_code"], self.language)
         return {"submission_id": submission_id}
 
     @XBlock.json_handler
@@ -265,8 +271,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         """
         Get code submission result.
         """
+        backend = BackendFactory.get_backend(self.judge0_api_key)
         submission_id = data["submission_id"]
-        return get_submission_result(self.judge0_api_key, submission_id)
+        return backend.get_result(submission_id)
 
     @staticmethod
     def workbench_scenarios():

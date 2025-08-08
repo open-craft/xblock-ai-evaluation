@@ -3,7 +3,6 @@ Utilities
 """
 
 from dataclasses import dataclass
-import requests
 
 
 @dataclass
@@ -44,41 +43,3 @@ SUPPORTED_LANGUAGE_MAP = {
         monaco_id="html", judge0_id=-1
     ),  # no exec
 }
-
-
-JUDGE0_BASE_CE_URL = "https://judge0-ce.p.rapidapi.com"
-
-
-def submit_code(api_key: str, code: str, language: str) -> str:
-    """
-    Submit code to the judge0 API.
-    """
-    url = f"{JUDGE0_BASE_CE_URL}/submissions?base64_encoded=false&wait=false"
-    headers = {"content-type": "application/json", "x-rapidapi-key": api_key}
-
-    data = {
-        "source_code": code,
-        "language_id": SUPPORTED_LANGUAGE_MAP[language].judge0_id,
-    }
-
-    response = requests.post(url, headers=headers, json=data, timeout=10)
-    response.raise_for_status()
-    result = response.json()
-    sub_id = result["token"]
-
-    return sub_id
-
-
-def get_submission_result(api_key: str, submission_id: str):
-    """
-    Get result from Judge0 submission.
-    """
-
-    url = f"{JUDGE0_BASE_CE_URL}/submissions/{submission_id}?base64_encoded=false&fields=*"
-    headers = {"content-type": "application/json", "x-rapidapi-key": api_key}
-
-    response = requests.get(url, headers=headers, timeout=10)
-    response.raise_for_status()
-    result = response.json()
-
-    return result
