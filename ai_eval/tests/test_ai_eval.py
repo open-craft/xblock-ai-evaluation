@@ -297,9 +297,17 @@ def test_judge0_get_result(mock_get):
     mock_get.assert_called_once()
 
 
+@patch('ai_eval.backends.custom.requests.get')
 @patch('ai_eval.backends.custom.requests.post')
-def test_custom_submit_code(mock_post):
+def test_custom_submit_code(mock_post, mock_get):
     """Test CustomServiceBackend.submit_code method."""
+    lang_resp = Mock()
+    lang_resp.json.return_value = [
+        {"name": "Python"}, {"name": "JavaScript"}, {"name": "Java"}, {"name": "C++"}
+    ]
+    lang_resp.raise_for_status = Mock()
+    mock_get.return_value = lang_resp
+
     mock_response = Mock()
     mock_response.json.return_value = {"submission_id": "test-token"}
     mock_response.raise_for_status = Mock()
@@ -321,18 +329,19 @@ def test_custom_backend_language_validation_fails(mock_get):
     """Test CustomServiceBackend raises error for unsupported languages."""
     mock_response = Mock()
     mock_response.json.return_value = [
-{"name": "Python"}  # Only Python supported
+        {"name": "Python"}  # Only Python supported
     ]
     mock_response.raise_for_status = Mock()
     mock_get.return_value = mock_response
 
     with pytest.raises(ValueError) as exc_info:
-        CustomServiceBackend(
+        backend = CustomServiceBackend(
             submit_endpoint="http://test.com/submit",
             results_endpoint="http://test.com/results/{submission_id}",
             languages_endpoint="http://test.com/languages",
             api_key="test-key"
         )
+        backend._ensure_languages_validated()
 
     assert "does not support languages" in str(exc_info.value)
 
@@ -340,16 +349,20 @@ def test_custom_backend_language_validation_fails(mock_get):
 @patch('ai_eval.backends.custom.requests.get')
 def test_custom_get_result(mock_get):
     """Test CustomServiceBackend.get_result method."""
-    mock_response = Mock()
-    mock_response.json.return_value = {
+    lang_resp = Mock()
+    lang_resp.json.return_value = [
+        {"name": "Python"}, {"name": "JavaScript"}, {"name": "Java"}, {"name": "C++"}
+    ]
+    lang_resp.raise_for_status = Mock()
+
+    result_resp = Mock()
+    result_resp.json.return_value = {
         "status": "Completed",
         "stdout": "hello\n",
-        "stderr": None,
-        "execution_time": 0.01,
-        "memory_usage": 1024
+        "stderr": None
     }
-    mock_response.raise_for_status = Mock()
-    mock_get.return_value = mock_response
+    result_resp.raise_for_status = Mock()
+    mock_get.side_effect = [lang_resp, result_resp]
 
     backend = CustomServiceBackend(
         submit_endpoint="http://test.com/submit",
@@ -360,7 +373,7 @@ def test_custom_get_result(mock_get):
 
     assert result["status"]["description"] == "Completed"
     assert result["stdout"] == "hello\n"
-    mock_get.assert_called_once()
+    assert mock_get.call_count == 2
 
 
 @pytest.mark.parametrize(
