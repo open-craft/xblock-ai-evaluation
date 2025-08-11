@@ -5,6 +5,11 @@ Utilities
 from dataclasses import dataclass
 
 
+# Default timeout (in seconds) for outbound HTTP requests made by backends.
+# Adjust here to change the global default behavior.
+DEFAULT_HTTP_TIMEOUT = 30
+
+
 @dataclass
 class ProgrammimgLanguage:
     """A programming language."""
@@ -42,4 +47,4 @@ SUPPORTED_LANGUAGE_MAP = {
     LanguageLabels.HTML_CSS: ProgrammimgLanguage(
         monaco_id="html", judge0_id=-1
     ),  # no exec
-}
+    }

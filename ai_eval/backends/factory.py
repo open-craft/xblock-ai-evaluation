@@ -1,4 +1,6 @@
-from django.conf import settings
+"""Backend selection factory."""
+
+import django.conf as django_conf
 from .judge0 import Judge0Backend
 from .custom import CustomServiceBackend
 
@@ -7,20 +9,21 @@ class BackendFactory:
     """
     Factory for creating code execution backends.
     """
-    
     @classmethod
     def get_backend(cls, api_key: str = ""):
         """
         Get the appropriate backend based on Django settings.
-        
+
         Args:
             api_key: Judge0 API key (only used for judge0 backend)
-            
+
         Returns:
             CodeExecutionBackend: Configured backend instance
         """
-        backend_config = getattr(settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', {})
-        
+        backend_config = getattr(
+            django_conf.settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', {}
+        )
+
         if backend_config.get('backend') == 'custom':
             config = backend_config.get('custom_config', {})
             return CustomServiceBackend(
@@ -32,7 +35,7 @@ class BackendFactory:
                 auth_header_name=config.get('auth_header_name', 'Authorization'),
                 auth_scheme=config.get('auth_scheme', 'Bearer'),
             )
-        
+
         # Default to judge0 backend
         judge0_config = backend_config.get('judge0_config', {})
         return Judge0Backend(

@@ -3,6 +3,7 @@
 import logging
 import pkg_resources
 
+from django.conf import settings
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
@@ -16,7 +17,6 @@ from .utils import (
     LanguageLabels,
 )
 from .backends.factory import BackendFactory
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
