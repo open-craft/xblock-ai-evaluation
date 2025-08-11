@@ -5,6 +5,7 @@ import logging
 import pkg_resources
 
 from django.utils.translation import gettext_noop as _
+from django.conf import settings
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
@@ -106,7 +107,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
     def get_judge0_api_key(self, obj: Self = None) -> str | None:
         """Get the API key for Judge0."""
 
-        return self._get_model_config_value("judge0_api_key", obj)
+        obj = obj or self
+        api_key_from_settings = settings.JUDGE0_API_KEY if hasattr(settings, "JUDGE0_API_KEY") else None
+        return obj.judge0_api_key or api_key_from_settings
 
     def student_view(self, context=None):
         """
