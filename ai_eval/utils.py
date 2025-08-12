@@ -29,16 +29,16 @@ class LanguageLabels:
 # https://ce.judge0.com/#statuses-and-languages-active-and-archived-languages
 SUPPORTED_LANGUAGE_MAP = {
     LanguageLabels.Python: ProgrammimgLanguage(
-        monaco_id="python", judge0_id=71
+        monaco_id="python", judge0_id=92
     ),  # Python (3.11.2)
     LanguageLabels.JavaScript: ProgrammimgLanguage(
-        monaco_id="javascript", judge0_id=63
+        monaco_id="javascript", judge0_id=93
     ),  # JavaScript (Node.js 18.15.0)
     LanguageLabels.Java: ProgrammimgLanguage(
-        monaco_id="java", judge0_id=62
+        monaco_id="java", judge0_id=91
     ),  # Java (JDK 17.0.6)
     LanguageLabels.CPP: ProgrammimgLanguage(
-        monaco_id="cpp", judge0_id=76
+        monaco_id="cpp", judge0_id=54
     ),  # C++ (GCC 9.2.0)
     # Monaco's HTML support includes CSS support within the 'style' tag.
     LanguageLabels.HTML_CSS: ProgrammimgLanguage(
