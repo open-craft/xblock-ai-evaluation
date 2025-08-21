@@ -3,6 +3,7 @@ from typing import Self
 
 import logging
 import pkg_resources
+from django.core.cache import cache
 
 from django.utils.translation import gettext_noop as _
 from xblock.core import XBlock
@@ -34,6 +35,24 @@ def _get_model_choices(block):
         if not available_models:
             logger.warning("Custom service returned empty models list, using defaults")
             available_models = SupportedModels.list()
+            # Record a warning for Studio validation
+            try:
+                # Cache a short-lived warning keyed by usage_id to be surfaced during validation
+                usage_id = getattr(getattr(block, "scope_ids", None), "usage_id", None)
+                if usage_id:
+                    cache_key = f"ai_eval:models_warn:{usage_id}"
+                    cache.set(
+                        cache_key,
+                        _(
+                            "Custom LLM service did not return any models. Showing default models instead. "
+                            "Check custom service availability/configuration and try again, or configure API keys "
+                            "for the default models."
+                        ),
+                        timeout=120,
+                    )
+            # pylint: disable=broad-exception-caught
+            except Exception:  # pragma: no cover - best-effort, avoid breaking dropdown population
+                pass
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.error(
@@ -168,6 +187,15 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                     )
                 )
             )
+
+        # Surface any warning captured during model choices population without re-calling the service.
+        usage_id = getattr(getattr(self, "scope_ids", None), "usage_id", None)
+        if usage_id:
+            cache_key = f"ai_eval:models_warn:{usage_id}"
+            warning_msg = cache.get(cache_key)
+            if warning_msg:
+                validation.add(ValidationMessage(ValidationMessage.WARNING, warning_msg))
+                cache.delete(cache_key)
 
         if not data.model:
             validation.add(
