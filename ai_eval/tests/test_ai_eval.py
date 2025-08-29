@@ -102,8 +102,13 @@ def test_shortanswer_reset_allowed(shortanswer_block_data):
         "messages": {"USER": ["Hello"], "LLM": ["Hello"]},
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    # Pre-populate thread metadata to verify reset clears it
+    block.thread_id = "abc123"
+    block.thread_tag = "provider:model:tag"
     block.reset.__wrapped__(block, data={})
     assert block.messages == {"USER": [], "LLM": []}
+    assert block.thread_id == ""
+    assert block.thread_tag == ""
 
 
 def test_shortanswer_reset_forbidden(shortanswer_block_data):
@@ -140,9 +145,11 @@ def test_shortanswer_attachments(shortanswer_block_data):
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
     block._download_attachment = Mock(return_value="file contents <&>")
-    block.get_llm_response = Mock(return_value=".")
-    block.get_response.__wrapped__(block, data={"user_input": "."})
-    messages = block.get_llm_response.call_args.args[0]
+    with patch('ai_eval.llm.get_llm_response') as mocked:
+        mocked.return_value = (".", None)
+        block.get_response.__wrapped__(block, data={"user_input": "."})
+        # Extract the messages argument passed into get_llm_response
+        messages = mocked.call_args.kwargs.get('messages') or mocked.call_args.args[2]
     prompt = messages[0]["content"]
     assert "<filename>1.txt</filename>" in prompt
     assert "<contents>file contents &lt;&amp;&gt;</contents>" in prompt

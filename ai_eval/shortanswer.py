@@ -1,6 +1,7 @@
 """Short answers Xblock with AI evaluation."""
 
 import logging
+import hashlib
 import urllib.parse
 import urllib.request
 from multiprocessing.dummy import Pool
@@ -14,6 +15,8 @@ from xblock.fields import Boolean, Dict, Integer, List, String, Scope
 from xblock.validation import ValidationMessage
 
 from .base import AIEvalXBlock
+from .llm import get_llm_service
+from .llm_services import CustomLLMService
 
 
 logger = logging.getLogger(__name__)
@@ -178,14 +181,35 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         user_submission = str(data["user_input"])
 
         attachments = []
+        attachment_hash_inputs = []
         for filename, contents in self._get_attachments():
+            # Build system prompt attachment section (HTML-like) as before
             attachments.append(f"""
                 <attachment>
                     <filename>{saxutils.escape(filename)}</filename>
                     <contents>{saxutils.escape(contents)}</contents>
                 </attachment>
             """)
+            # For tagging, hash filename + contents
+            attachment_hash_inputs.append(f"{filename}|{contents}")
         attachments = '\n'.join(attachments)
+
+        # Compute a tag to identify compatible reuse across provider/model/prompt
+        # Include evaluation prompt, question, and attachment content hashes
+        prompt_hasher = hashlib.sha256()
+        prompt_hasher.update((self.evaluation_prompt or "").strip().encode("utf-8"))
+        prompt_hasher.update((self.question or "").strip().encode("utf-8"))
+        for item in attachment_hash_inputs:
+            prompt_hasher.update(item.encode("utf-8"))
+        prompt_hash = prompt_hasher.hexdigest()
+
+        # Determine provider tag based on service type
+        llm_service = get_llm_service()
+        provider_tag = "custom" if isinstance(llm_service, CustomLLMService) else "default"
+        current_tag = f"{provider_tag}:{self.model}:{prompt_hash}"
+        # Invalidate stale threads when tag changes
+        if getattr(self, "thread_tag", "") != current_tag:
+            self.thread_id = ""
 
         system_msg = {
             "role": "system",
@@ -210,6 +234,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         messages.append({"role": "user", "content": user_submission})
 
         try:
+            # Use the base wrapper which will pass/persist thread_id when supported
             response = self.get_llm_response(messages)
         except Exception as e:
             logger.error(
@@ -221,6 +246,9 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         if response:
             self.messages[self.USER_KEY].append(user_submission)
             self.messages[self.LLM_KEY].append(response)
+            # Persist the tag when a provider thread is active
+            if getattr(self, "thread_id", ""):
+                self.thread_tag = current_tag
             return {"response": response}
 
         raise JsonHandlerError(500, "A probem occured. The LLM sent an empty response.")
@@ -233,6 +261,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         if not self.allow_reset:
             raise JsonHandlerError(403, "Reset is disabled.")
         self.messages = {self.USER_KEY: [], self.LLM_KEY: []}
+        self.thread_id = ""
+        self.thread_tag = ""
         return {}
 
     @staticmethod

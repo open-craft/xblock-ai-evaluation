@@ -6,6 +6,7 @@ import requests
 
 from litellm import completion
 from .supported_models import SupportedModels
+from .compat import get_site_configuration_value
 
 logger = logging.getLogger(__name__)
 
@@ -16,29 +17,64 @@ class LLMServiceBase:
     """
     Base class for llm service.
     """
-    def get_response(self, model, api_key, messages, api_base):
+    # pylint: disable=too-many-positional-arguments
+    def get_response(self, model, api_key, messages, api_base, thread_id=None, use_threads=False):
+        """Get a response from the provider.
+
+        Args:
+            model (str): Model identifier.
+            api_key (str): API key (for default providers or passthrough).
+            messages (list[dict]): Chat messages.
+            api_base (str|None): Optional base URL (e.g., for llama/ollama).
+            thread_id (str|None): Optional provider-side conversation/thread id.
+            use_threads (bool): Whether provider threads are enabled by policy.
+
+        Returns:
+            tuple[str, str|None]: (response_text, new_thread_id)
+        """
         raise NotImplementedError
 
     def get_available_models(self):
         raise NotImplementedError
+
+    def supports_threads(self) -> bool:
+        """
+        Check if this service supports provider-side threads.
+
+        Default is False; custom services can override to be flag-driven.
+        """
+        return False
 
 
 class DefaultLLMService(LLMServiceBase):
     """
     Default llm service.
     """
-    def get_response(self, model, api_key, messages, api_base):
+    # pylint: disable=too-many-positional-arguments
+    def get_response(
+            self,
+            model,
+            api_key,
+            messages,
+            api_base,
+            thread_id=None,
+            use_threads=False
+    ):
         kwargs = {}
         if api_base:
             kwargs["api_base"] = api_base
-        return (
+        text = (
             completion(model=model, api_key=api_key, messages=messages, **kwargs)
             .choices[0]
             .message.content
         )
+        return text, None
 
     def get_available_models(self):
         return [str(m.value) for m in SupportedModels]
+
+    def supports_threads(self) -> bool:  # pragma: nocover - default is stateless
+        return False
 
 
 class CustomLLMService(LLMServiceBase):
@@ -81,25 +117,56 @@ class CustomLLMService(LLMServiceBase):
         self._ensure_token()
         return {'Authorization': f'Bearer {self._access_token}'}
 
-    def get_response(self, model, api_key, messages, api_base):
+    def get_response(
+            self,
+            model,
+            api_key,
+            messages,
+            api_base,
+            thread_id=None,
+            use_threads=False
+    ):
         """
         Send completion request to custom LLM endpoint.
         """
         url = self.completions_url
+        # When reusing an existing thread, only send the latest user input and rely on
+        # the provider to apply prior context associated with the conversation_id.
+        if use_threads and thread_id:
+            latest_user = None
+            for msg in reversed(messages):
+                if (msg.get('role') or '').lower() == 'user':
+                    latest_user = msg.get('content', '').strip()
+                    break
+            prompt = f"User: {latest_user}" if latest_user is not None else ""
+        else:
+            prompt = " ".join(
+                f"{msg.get('role', '').capitalize()}: {msg.get('content', '').strip()}"
+                for msg in messages
+            )
         # Adjust the payload structure based on custom API requirements
-        prompt = " ".join(
-            f"{msg.get('role', '').capitalize()}: {msg.get('content', '').strip()}"
-            for msg in messages
-        )
         payload = {
             "model": str(model),
             "prompt": prompt,
         }
+        # If threads are enabled, pass through conversation id when available
+        # and let the provider initialize a new thread if not.
+        if use_threads and thread_id:
+            payload["conversation_id"] = thread_id
+
         response = requests.post(url, json=payload, headers=self._get_headers(), timeout=10)
         response.raise_for_status()
         data = response.json()
         # Adjust this if custom API returns the response differently
-        return data.get("response")
+        text = data.get("response")
+        # Try to capture a new conversation/thread id if the API returns one.
+        new_thread_id = None
+        if use_threads:
+            new_thread_id = (
+                data.get("conversation_id")
+                or (data.get("data", {}) if isinstance(data.get("data"), dict) else {}).get("conversation_id")
+            )
+        return text, new_thread_id
 
     def get_available_models(self):
         url = self.models_url
@@ -153,3 +220,10 @@ class CustomLLMService(LLMServiceBase):
                 exc_info=True,
             )
             return []
+
+    def supports_threads(self) -> bool:
+        """Return whether provider threads should be used, from site flag."""
+        try:
+            return bool(get_site_configuration_value("ai_eval", "USE_PROVIDER_THREADS"))
+        except Exception:  # pylint: disable=broad-exception-caught
+            return False

@@ -50,8 +50,8 @@ def get_llm_service():
 
 
 def get_llm_response(
-    model: str, api_key: str, messages: list, api_base: str
-) -> str:
+    model: str, api_key: str, messages: list, api_base: str, thread_id: str | None = None
+) -> tuple[str, str | None]:
     """
     Get LLM response, using either the default or custom service based on site configuration.
 
@@ -80,8 +80,12 @@ def get_llm_response(
             API request URL. This is required only when using Llama which doesn't have an official provider.
 
     Returns:
-        str: The response text from the LLM. This is typically the generated output based on the provided
-            messages.
+        tuple[str, Optional[str]]: The response text and a new thread id if a provider thread was created/used.
     """
     llm_service = get_llm_service()
-    return llm_service.get_response(model, api_key, messages, api_base)
+    use_threads = False
+    try:
+        use_threads = bool(llm_service.supports_threads())
+    except Exception:  # pylint: disable=broad-exception-caught
+        use_threads = False
+    return llm_service.get_response(model, api_key, messages, api_base, thread_id=thread_id, use_threads=use_threads)

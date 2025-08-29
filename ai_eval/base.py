@@ -78,6 +78,16 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         default="",
         values_provider=_get_model_choices,
     )
+    thread_id = String(
+        help=_("Provider conversation/thread identifier (cache only)"),
+        default="",
+        scope=Scope.user_state,
+    )
+    thread_tag = String(
+        help=_("Fingerprint of provider/model/prompt for thread reuse"),
+        default="",
+        scope=Scope.user_state,
+    )
 
     editable_fields = (
         "display_name",
@@ -207,5 +217,17 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                 )
 
     def get_llm_response(self, messages):
-        return get_llm_response(self.model, self.get_model_api_key(), messages,
-                                self.get_model_api_url())
+        """
+        Call the shared LLM entrypoint and return the response.
+        """
+        prior_thread_id = self.thread_id or None
+        text, new_thread_id = get_llm_response(
+            self.model,
+            self.get_model_api_key(),
+            messages,
+            self.get_model_api_url(),
+            thread_id=prior_thread_id,
+        )
+        if new_thread_id:
+            self.thread_id = new_thread_id
+        return text

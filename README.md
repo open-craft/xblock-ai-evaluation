@@ -93,6 +93,23 @@ CUSTOM_LLM_CLIENT_SECRET = "your-client-secret"
 Your custom service must implement the expected OAuth2 client‑credentials flow and provide JSON endpoints
 for listing models, obtaining completions, and fetching tokens as used by `CustomLLMService`.
 
+#### Optional provider threads (conversation IDs)
+
+For deployments using a custom LLM service, you can enable provider‑side threads to cache context between turns. This is optional and disabled by default. When enabled, the LMS/XBlock remains the canonical chat history as that ensures vendor flexibility and continuity; provider threads are treated as a cache.
+
+- Site configuration (under `ai_eval`):
+  - `USE_PROVIDER_THREADS`: boolean, default `false`. When `true`, `CustomLLMService` attempts to reuse a provider conversation ID.
+- XBlock user state (managed automatically):
+  - `thread_id`: provider conversation ID cache.
+  - `thread_tag`: fingerprint of provider/model/prompt used to invalidate stale threads when configuration changes.
+
+Changing model or prompt automatically invalidates the cached thread; using the Reset button also clears both `thread_id` and `thread_tag`.
+
+Compatibility and fallback
+- Not all vendors/models support `conversation_id`. The default service path (via LiteLLM chat completions) does not use provider threads; calls remain stateless.
+- If threads are unsupported or ignored by a provider, the code still works and behaves statelessly.
+- With a custom provider that supports threads, the first turn sends full context and later turns send only the latest user input along with the cached `conversation_id`.
+
 ### Custom Code Execution Service (advanced)
 
 The Coding XBlock can route code execution to a third‑party service instead of Judge0. The service is expected to be asynchronous, exposing a submit endpoint that returns a submission identifier, and a results endpoint that returns the execution result when available. Configure this via Django settings:
