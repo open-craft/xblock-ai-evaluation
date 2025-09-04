@@ -145,7 +145,13 @@ def test_shortanswer_attachments(shortanswer_block_data):
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
     block._download_attachment = Mock(return_value="file contents <&>")
-    with patch('ai_eval.llm.get_llm_response') as mocked:
+    with patch('ai_eval.shortanswer.get_llm_service') as mock_service, \
+         patch('ai_eval.llm.get_llm_service') as mock_llm_service, \
+         patch('ai_eval.base.get_site_configuration_value', return_value=None), \
+         patch('ai_eval.base.get_llm_response') as mocked:
+        mock_service.return_value = Mock()
+        mock_service.return_value.supports_threads.return_value = False
+        mock_llm_service.return_value = mock_service.return_value
         mocked.return_value = (".", None)
         block.get_response.__wrapped__(block, data={"user_input": "."})
         # Extract the messages argument passed into get_llm_response
