@@ -207,9 +207,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         llm_service = get_llm_service()
         provider_tag = "custom" if isinstance(llm_service, CustomLLMService) else "default"
         current_tag = f"{provider_tag}:{self.model}:{prompt_hash}"
-        # Invalidate stale threads when tag changes
-        if getattr(self, "thread_tag", "") != current_tag:
-            self.thread_id = ""
 
         system_msg = {
             "role": "system",
@@ -234,8 +231,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         messages.append({"role": "user", "content": user_submission})
 
         try:
-            # Use the base wrapper which will pass/persist thread_id when supported
-            response = self.get_llm_response(messages)
+            text = self.get_llm_response(messages, tag=current_tag)
         except Exception as e:
             logger.error(
                 f"Failed while making LLM request using model {self.model}. Error: {e}",
@@ -243,13 +239,10 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             )
             raise JsonHandlerError(500, "A probem occured. Please retry.") from e
 
-        if response:
+        if text:
             self.messages[self.USER_KEY].append(user_submission)
-            self.messages[self.LLM_KEY].append(response)
-            # Persist the tag when a provider thread is active
-            if getattr(self, "thread_id", ""):
-                self.thread_tag = current_tag
-            return {"response": response}
+            self.messages[self.LLM_KEY].append(text)
+            return {"response": text}
 
         raise JsonHandlerError(500, "A probem occured. The LLM sent an empty response.")
 
@@ -261,8 +254,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         if not self.allow_reset:
             raise JsonHandlerError(403, "Reset is disabled.")
         self.messages = {self.USER_KEY: [], self.LLM_KEY: []}
-        self.thread_id = ""
-        self.thread_tag = ""
+        self.thread_map = {}
         return {}
 
     @staticmethod

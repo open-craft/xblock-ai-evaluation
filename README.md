@@ -100,10 +100,9 @@ For deployments using a custom LLM service, you can enable provider‑side threa
 - Site configuration (under `ai_eval`):
   - `USE_PROVIDER_THREADS`: boolean, default `false`. When `true`, `CustomLLMService` attempts to reuse a provider conversation ID.
 - XBlock user state (managed automatically):
-  - `thread_id`: provider conversation ID cache.
-  - `thread_tag`: fingerprint of provider/model/prompt used to invalidate stale threads when configuration changes.
+  - `thread_map`: a dictionary mapping `tag -> conversation_id`, where `tag = provider:model:prompt_hash`. This allows multiple concurrent provider threads per learner per XBlock, one per distinct prompt/model context.
 
-Changing model or prompt automatically invalidates the cached thread; using the Reset button also clears both `thread_id` and `thread_tag`.
+Reset clears `thread_map`. If a provider ignores threads, behavior remains stateless.
 
 Compatibility and fallback
 - Not all vendors/models support `conversation_id`. The default service path (via LiteLLM chat completions) does not use provider threads; calls remain stateless.

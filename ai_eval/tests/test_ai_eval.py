@@ -102,13 +102,11 @@ def test_shortanswer_reset_allowed(shortanswer_block_data):
         "messages": {"USER": ["Hello"], "LLM": ["Hello"]},
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
-    # Pre-populate thread metadata to verify reset clears it
-    block.thread_id = "abc123"
-    block.thread_tag = "provider:model:tag"
+    # Pre-populate thread map to verify reset clears it
+    block.thread_map = {"provider:model:tag": "abc123"}
     block.reset.__wrapped__(block, data={})
     assert block.messages == {"USER": [], "LLM": []}
-    assert block.thread_id == ""
-    assert block.thread_tag == ""
+    assert not block.thread_map
 
 
 def test_shortanswer_reset_forbidden(shortanswer_block_data):

@@ -6,7 +6,7 @@ import pkg_resources
 
 from django.utils.translation import gettext_noop as _
 from xblock.core import XBlock
-from xblock.fields import String, Scope
+from xblock.fields import String, Scope, Dict
 from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
@@ -78,14 +78,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         default="",
         values_provider=_get_model_choices,
     )
-    thread_id = String(
-        help=_("Provider conversation/thread identifier (cache only)"),
-        default="",
-        scope=Scope.user_state,
-    )
-    thread_tag = String(
-        help=_("Fingerprint of provider/model/prompt for thread reuse"),
-        default="",
+    thread_map = Dict(
+        help=_("Map of provider thread IDs keyed by tag"),
+        default={},
         scope=Scope.user_state,
     )
 
@@ -216,11 +211,17 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                     )
                 )
 
-    def get_llm_response(self, messages):
+    def get_llm_response(self, messages, tag: str | None = None):
         """
-        Call the shared LLM entrypoint and return the response.
+        Call the shared LLM entrypoint and return only the response text.
         """
-        prior_thread_id = self.thread_id or None
+        prior_thread_id = None
+        if tag:
+            try:
+                prior_thread_id = (self.thread_map or {}).get(tag) or None
+            except Exception:  # pylint: disable=broad-exception-caught
+                prior_thread_id = None
+
         text, new_thread_id = get_llm_response(
             self.model,
             self.get_model_api_key(),
@@ -228,6 +229,8 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             self.get_model_api_url(),
             thread_id=prior_thread_id,
         )
-        if new_thread_id:
-            self.thread_id = new_thread_id
+        if tag and new_thread_id:
+            tm = dict(getattr(self, "thread_map", {}) or {})
+            tm[tag] = new_thread_id
+            self.thread_map = tm
         return text
