@@ -83,9 +83,19 @@ def get_llm_response(
         tuple[str, Optional[str]]: The response text and a new thread id if a provider thread was created/used.
     """
     llm_service = get_llm_service()
-    use_threads = False
+    allow_threads = False
     try:
-        use_threads = bool(llm_service.supports_threads())
+        allow_threads = bool(llm_service.supports_threads())
     except Exception:  # pylint: disable=broad-exception-caught
-        use_threads = False
-    return llm_service.get_response(model, api_key, messages, api_base, thread_id=thread_id, use_threads=use_threads)
+        allow_threads = False
+
+    # Continue threaded conversation when a thread_id is provided
+    if thread_id:
+        return llm_service.get_response(model, api_key, messages, api_base, thread_id=thread_id)
+
+    # Start a new thread only when allowed in config setting
+    if allow_threads:
+        return llm_service.start_thread(model, api_key, messages, api_base)
+
+    # Stateless call - do not create or persist any conversation id
+    return llm_service.get_response(model, api_key, messages, api_base, thread_id=None)
