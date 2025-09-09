@@ -6,6 +6,7 @@ import requests
 
 from litellm import completion
 from .supported_models import SupportedModels
+from .compat import get_site_configuration_value
 
 logger = logging.getLogger(__name__)
 
@@ -18,27 +19,70 @@ class LLMServiceBase:
     """
     Base class for llm service.
     """
-    def get_response(self, model, api_key, messages, api_base):
+    # pylint: disable=too-many-positional-arguments
+    def get_response(self, model, api_key, messages, api_base, thread_id=None):
+        """
+        Get a response from the provider.
+
+        Args:
+            model (str): Model identifier.
+            api_key (str): API key (for default providers or passthrough).
+            messages (list[dict]): Chat messages.
+            api_base (str|None): Optional base URL (e.g., for llama/ollama).
+            thread_id (str|None): Optional provider-side conversation/thread id.
+
+        Returns:
+            tuple[str, str|None]: (response_text, optional_thread_id)
+        """
+        raise NotImplementedError
+
+    # pylint: disable=too-many-positional-arguments
+    def start_thread(self, model, api_key, messages, api_base):
+        """
+        Start a new provider-side thread and return its first response.
+
+        Return the provider-issued conversation/thread id if available.
+
+        Returns:
+            tuple[str, str|None]: (response_text, new_thread_id)
+        """
         raise NotImplementedError
 
     def get_available_models(self):
         raise NotImplementedError
+
+    def supports_threads(self) -> bool:
+        """
+        Check if this service supports provider-side threads.
+
+        Default is False; custom services can override to be flag-driven.
+        """
+        return False
 
 
 class DefaultLLMService(LLMServiceBase):
     """
     Default llm service.
     """
-    def get_response(self, model, api_key, messages, api_base):
+    # pylint: disable=too-many-positional-arguments
+    def get_response(
+            self,
+            model,
+            api_key,
+            messages,
+            api_base,
+            thread_id=None,
+    ):
         kwargs = {}
         if api_base:
             kwargs["api_base"] = api_base
         try:
-            return (
-                completion(model=model, api_key=api_key, messages=messages, timeout=30, **kwargs)
+            text = (
+                completion(model=model, api_key=api_key, messages=messages, **kwargs)
                 .choices[0]
                 .message.content
             )
+            return text, None
         except Exception as e:
             if "timeout" in str(e).lower():
                 raise Exception(TIMEOUT_ERROR_MESSAGE) from e
@@ -46,6 +90,9 @@ class DefaultLLMService(LLMServiceBase):
 
     def get_available_models(self):
         return [str(m.value) for m in SupportedModels]
+
+    def supports_threads(self) -> bool:  # pragma: nocover - default is stateless
+        return False
 
 
 class CustomLLMService(LLMServiceBase):
@@ -88,11 +135,34 @@ class CustomLLMService(LLMServiceBase):
         self._ensure_token()
         return {'Authorization': f'Bearer {self._access_token}'}
 
-    def get_response(self, model, api_key, messages, api_base):
+    def get_response(
+            self,
+            model,
+            api_key,
+            messages,
+            api_base,
+            thread_id=None,
+    ):
         """
         Send completion request to custom LLM endpoint.
+        If thread_id is provided, include it and send only the latest user input.
+        If thread_id is None, send full context and return (text, None).
         """
         url = self.completions_url
+        # When reusing an existing thread, only send the latest user input and rely on
+        # the provider to apply prior context associated with the conversation_id.
+        if thread_id:
+            latest_user = None
+            for msg in reversed(messages):
+                if (msg.get('role') or '').lower() == 'user':
+                    latest_user = msg.get('content', '').strip()
+                    break
+            prompt = f"User: {latest_user}" if latest_user is not None else ""
+        else:
+            prompt = " ".join(
+                f"{msg.get('role', '').capitalize()}: {msg.get('content', '').strip()}"
+                for msg in messages
+            )
         # Adjust the payload structure based on custom API requirements
         prompt = " ".join(
             f"{msg.get('role', '').capitalize()}: {msg.get('content', '').strip()}"
@@ -103,11 +173,14 @@ class CustomLLMService(LLMServiceBase):
             "prompt": prompt,
         }
         try:
-            response = requests.post(url, json=payload, headers=self._get_headers(), timeout=30)
+            response = requests.post(url, json=payload, headers=self._get_headers(), timeout=10)
             response.raise_for_status()
             data = response.json()
-            # Adjust this if custom API returns the response differently
-            return data.get("response")
+            text = data.get("response")
+            new_thread_id = data.get("conversation_id")
+            if not new_thread_id and isinstance(data.get("data"), dict):
+                new_thread_id = data["data"].get("conversation_id")
+            return text, new_thread_id
         except requests.exceptions.Timeout:
             raise Exception(TIMEOUT_ERROR_MESSAGE)  # pylint: disable=raise-missing-from
 
@@ -163,3 +236,11 @@ class CustomLLMService(LLMServiceBase):
                 exc_info=True,
             )
             return []
+
+    def supports_threads(self) -> bool:
+        """Return whether provider threads should be used, from site flag."""
+        try:
+            val = get_site_configuration_value("ai_eval", "PROVIDER_SUPPORTS_THREADS")
+            return bool(val)
+        except Exception:  # pylint: disable=broad-exception-caught
+            return False

@@ -102,8 +102,11 @@ def test_shortanswer_reset_allowed(shortanswer_block_data):
         "messages": {"USER": ["Hello"], "LLM": ["Hello"]},
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    # Pre-populate thread map to verify reset clears it
+    block.thread_map = {"provider:model:tag": "abc123"}
     block.reset.__wrapped__(block, data={})
     assert block.messages == {"USER": [], "LLM": []}
+    assert not block.thread_map
 
 
 def test_shortanswer_reset_forbidden(shortanswer_block_data):
@@ -140,9 +143,17 @@ def test_shortanswer_attachments(shortanswer_block_data):
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
     block._download_attachment = Mock(return_value="file contents <&>")
-    block.get_llm_response = Mock(return_value=".")
-    block.get_response.__wrapped__(block, data={"user_input": "."})
-    messages = block.get_llm_response.call_args.args[0]
+    with patch('ai_eval.shortanswer.get_llm_service') as mock_service, \
+         patch('ai_eval.llm.get_llm_service') as mock_llm_service, \
+         patch('ai_eval.base.get_site_configuration_value', return_value=None), \
+         patch('ai_eval.base.get_llm_response') as mocked:
+        mock_service.return_value = Mock()
+        mock_service.return_value.supports_threads.return_value = False
+        mock_llm_service.return_value = mock_service.return_value
+        mocked.return_value = (".", None)
+        block.get_response.__wrapped__(block, data={"user_input": "."})
+        # Extract the messages argument passed into get_llm_response
+        messages = mocked.call_args.kwargs.get('messages') or mocked.call_args.args[2]
     prompt = messages[0]["content"]
     assert "<filename>1.txt</filename>" in prompt
     assert "<contents>file contents &lt;&amp;&gt;</contents>" in prompt
