@@ -1,5 +1,6 @@
 """Short answers Xblock with AI evaluation."""
 
+import chardet
 import logging
 import hashlib
 import urllib.parse
@@ -146,6 +147,15 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 )
             )
 
+        try:
+            self._get_attachments(data.attachment_urls)
+        except Exception:
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR, _("Error downloading attachments"),
+                )
+            )
+
     def student_view(self, context=None):
         """
         The primary view of the ShortAnswerAIEvalXBlock, shown to students
@@ -182,15 +192,17 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
     def _download_attachment(self, url):
         with urllib.request.urlopen(url) as f:
-            return f.read().decode('utf-8')
+            data = f.read()
+            encoding = chardet.detect(data)['encoding']
+            return data.decode(encoding)
 
     def _filename_for_url(self, url):
         return urllib.parse.urlparse(url).path.split('/')[-1]
 
-    def _get_attachments(self):
+    def _get_attachments(self, attachment_urls):
         pool = Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS)
-        attachments = pool.map(self._download_attachment, self.attachment_urls)
-        filenames = map(self._filename_for_url, self.attachment_urls)
+        attachments = pool.map(self._download_attachment, attachment_urls)
+        filenames = map(self._filename_for_url, attachment_urls)
         return zip(filenames, attachments)
 
     @XBlock.json_handler
@@ -200,7 +212,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         attachments = []
         attachment_hash_inputs = []
-        for filename, contents in self._get_attachments():
+        for filename, contents in self._get_attachments(self.attachment_urls):
             # Build system prompt attachment section (HTML-like) as before
             attachments.append(f"""
                 <attachment>
