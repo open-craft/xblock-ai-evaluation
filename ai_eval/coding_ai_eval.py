@@ -11,6 +11,7 @@ from xblock.fields import Dict, Scope, String
 from xblock.validation import ValidationMessage
 
 from .base import AIEvalXBlock
+from .llm_services import TIMEOUT_ERROR_MESSAGE
 from .utils import (
     submit_code,
     get_submission_result,
@@ -224,7 +225,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 f"Failed while making LLM request using model {self.model}. Error: {e}",
                 exc_info=True,
             )
-            raise JsonHandlerError(500, "A probem occured. Please retry.") from e
+            if str(e) == TIMEOUT_ERROR_MESSAGE:
+                raise JsonHandlerError(500, str(e)) from e
+            raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
         if response:
             self.messages[USER_RESPONSE] = data["code"]

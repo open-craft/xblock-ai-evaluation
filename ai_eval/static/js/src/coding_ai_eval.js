@@ -96,7 +96,7 @@ function CodingAIEvalXBlock(runtime, element, data) {
           })
           .fail(function (error) {
             console.log("Error: ", error);
-            deferred.reject(new Error("An error occured while trying to fetch Judge0 submission result."));
+            deferred.reject(new Error("An error occurred while trying to fetch Judge0 submission result."));
           });
       }
       attempt();
@@ -133,9 +133,14 @@ function CodingAIEvalXBlock(runtime, element, data) {
             stderr.text("");
           }
         },
-        error: function(xhr, status, error) {
-          console.error('Error:', error);
-          alert("A problem occured during reset.");
+        error: function(xhr) {
+          console.error('Error:', xhr);
+          try {
+            const response = JSON.parse(xhr.responseText);
+            alert(response.error || "A problem occurred during reset.");
+          } catch (e) {
+            alert("A problem occurred during reset.");
+          }
         }
       });
 
@@ -164,10 +169,15 @@ function CodingAIEvalXBlock(runtime, element, data) {
         .done(function (data) {
           enableSubmitButton();
         })
-        .fail(function (error) {
-          console.log("Error: ", error);
+        .fail(function (xhr) {
+          console.log("Error: ", xhr);
           enableSubmitButton();
-          alert("A problem occured while submitting the code.");
+          try {
+            const response = JSON.parse(xhr.responseText);
+            alert(response.error || "A problem occurred while submitting the code.");
+          } catch (e) {
+            alert("A problem occurred while submitting the code.");
+          }
         });
     });
 

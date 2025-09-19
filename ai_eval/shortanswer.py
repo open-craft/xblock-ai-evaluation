@@ -14,6 +14,7 @@ from xblock.fields import Boolean, Dict, Integer, List, String, Scope
 from xblock.validation import ValidationMessage
 
 from .base import AIEvalXBlock
+from .llm_services import TIMEOUT_ERROR_MESSAGE
 
 
 logger = logging.getLogger(__name__)
@@ -117,11 +118,11 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 )
             )
 
-        if not data.max_responses or data.max_responses <= 0 or data.max_responses > 9:
+        if not data.max_responses or data.max_responses <= 0 or data.max_responses > 15:
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR,
-                    _("max responses must be an integer between 1 and 9"),
+                    _("max responses must be an integer between 1 and 15"),
                 )
             )
 
@@ -216,14 +217,16 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 f"Failed while making LLM request using model {self.model}. Error: {e}",
                 exc_info=True,
             )
-            raise JsonHandlerError(500, "A probem occured. Please retry.") from e
+            if str(e) == TIMEOUT_ERROR_MESSAGE:
+                raise JsonHandlerError(500, str(e)) from e
+            raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
         if response:
             self.messages[self.USER_KEY].append(user_submission)
             self.messages[self.LLM_KEY].append(response)
             return {"response": response}
 
-        raise JsonHandlerError(500, "A probem occured. The LLM sent an empty response.")
+        raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")
 
     @XBlock.json_handler
     def reset(self, data, suffix=""):
