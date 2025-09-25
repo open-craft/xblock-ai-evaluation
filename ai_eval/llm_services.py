@@ -36,7 +36,6 @@ class LLMServiceBase:
         """
         raise NotImplementedError
 
-    # pylint: disable=too-many-positional-arguments
     def start_thread(self, model, api_key, messages, api_base):
         """
         Start a new provider-side thread and return its first response.
@@ -60,6 +59,7 @@ class LLMServiceBase:
         return False
 
 
+# pylint: disable=abstract-method
 class DefaultLLMService(LLMServiceBase):
     """
     Default llm service.
@@ -95,6 +95,7 @@ class DefaultLLMService(LLMServiceBase):
         return False
 
 
+# pylint: disable=abstract-method
 class CustomLLMService(LLMServiceBase):
     """
     Custom llm service.
