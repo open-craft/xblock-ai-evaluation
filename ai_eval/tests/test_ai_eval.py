@@ -26,7 +26,7 @@ from ai_eval.backends.custom import CustomServiceBackend
 def coding_block_data():
     """Fixture for coding block test data."""
     return {
-        "language": "Python",
+        "language": "Python (3.8.1)",
         "question": "ca va?",
         "code": "",
         "ai_evaluation": "",
@@ -247,10 +247,10 @@ def test_custom_backend_initialization(mock_get):
     """Test CustomServiceBackend initializes with correct config."""
     mock_response = Mock()
     mock_response.json.return_value = [
-        {"id": "92", "name": "Python"},
-        {"id": "93", "name": "JavaScript"},
-        {"id": "91", "name": "Java"},
-        {"id": "54", "name": "C++"}
+        {"id": "92", "name": "Python (3.8.1)"},
+        {"id": "93", "name": "JavaScript (Node.js 12.14.0)"},
+        {"id": "91", "name": "Java (OpenJDK 13.0.1)"},
+        {"id": "54", "name": "C++ (GCC 9.2.0)"}
     ]
     mock_response.raise_for_status = Mock()
     mock_get.return_value = mock_response
@@ -277,7 +277,7 @@ def test_judge0_submit_code(mock_post):
     mock_post.return_value = mock_response
 
     backend = Judge0Backend(api_key="test-key")
-    submission_id = backend.submit_code("print('hello')", "Python")
+    submission_id = backend.submit_code("print('hello')", "Python (3.8.1)")
 
     assert submission_id == "test-token"
     mock_post.assert_called_once()
@@ -312,7 +312,10 @@ def test_custom_submit_code(mock_post, mock_get):
     """Test CustomServiceBackend.submit_code method."""
     lang_resp = Mock()
     lang_resp.json.return_value = [
-        {"name": "Python"}, {"name": "JavaScript"}, {"name": "Java"}, {"name": "C++"}
+        {"name": "Python (3.8.1)"},
+        {"name": "JavaScript (Node.js 12.14.0)"},
+        {"name": "Java (OpenJDK 13.0.1)"},
+        {"name": "C++ (GCC 9.2.0)"}
     ]
     lang_resp.raise_for_status = Mock()
     mock_get.return_value = lang_resp
@@ -327,7 +330,7 @@ def test_custom_submit_code(mock_post, mock_get):
         results_endpoint="http://test.com/results/{submission_id}",
         languages_endpoint="http://test.com/languages"
     )
-    submission_id = backend.submit_code("print('hello')", "Python")
+    submission_id = backend.submit_code("print('hello')", "Python (3.8.1)")
 
     assert submission_id == "test-token"
     mock_post.assert_called_once()
@@ -338,7 +341,7 @@ def test_custom_backend_language_validation_fails(mock_get):
     """Test CustomServiceBackend raises error for unsupported languages."""
     mock_response = Mock()
     mock_response.json.return_value = [
-        {"name": "Python"}  # Only Python supported
+        {"name": "Python (3.8.1)"}  # Only Python supported
     ]
     mock_response.raise_for_status = Mock()
     mock_get.return_value = mock_response
@@ -360,7 +363,10 @@ def test_custom_get_result(mock_get):
     """Test CustomServiceBackend.get_result method."""
     lang_resp = Mock()
     lang_resp.json.return_value = [
-        {"name": "Python"}, {"name": "JavaScript"}, {"name": "Java"}, {"name": "C++"}
+        {"name": "Python (3.8.1)"},
+        {"name": "JavaScript (Node.js 12.14.0)"},
+        {"name": "Java (OpenJDK 13.0.1)"},
+        {"name": "C++ (GCC 9.2.0)"}
     ]
     lang_resp.raise_for_status = Mock()
 
@@ -448,7 +454,7 @@ def test_coding_block_submit_code_uses_backend(mock_get_backend, coding_block_da
     result = block.submit_code_handler.__wrapped__(block, data={"user_code": "print('hello')"})
 
     assert result == {"submission_id": "test-submission-id"}
-    mock_backend.submit_code.assert_called_once_with("print('hello')", "Python")
+    mock_backend.submit_code.assert_called_once_with("print('hello')", "Python (3.8.1)")
 
 
 @patch('ai_eval.coding_ai_eval.BackendFactory.get_backend')

@@ -15,7 +15,7 @@ class CodeExecutionBackend(ABC):
 
         Args:
             code: The source code to execute
-            language_label: Human-readable language label (e.g., "Python").
+            language_label: Human-readable language label (e.g., "Python (3.8.1)").
                 Implementations map this to their own representation.
 
         Returns:

@@ -21,10 +21,10 @@ class ProgrammimgLanguage:
 class LanguageLabels:
     """Language labels as seen by users."""
 
-    Python = "Python"
-    JavaScript = "JavaScript"
-    Java = "Java"
-    CPP = "C++"
+    Python = "Python (3.8.1)"
+    JavaScript = "JavaScript (Node.js 12.14.0)"
+    Java = "Java (OpenJDK 13.0.1)"
+    CPP = "C++ (GCC 9.2.0)"
     HTML_CSS = "HTML/CSS"
 
 
