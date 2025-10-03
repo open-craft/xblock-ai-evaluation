@@ -1,3 +1,4 @@
+{% load i18n %}
 {% if self.character_image %}
     <div class="shortanswer_image">
         <img src="{{ self.character_image }}" />
@@ -12,9 +13,9 @@
     </div>
 
     <div>
-        <div id="chat-history">
+        <div id="chat-history" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false">
             <div class="chat-message-container" id="chat-spinner-container">
-                <div class="chat-message" id="message-spinner" style="display: none;">
+                <div class="chat-message" id="message-spinner" style="display: none;" aria-hidden="true">
                     <div class="bounce1">
                     </div>
                     <div class="bounce2">
@@ -24,15 +25,19 @@
                 </div>
             </div>
         </div>
+        <div class="sr-only" id="chat-status" role="status" aria-live="polite"></div>
+        <div class="chat-instructions" id="chat-instructions">
+            <p>{% trans "Use the Submit button or press Ctrl+Enter (Cmd+Enter on Mac) to send your message. Use Shift+Enter to insert a new line." %}</p>
+        </div>
         <div class="submit-row">
             {% if self.allow_reset %}
-                <span class="chat-button" id="reset-button">Reset chat</span>
+                <button type="button" class="chat-button" id="reset-button">Reset chat</button>
             {% endif %}
             {% if has_finish_button %}
-                <span class="chat-button" id="finish-button">Submit for evaluation</span>
+                <button type="button" class="chat-button" id="finish-button">Submit for evaluation</button>
             {% endif %}
-            <textarea id="user-input" rows="1" placeholder="Type your answer here" maxlength="1000"></textarea>
-            <span class="chat-button" id="submit-button">Submit <i class="fa fa-paper-plane"></i></span>
+            <textarea id="user-input" rows="1" aria-describedby="chat-instructions" placeholder="Type your answer here" maxlength="1000"></textarea>
+            <button type="button" class="chat-button" id="submit-button">Submit <i class="fa fa-paper-plane"></i></button>
         </div>
     </div>
 </div>
