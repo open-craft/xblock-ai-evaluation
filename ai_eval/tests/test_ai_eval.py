@@ -20,11 +20,18 @@ from ai_eval.supported_models import SupportedModels
 from ai_eval.backends.factory import BackendFactory
 from ai_eval.backends.judge0 import Judge0Backend
 from ai_eval.backends.custom import CustomServiceBackend
+from ai_eval.utils import SUPPORTED_LANGUAGE_MAP, LanguageLabels
 
 
 @pytest.fixture
 def coding_block_data():
     """Fixture for coding block test data."""
+    monaco_html = AIEvalXBlock.loader.render_django_template(
+        "/templates/monaco.html",
+        {
+            "monaco_language": SUPPORTED_LANGUAGE_MAP[LanguageLabels.Python].monaco_id,
+        },
+    )
     return {
         "language": "Python",
         "question": "ca va?",
@@ -34,13 +41,7 @@ def coding_block_data():
         "marked_html": '<!doctype html>\n<html lang="en">\n<head></head>\n<body>\n    <script '
         'type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/marked/13.0.2/marked'
         '.min.js"></script>\n</body>\n</html>',
-        "monaco_html": '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n'
-        '  <title>Monaco Editor</title>\n</head>\n<body style="margin: 0;">\n  <div class="monaco"'
-        ' style="width: 100vw; height: 100vh;"></div>\n  <script type="module">\n    import * as'
-        ' monaco from "https://cdn.jsdelivr.net/npm/monaco-editor@0.49.0/+esm";\n\n    window.editor '
-        '= monaco.editor.create(document.querySelector(".monaco"), {\n      language: "python",\n    '
-        "  minimap: { enabled: false },\n      lineNumbersMinChars: 2,\n      folding: false,\n    });\n\n"
-        "    window.parent.postMessage('__USAGE_ID_PLACEHOLDER__', '*');\n  </script>\n</body>\n</html>\n",
+        "monaco_html": monaco_html,
     }
 
 
