@@ -1,23 +1,28 @@
+{% load i18n %}
 <div id="question-text"></div>
+<div class="coding-instructions" id="coding-instructions">
+  <p>{% trans "Press Alt+F1 for editor accessibility help. Press Tab to move out of the editor and use the Submit Code button to run your program." %}</p>
+</div>
+<div class="sr-only" id="coding-status" role="status" aria-live="polite"></div>
 <div class="eval-ai-container">
   <div class="eval-ai-code-editor">
     <div class="used-prog-language">
       <span>{{ self.language }}</span>
     </div>
-    <iframe id="monaco" frameborder="0" scrolling="no"></iframe>
+    <iframe id="monaco" frameborder="0" scrolling="no" aria-describedby="coding-instructions"></iframe>
     <div class="eval-ai-buttons">
       <button id="reset-button" class="eval-ai-button">Reset</button>
       <button id="submit-button" class="eval-ai-button btn btn-primary">Submit Code</button>
     </div>
   </div>
 
-  <div class="result">
-    <div class="tab">
-      <span class="tablinks result-tab-btn" data-id="output" id="defaultOpen">Output</span>
-      <span class="tablinks result-tab-btn" data-id="ai-feedback" id="ai-feedback-tab">AI feedback</span>
+  <div class="result" aria-live="polite">
+    <div class="tab" role="tablist" aria-label="Code evaluation panels">
+      <button type="button" class="result-tab-btn" id="output-tab" role="tab" aria-controls="output-panel" aria-selected="true">{% trans "Output" %}</button>
+      <button type="button" class="result-tab-btn" id="ai-feedback-tab" role="tab" aria-controls="ai-feedback-panel" aria-selected="false" tabindex="-1">{% trans "AI feedback" %}</button>
     </div>
 
-    <div id="output" class="tabcontent">
+    <div id="output-panel" class="tabcontent" role="tabpanel" aria-labelledby="output-tab" aria-hidden="false">
       {% if self.language == "HTML/CSS" %}
       <iframe class="html-render" scrolling="no" frameBorder="0"></iframe>
       {% else %}
@@ -26,6 +31,6 @@
       {% endif %}
     </div>
 
-    <div id="ai-feedback" class="tabcontent"></div>
+    <div id="ai-feedback-panel" class="tabcontent" role="tabpanel" aria-labelledby="ai-feedback-tab" hidden aria-hidden="true"></div>
   </div>
 </div>

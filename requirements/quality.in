@@ -5,4 +5,3 @@
 
 edx-lint                  # edX pylint rules and plugins
 pycodestyle               # PEP 8 compliance validation
-openai==0.28.1

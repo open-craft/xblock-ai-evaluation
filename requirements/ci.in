@@ -2,5 +2,4 @@
 -c constraints.txt
 
 tox                       # Virtualenv management for tests
-openai==0.28.1
-certifi==2023.11.17
+certifi==2025.8.3
