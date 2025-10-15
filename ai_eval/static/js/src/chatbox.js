@@ -15,6 +15,36 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
   const $submitButton = $("#submit-button", element);
   const $userInput = $("#user-input", element);
   const $status = $("#chat-status", element);
+  const $characterImage = $(".shortanswer_image img", element);
+  const $question = $("#question-text", element);
+
+  const updateChatMinHeight = function() {
+    if (!$characterImage.length) {
+      $chatContainer.css("min-height", "");
+      return;
+    }
+    const imageHeight = $characterImage.height();
+    if (!imageHeight) {
+      $chatContainer.css("min-height", "");
+      return;
+    }
+    const questionHeight = $question.outerHeight(true) || 0;
+    const minHeight = imageHeight - questionHeight;
+    if (minHeight > 0) {
+      $chatContainer.css("min-height", minHeight);
+    } else {
+      $chatContainer.css("min-height", "");
+    }
+  };
+
+  if ($characterImage.length) {
+    updateChatMinHeight();
+    if (!$characterImage[0].complete) {
+      $characterImage.on("load", updateChatMinHeight);
+      $characterImage.on("error", updateChatMinHeight);
+    }
+    $(window).on("resize", updateChatMinHeight);
+  }
 
   const announceStatus = function(message) {
     if ($status.length) {
@@ -227,6 +257,7 @@ function ChatBox(runtime, element, data, handleInit, handleResponse,
     }
     initDone = true;
     handleInit.call(fns);
+    updateChatMinHeight();
   };
 
   runFuncAfterLoading(init);
