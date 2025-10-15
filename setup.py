@@ -41,6 +41,7 @@ setup(
             "shortanswer_ai_eval = ai_eval:ShortAnswerAIEvalXBlock",
             "coding_ai_eval = ai_eval:CodingAIEvalXBlock",
             "multiagent_ai_eval = ai_eval:MultiAgentAIEvalXBlock",
+            "coach_ai_eval = ai_eval:CoachAIEvalXBlock",
         ]
     },
     package_data=package_data("ai_eval", ["static", "public", "templates"]),

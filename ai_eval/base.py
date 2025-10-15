@@ -243,6 +243,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         Call the shared LLM entrypoint and return only the response text.
         """
+        messages = list(messages)
         prior_thread_id = None
         if tag:
             try:

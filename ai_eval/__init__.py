@@ -5,4 +5,5 @@ Xblock to have short text and code entries with AI-driven evaluation.
 from .shortanswer import ShortAnswerAIEvalXBlock
 from .coding_ai_eval import CodingAIEvalXBlock
 from .multiagent import MultiAgentAIEvalXBlock
+from .coach import CoachAIEvalXBlock
 from .export import DataExportXBlock
