@@ -61,7 +61,7 @@ class Judge0Backend(CodeExecutionBackend):
         if isinstance(payload, list):
             for entry in payload:
                 try:
-                    name = str(entry["name"]).strip().lower()
+                    name = str(entry["name"]).strip()
                     language_id = int(entry["id"])
                 except (KeyError, TypeError, ValueError):
                     continue
