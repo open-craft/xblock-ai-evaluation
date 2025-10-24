@@ -1,12 +1,13 @@
 """Short answers Xblock with AI evaluation."""
 
-import chardet
 import logging
 import hashlib
 import urllib.parse
 import urllib.request
 from multiprocessing.dummy import Pool
 from xml.sax import saxutils
+
+import chardet
 
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
@@ -149,7 +150,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         try:
             self._get_attachments(data.attachment_urls)
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR, _("Error downloading attachments"),

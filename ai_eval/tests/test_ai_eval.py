@@ -4,6 +4,7 @@ Testing module.
 # pylint: disable=redefined-outer-name,protected-access
 
 import urllib.request
+import io
 from unittest.mock import Mock, patch
 
 import pytest
