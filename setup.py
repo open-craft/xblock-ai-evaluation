@@ -33,6 +33,7 @@ setup(
     install_requires=[
         "XBlock",
         "celery",
+        "chardet",
         "litellm",
     ],
     entry_points={

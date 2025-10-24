@@ -3,6 +3,8 @@ Testing module.
 """
 # pylint: disable=redefined-outer-name,protected-access
 
+import urllib.request
+import io
 from unittest.mock import Mock, patch
 
 import pytest
@@ -156,6 +158,14 @@ def test_shortanswer_attachments(shortanswer_block_data):
     prompt = messages[0]["content"]
     assert "<filename>1.txt</filename>" in prompt
     assert "<contents>file contents &lt;&amp;&gt;</contents>" in prompt
+
+
+def test_shortanswer_attachments_encoding(shortanswer_block_data):
+    """Test attachments for ShortAnswerAIEvalXBlock."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    urllib.request.urlopen = Mock(return_value=io.BytesIO("á".encode('latin-1')))
+    contents = block._download_attachment("http://example.com/1.txt")
+    assert contents == "á"
 
 
 def test_multiagent_block_finished():
