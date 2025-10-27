@@ -1,6 +1,7 @@
 """Multi-agent AI XBlock."""
 
-import itertools
+import hashlib
+import json
 import re
 import textwrap
 
@@ -14,6 +15,8 @@ from xblock.validation import ValidationMessage
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
+from .llm import get_llm_service
+from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 
 
@@ -299,6 +302,26 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def _get_field_display_name(self, field_name):
         return self.fields[field_name].display_name
 
+    def _get_thread_tag(self):
+        """Build provider:model:prompt_hash tag for LLM thread continuity."""
+        llm_service = get_llm_service()
+        provider_tag = "custom" if isinstance(llm_service, CustomLLMService) else "default"
+
+        prompt_hasher = hashlib.sha256()
+
+        def _update_hash(value):
+            if value:
+                prompt_hasher.update(str(value).strip().encode("utf-8"))
+
+        _update_hash(self.initial_message)
+        _update_hash(self.character_1_prompt)
+        _update_hash(self.character_2_prompt)
+        _update_hash(self.evaluator_prompt)
+        _update_hash(self.scenario_title)
+
+        prompt_hash = prompt_hasher.hexdigest()
+        return f"{provider_tag}:{self.model or ''}:{prompt_hash}"
+
     def student_view(self, context=None):
         """
         The primary view of the MultiAgentAIEvalXBlock, shown to students
@@ -357,7 +380,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             scenario_data=self.scenario_data,
             character_data=self._get_character_data(character_index),
         )
-        message = self.get_llm_response(self._llm_input(prompt, user_input))
+        message = self.get_llm_response(
+            self._llm_input(prompt, user_input),
+            tag=self._get_thread_tag(),
+        )
         if self.blacklist:
             if re.search(fr"\b({'|'.join(map(re.escape, self.blacklist))})\b",
                          message, re.I):
@@ -402,7 +428,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self.evaluator_prompt,
             scenario_data=self.scenario_data,
         )
-        message = self.get_llm_response(self._llm_input(prompt))
+        message = self.get_llm_response(
+            self._llm_input(prompt),
+            tag=self._get_thread_tag(),
+        )
         self.chat_history.append({
             "character_index": 0,
             "user_message": "",
