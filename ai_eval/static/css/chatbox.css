@@ -203,10 +203,25 @@
   margin-bottom: 1.5rem;
 }
 
+.coach-intro {
+  margin-bottom: 1rem;
+  color: #1f2933;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
 .coach-layout {
   display: flex;
   gap: 1.5rem;
   align-items: stretch;
+}
+
+.coach-pane--workspace {
+  flex: 1.6;
+}
+
+.coach-pane--coach {
+  flex: 1;
 }
 
 .coach-pane {
@@ -240,6 +255,14 @@
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0;
+}
+
+.coach-pane__title--workspace {
+  color: #ffffff;
+}
+
+.coach-pane__title--coach {
+  color: #1f2933;
 }
 
 .coach-link-button {
@@ -412,21 +435,35 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: rgba(15, 23, 42, 0.35);
   border-radius: 999px;
   padding: 0.4rem 0.6rem;
   margin-bottom: 1rem;
+  background: transparent;
+}
+
+.coach-pane--workspace .coach-input {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.coach-pane--coach .coach-input {
+  background: #f5f7fa;
 }
 
 .coach-input__textarea {
   flex: 1 1 auto;
   border: none;
-  background: transparent;
+  background: #ffffff;
   resize: none;
-  color: inherit;
+  color: #1f2933;
   font-size: 1rem;
   min-height: 2.4rem;
   max-height: 6.5rem;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+}
+
+.coach-input__textarea::placeholder {
+  color: #64748b;
 }
 
 .coach-input__textarea:focus {
@@ -502,7 +539,7 @@
 .coach-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
   flex-wrap: wrap;
 }
@@ -510,8 +547,8 @@
 .coach-attempts {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-right: auto;
 }
 
 .coach-attempts__label {

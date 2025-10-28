@@ -1,5 +1,10 @@
 {% load i18n %}
 <div class="coach-block">
+    {% if intro_text %}
+        <div class="coach-intro">
+            {{ intro_text | safe }}
+        </div>
+    {% endif %}
     {% if question_text %}
         <div class="coach-question">
             <div class="question-text">
@@ -11,7 +16,7 @@
     <div class="coach-layout">
         <section class="coach-pane coach-pane--workspace" aria-label="{% blocktrans %}Learner workspace{% endblocktrans %}">
             <header class="coach-pane__header">
-                <h2 class="coach-pane__title">{{ self.workspace_title }}</h2>
+                <h2 class="coach-pane__title coach-pane__title--workspace">{{ self.workspace_title }}</h2>
             </header>
             <div class="coach-history" data-character-index="0" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false">
                 <div class="coach-messages" data-pane="workspace"></div>
@@ -54,7 +59,7 @@
 
         <aside class="coach-pane coach-pane--coach" aria-label="{% blocktrans %}Coach conversation{% endblocktrans %}">
             <header class="coach-pane__header">
-                <h2 class="coach-pane__title">{{ self.coach_title }}</h2>
+                <h2 class="coach-pane__title coach-pane__title--coach">{{ self.coach_title }}</h2>
                 {% if self.allow_reset %}
                     <button type="button" class="coach-link-button coach-reset-button">
                         {% trans "Reset" %}

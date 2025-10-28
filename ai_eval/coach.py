@@ -133,6 +133,14 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
+    intro_text = String(
+        display_name=_("Introductory text"),
+        help=_("Optional introductory paragraph shown above the chat panes."),
+        default="",
+        scope=Scope.settings,
+        multiline_editor=True,
+    )
+
     character_1_avatar = String(
         display_name=_("Character #1 avatar URL"),
         help=_("URL for character #1 avatar image"),
@@ -252,6 +260,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "scenario_data",
         "workspace_title",
         "coach_title",
+        "intro_text",
         "character_1_name",
         "character_1_role",
         "character_1_prompt",
@@ -417,6 +426,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 {
                     "self": self,
                     "question_text": f"<h3><b>{self.scenario_title}</b></h3>",
+                    "intro_text": self.intro_text,
                     "characters": characters,
                 },
             )
@@ -454,7 +464,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if not isinstance(data, dict):
             raise JsonHandlerError(400, "Invalid payload.")
         if data.get("force_finish"):
-            raise JsonHandlerError(400, "Finish requests must call the evaluator handler.")
+            return self.get_evaluator_response()
 
         try:
             character_index = int(data["character_index"])
