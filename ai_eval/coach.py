@@ -1,7 +1,6 @@
 """Multi-agent AI XBlock."""
 
 import hashlib
-import json
 import re
 import textwrap
 
@@ -10,7 +9,7 @@ from django.utils.translation import gettext_noop as _
 from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
-from xblock.fields import Boolean, Dict, List, Scope, String
+from xblock.fields import Boolean, Dict, Integer, List, Scope, String
 from xblock.validation import ValidationMessage
 from web_fragments.fragment import Fragment
 
@@ -122,6 +121,32 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
+    workspace_title = String(
+        display_name=_("Workspace title"),
+        default=_("Add your answer"),
+        scope=Scope.settings,
+    )
+
+    coach_title = String(
+        display_name=_("Coach title"),
+        default=_("Tutor"),
+        scope=Scope.settings,
+    )
+
+    character_1_avatar = String(
+        display_name=_("Character #1 avatar URL"),
+        help=_("URL for character #1 avatar image"),
+        scope=Scope.settings,
+        default="",
+    )
+
+    character_2_avatar = String(
+        display_name=_("Character #2 avatar URL"),
+        help=_("URL for character #2 avatar image"),
+        scope=Scope.settings,
+        default="",
+    )
+
     character_1_name = String(
         display_name=_("Character #1 name"),
         help=_("Name of character #1"),
@@ -210,18 +235,35 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         scope=Scope.user_state,
     )
 
+    attempts_used = Integer(
+        scope=Scope.user_state,
+        default=0,
+    )
+
+    max_attempts = Integer(
+        display_name=_("Maximum attempts"),
+        help=_("Total attempts a learner is allowed for evaluation"),
+        default=3,
+        scope=Scope.settings,
+    )
+
     editable_fields = AIEvalXBlock.editable_fields + (
         "initial_message",
         "scenario_data",
+        "workspace_title",
+        "coach_title",
         "character_1_name",
         "character_1_role",
         "character_1_prompt",
+        "character_1_avatar",
         "character_2_name",
         "character_2_role",
         "character_2_prompt",
+        "character_2_avatar",
         "evaluator_prompt",
         "allow_reset",
         "blacklist",
+        "max_attempts",
     )
 
     # def studio_view(self, context):
@@ -240,29 +282,46 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def _get_character_data(self, character_index):
         # Hardcoded at 2 characters but extensible.
-        return [
+        characters = [
             {
                 "name": self.character_1_name,
                 "role": self.character_1_role,
+                "avatar": self.character_1_avatar,
+                "pane": "workspace",
             },
             {
                 "name": self.character_2_name,
                 "role": self.character_2_role,
+                "avatar": self.character_2_avatar,
+                "pane": "coach",
             },
-        ][character_index]
+        ]
+        return characters[character_index]
 
     def _get_chat_fragment_messages(self, fragment):
         character_index = fragment["character_index"]
-        return [
-            {
-                "character": {"name": "", "role": "user"},
-                "content": fragment["user_message"],
-            },
-            {
-                "character": self._get_character_data(character_index),
-                "content": fragment["character_message"],
-            },
-        ]
+        pane = self._get_character_data(character_index)["pane"]
+        messages = []
+        user_content = fragment.get("user_message")
+        if user_content:
+            messages.append({
+                "character": {
+                    "name": "",
+                    "role": "user",
+                    "avatar": "",
+                    "pane": pane,
+                },
+                "is_user": True,
+                "content": user_content,
+                "pane": pane,
+            })
+        messages.append({
+            "character": self._get_character_data(character_index),
+            "is_user": False,
+            "content": fragment["character_message"],
+            "pane": pane,
+        })
+        return messages
 
     def _get_chat_histories(self):
         """Get chat histories separated by character."""
@@ -302,6 +361,27 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def _get_field_display_name(self, field_name):
         return self.fields[field_name].display_name
 
+    def _get_attempt_state(self):
+        """Return attempt usage details for the frontend."""
+        max_attempts = self.max_attempts or 0
+        attempts_used = self.attempts_used or 0
+        if max_attempts < 0:
+            max_attempts = 0
+        if attempts_used < 0:
+            attempts_used = 0
+        attempts_remaining = max_attempts - attempts_used if max_attempts else None
+        if attempts_remaining is not None:
+            attempts_remaining = max(attempts_remaining, 0)
+        can_retry = True
+        if max_attempts:
+            can_retry = attempts_used < max_attempts
+        return {
+            "max_attempts": max_attempts,
+            "attempts_used": attempts_used,
+            "attempts_remaining": attempts_remaining,
+            "can_retry": can_retry and self.allow_reset,
+        }
+
     def _get_thread_tag(self):
         """Build provider:model:prompt_hash tag for LLM thread continuity."""
         llm_service = get_llm_service()
@@ -333,10 +413,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         frag = Fragment()
         frag.add_content(
             self.loader.render_django_template(
-                "/templates/chatbox_multi.html",
+                "/templates/coach_layout.html",
                 {
                     "self": self,
-                    "has_finish_button": True,
                     "question_text": f"<h3><b>{self.scenario_title}</b></h3>",
                     "characters": characters,
                 },
@@ -344,8 +423,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         )
         frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript(self.resource_string("static/js/src/utils.js"))
-        frag.add_javascript(self.resource_string("static/js/src/chatbox_multi.js"))
-        frag.add_javascript(self.resource_string("static/js/src/coach.js"))
         marked_html = self.resource_string("static/html/marked-iframe.html")
         js_data = {
             "chat_histories": self._get_chat_histories(),
@@ -356,8 +433,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "characters": characters,
             "finished": self.finished,
             "allow_reset": self.allow_reset,
+            "attempts": self._get_attempt_state(),
+            "max_attempts": self.max_attempts,
+            "titles": {
+                "workspace": self.workspace_title,
+                "coach": self.coach_title,
+            },
             "marked_html": marked_html,
         }
+        frag.add_javascript(self.resource_string("static/js/src/coach_redesign.js"))
         frag.initialize_js("CoachAIEvalXBlock", js_data)
         return frag
 
@@ -367,8 +451,25 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if self.finished:
             raise JsonHandlerError(403, "The session has ended.")
 
-        user_input = data["user_input"]
-        character_index = data["character_index"]
+        if not isinstance(data, dict):
+            raise JsonHandlerError(400, "Invalid payload.")
+        if data.get("force_finish"):
+            raise JsonHandlerError(400, "Finish requests must call the evaluator handler.")
+
+        try:
+            character_index = int(data["character_index"])
+        except (KeyError, TypeError, ValueError):
+            raise JsonHandlerError(400, "Missing character index.") from None
+        if character_index not in (0, 1):
+            raise JsonHandlerError(400, "Invalid character index.")
+
+        try:
+            user_input = data["user_input"]
+        except KeyError as exc:
+            raise JsonHandlerError(400, "Missing user input.") from exc
+        if user_input is None:
+            user_input = ""
+        user_input = str(user_input)
 
         # Hardcoded at 2 characters for now but designed to be extensible.
         template = [
@@ -400,11 +501,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "user_message": user_input,
             "character_message": message,
         })
+        character = self._get_character_data(character_index)
         return {
             "message": {
-                "character": self._get_character_data(character_index),
+                "character": character,
                 "content": message,
+                "pane": character["pane"],
             },
+            "attempts": self._get_attempt_state(),
+            "finished": self.finished,
         }
 
     @XBlock.json_handler
@@ -412,9 +517,17 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """Reset the chat history."""
         if not self.allow_reset:
             raise JsonHandlerError(403, "Reset is disabled.")
+        attempts_state = self._get_attempt_state()
+        if self.finished and attempts_state["attempts_remaining"] == 0 and attempts_state["max_attempts"]:
+            raise JsonHandlerError(403, "No attempts remaining.")
         self.chat_history = []
         self.finished = False
-        return {}
+        self.thread_map = {}
+        return {
+            "chat_histories": self._get_chat_histories(),
+            "attempts": self._get_attempt_state(),
+            "finished": self.finished,
+        }
 
     @XBlock.json_handler
     def get_evaluator_response(self):
@@ -424,6 +537,13 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         activity.
 
         """
+        if self.finished:
+            raise JsonHandlerError(403, "The session has ended.")
+
+        max_attempts = self.max_attempts or 0
+        if max_attempts and self.attempts_used >= max_attempts:
+            raise JsonHandlerError(403, "No attempts remaining.")
+
         prompt = self._render_template(
             self.evaluator_prompt,
             scenario_data=self.scenario_data,
@@ -438,9 +558,14 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "character_message": message,
         })
         self.finished = True
+        self.attempts_used = (self.attempts_used or 0) + 1
+        character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
         return {
             "message": {
-                "character": {"name": "", "role": "evaluator"},
+                "character": character,
                 "content": message,
+                "pane": character["pane"],
             },
+            "attempts": self._get_attempt_state(),
+            "finished": self.finished,
         }
