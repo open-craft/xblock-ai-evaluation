@@ -6,6 +6,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
 
   const handlerUrl = runtime.handlerUrl(element, "get_character_response");
   const resetHandlerUrl = runtime.handlerUrl(element, "reset");
+  const resumeAttemptHandlerUrl = runtime.handlerUrl(element, "resume_attempt");
   const evaluatorHandlerUrl = runtime.handlerUrl(element, "get_evaluator_response");
 
   const translate = (typeof gettext === "function") ? gettext : (message) => message;
@@ -190,6 +191,17 @@ function CoachAIEvalXBlock(runtime, element, data) {
     });
   };
 
+  const toggleInputsForWorkspace = function(show) {
+    const $workspaceInput = $(".coach-input[data-character-index='0']", element);
+    if ($workspaceInput.length) {
+      if (show) {
+        $workspaceInput.removeClass("coach-input--hidden");
+      } else {
+        $workspaceInput.addClass("coach-input--hidden");
+      }
+    }
+  };
+
   const setEvaluationEnabled = function(enable) {
     if ($submitEvaluation.length) {
       $submitEvaluation.prop("disabled", !enable);
@@ -231,16 +243,19 @@ function CoachAIEvalXBlock(runtime, element, data) {
       $attemptLabel.toggleClass("coach-attempts__label--warning", warning);
     }
 
-    const canRetry = attempts.can_retry;
+    const inputOpen = attempts.input_open !== undefined ? Boolean(attempts.input_open) : true;
+    const canRetry = attempts.can_retry && !inputOpen;
     setTryAgainEnabled(Boolean(canRetry));
-    const canReset = attempts.can_retry || !state.finished;
+    const canReset = attempts.can_retry || !inputOpen;
     setResetEnabled(Boolean(canReset));
 
-    let evalEnabled = !state.finished;
-    if (attempts.max_attempts && typeof attempts.attempts_remaining === "number") {
-      evalEnabled = evalEnabled && attempts.attempts_remaining > 0;
-    }
-    setEvaluationEnabled(evalEnabled);
+    const attemptsRemaining = typeof attempts.attempts_remaining === "number"
+      ? attempts.attempts_remaining
+      : null;
+    const showInput = !state.finished && inputOpen && (attemptsRemaining === null || attemptsRemaining > 0);
+    toggleInputsForWorkspace(showInput);
+
+    setEvaluationEnabled(!state.finished);
   };
 
   const applyFinishedState = function(finished) {
@@ -353,10 +368,49 @@ function CoachAIEvalXBlock(runtime, element, data) {
   };
 
   const startNewAttempt = function() {
-    if (!state.allowReset || !$tryAgainButton.length) {
+    const attempts = state.attempts || {};
+    const inputOpen = attempts.input_open !== undefined ? Boolean(attempts.input_open) : true;
+    if (inputOpen) {
       return;
     }
-    if (state.attempts && !state.attempts.can_retry && state.finished) {
+    if (attempts.max_attempts && attempts.attempts_remaining === 0) {
+      return;
+    }
+    setAllInputsEnabled(false);
+    if (paneControllers[0]) {
+      setPaneBusy(paneControllers[0], true);
+    }
+    announceStatus("workspace", translate("Preparing a new attempt…"));
+    $.ajax({
+      url: resumeAttemptHandlerUrl,
+      method: "POST",
+      data: JSON.stringify({}),
+      success: function(response) {
+        state.finished = Boolean(response && response.finished);
+        if (response && response.attempts) {
+          state.attempts = response.attempts;
+        }
+        setAllInputsEnabled(true);
+        if (paneControllers[0]) {
+          setPaneBusy(paneControllers[0], false);
+        }
+        updateAttemptUI();
+        announceStatus("workspace", translate("You can try again now."));
+      },
+      error: function() {
+        setAllInputsEnabled(true);
+        if (paneControllers[0]) {
+          setPaneBusy(paneControllers[0], false);
+        }
+        updateAttemptUI();
+        announceStatus("workspace", translate("Unable to start a new attempt."));
+        alert(translate("An error has occurred."));
+      },
+    });
+  };
+
+  const resetCoachPane = function() {
+    if (!state.allowReset || !$resetButton.length) {
       return;
     }
     setAllInputsEnabled(false);
@@ -387,8 +441,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
         if (paneControllers[1]) {
           setPaneBusy(paneControllers[1], false);
         }
-        applyFinishedState(Boolean(response && response.finished));
+        state.finished = Boolean(response && response.finished);
         setAllInputsEnabled(true);
+        updateAttemptUI();
       },
       error: function() {
         if (paneControllers[0]) {
@@ -402,13 +457,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
         alert(translate("An error has occurred."));
       },
     });
-  };
-
-  const resetCoachPane = function() {
-    if (!state.allowReset || !$resetButton.length) {
-      return;
-    }
-    startNewAttempt();
   };
 
   const submitForEvaluation = function() {

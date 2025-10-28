@@ -248,6 +248,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         default=0,
     )
 
+    input_open = Boolean(
+        scope=Scope.user_state,
+        default=True,
+    )
+
     max_attempts = Integer(
         display_name=_("Maximum attempts"),
         help=_("Total attempts a learner is allowed for evaluation"),
@@ -384,11 +389,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         can_retry = True
         if max_attempts:
             can_retry = attempts_used < max_attempts
+        input_open = self.input_open
+        if input_open is None:
+            input_open = True
         return {
             "max_attempts": max_attempts,
             "attempts_used": attempts_used,
             "attempts_remaining": attempts_remaining,
             "can_retry": can_retry and self.allow_reset,
+            "input_open": bool(input_open),
         }
 
     def _get_thread_tag(self):
@@ -480,6 +489,21 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if user_input is None:
             user_input = ""
         user_input = str(user_input)
+        trimmed_input = user_input.strip()
+
+        if character_index == 0:
+            max_attempts = self.max_attempts or 0
+            input_open = self.input_open
+            if input_open is None:
+                input_open = True
+            if not input_open:
+                raise JsonHandlerError(403, "No active attempt.")
+            if not trimmed_input:
+                raise JsonHandlerError(400, "Input cannot be empty.")
+            if max_attempts and self.attempts_used >= max_attempts:
+                raise JsonHandlerError(403, "No attempts remaining.")
+            self.attempts_used = (self.attempts_used or 0) + 1
+            self.input_open = False
 
         # Hardcoded at 2 characters for now but designed to be extensible.
         template = [
@@ -533,8 +557,22 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         self.chat_history = []
         self.finished = False
         self.thread_map = {}
+        self.input_open = True
         return {
             "chat_histories": self._get_chat_histories(),
+            "attempts": self._get_attempt_state(),
+            "finished": self.finished,
+        }
+
+    @XBlock.json_handler
+    def resume_attempt(self, data, suffix=""):
+        """Reopen the session for another attempt without clearing history."""
+        max_attempts = self.max_attempts or 0
+        if max_attempts and self.attempts_used >= max_attempts:
+            raise JsonHandlerError(403, "No attempts remaining.")
+        self.finished = False
+        self.input_open = True
+        return {
             "attempts": self._get_attempt_state(),
             "finished": self.finished,
         }
@@ -550,10 +588,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if self.finished:
             raise JsonHandlerError(403, "The session has ended.")
 
-        max_attempts = self.max_attempts or 0
-        if max_attempts and self.attempts_used >= max_attempts:
-            raise JsonHandlerError(403, "No attempts remaining.")
-
         prompt = self._render_template(
             self.evaluator_prompt,
             scenario_data=self.scenario_data,
@@ -568,7 +602,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "character_message": message,
         })
         self.finished = True
-        self.attempts_used = (self.attempts_used or 0) + 1
         character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
         return {
             "message": {

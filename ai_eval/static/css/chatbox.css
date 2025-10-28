@@ -216,30 +216,23 @@
   align-items: stretch;
 }
 
-.coach-pane--workspace {
-  flex: 1.6;
-}
-
-.coach-pane--coach {
-  flex: 1;
-}
-
 .coach-pane {
   display: flex;
   flex-direction: column;
   border-radius: 12px;
   padding: 1.5rem;
-  flex: 1 1 0;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   min-height: 28rem;
 }
 
 .coach-pane--workspace {
+  flex: 1.7 1 0;
   background: linear-gradient(180deg, #0a1d33 0%, #0d233f 100%);
   color: #f5f8ff;
 }
 
 .coach-pane--coach {
+  flex: 1 1 0;
   background: #ffffff;
 }
 
@@ -249,11 +242,13 @@
   justify-content: space-between;
   margin-bottom: 1rem;
   gap: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
 }
 
 .coach-pane__title {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
 }
 
@@ -270,7 +265,8 @@
   border: none;
   padding: 0;
   color: #2563eb;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 0.9rem;
   cursor: pointer;
   text-decoration: underline;
 }
@@ -439,6 +435,10 @@
   padding: 0.4rem 0.6rem;
   margin-bottom: 1rem;
   background: transparent;
+}
+
+.coach-input--hidden {
+  display: none;
 }
 
 .coach-pane--workspace .coach-input {
