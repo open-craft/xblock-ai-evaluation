@@ -112,9 +112,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
       if (character.name) {
         $meta.append($('<span class="coach-message__name">').text(character.name));
       }
-      if (character.role && character.role.toLowerCase() !== "user") {
-        $meta.append($('<span class="coach-message__role">').text(character.role));
-      }
       $contentWrapper.append($meta);
     }
 

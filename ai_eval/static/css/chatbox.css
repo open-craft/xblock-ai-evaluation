@@ -387,11 +387,6 @@
   align-items: baseline;
 }
 
-.coach-message__role {
-  font-weight: 400;
-  opacity: 0.75;
-}
-
 .coach-message__content p {
   margin: 0 0 0.5rem 0;
 }
@@ -431,10 +426,9 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  border-radius: 999px;
+  border-radius: 6px;
   padding: 0.4rem 0.6rem;
   margin-bottom: 1rem;
-  background: transparent;
 }
 
 .coach-input--hidden {
@@ -442,11 +436,12 @@
 }
 
 .coach-pane--workspace .coach-input {
-  background: rgba(255, 255, 255, 0.14);
+  background: white;
 }
 
 .coach-pane--coach .coach-input {
-  background: #f5f7fa;
+  background: white;
+  border: 1px solid;
 }
 
 .coach-input__textarea {
@@ -458,8 +453,8 @@
   font-size: 1rem;
   min-height: 2.4rem;
   max-height: 6.5rem;
-  border-radius: 999px;
   padding: 0.4rem 0.75rem;
+  box-shadow: none !important;
 }
 
 .coach-input__textarea::placeholder {
@@ -468,10 +463,7 @@
 
 .coach-input__textarea:focus {
   outline: none;
-}
-
-.coach-pane--coach .coach-input {
-  background: #f5f7fa;
+  box-shadow: none !important;
 }
 
 .coach-pane--coach .coach-input__textarea {
@@ -480,7 +472,7 @@
 
 .coach-button {
   border: none;
-  border-radius: 999px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 0.95rem;
   font-weight: 600;
@@ -513,12 +505,12 @@
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 999px;
-  background: #0b74de;
+  background: #1f2933;
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 16px rgba(11, 116, 222, 0.35);
+  /* box-shadow: 0 8px 16px rgba(11, 116, 222, 0.35); */
 }
 
 .coach-pane--coach .coach-button--icon {

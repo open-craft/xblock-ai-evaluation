@@ -473,7 +473,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if not isinstance(data, dict):
             raise JsonHandlerError(400, "Invalid payload.")
         if data.get("force_finish"):
-            return self.get_evaluator_response()
+            return self.get_evaluator_response({}, suffix)
 
         try:
             character_index = int(data["character_index"])
@@ -578,7 +578,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         }
 
     @XBlock.json_handler
-    def get_evaluator_response(self):
+    def get_evaluator_response(self, data, suffix=""):
         """
 
         Get the response from the AI model acting to evaluate the learner's
