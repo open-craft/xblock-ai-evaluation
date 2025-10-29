@@ -252,7 +252,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
     const showInput = !state.finished && inputOpen && (attemptsRemaining === null || attemptsRemaining > 0);
     toggleInputsForWorkspace(showInput);
 
-    setEvaluationEnabled(!state.finished);
+    setEvaluationEnabled(!state.finished && !inputOpen);
   };
 
   const applyFinishedState = function(finished) {

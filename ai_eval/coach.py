@@ -587,13 +587,42 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         if self.finished:
             raise JsonHandlerError(403, "The session has ended.")
+        if self.input_open:
+            raise JsonHandlerError(400, "No learner response available for evaluation.")
+
+        latest_fragment = next(
+            (
+                fragment
+                for fragment in reversed(self.chat_history)
+                if (fragment.get("user_message") or "").strip()
+            ),
+            None,
+        )
+        if not latest_fragment:
+            raise JsonHandlerError(400, "No learner response available for evaluation.")
 
         prompt = self._render_template(
             self.evaluator_prompt,
             scenario_data=self.scenario_data,
         )
+        conversation_messages = [
+            {
+                "character": {"name": "", "role": "user"},
+                "content": latest_fragment["user_message"],
+            }
+        ]
+        prompt += "\n\n" + self._render_template(
+            self.conversation_format,
+            messages=conversation_messages,
+        )
+
+        def _evaluator_messages():
+            yield {"role": "system", "content": prompt}
+            if self.model == SupportedModels.CLAUDE_SONNET.value:
+                yield {"role": "user", "content": "."}
+
         message = self.get_llm_response(
-            self._llm_input(prompt),
+            _evaluator_messages(),
             tag=self._get_thread_tag(),
         )
         self.chat_history.append({
