@@ -601,9 +601,19 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if not latest_fragment:
             raise JsonHandlerError(400, "No learner response available for evaluation.")
 
+        scenario_data = dict(self.scenario_data or {})
+        raw_criteria = scenario_data.get("evaluation_criteria") or []
+        normalized_criteria = []
+        for criterion in raw_criteria:
+            if isinstance(criterion, dict):
+                normalized_criteria.append(criterion)
+            else:
+                normalized_criteria.append({"name": str(criterion)})
+        scenario_data["evaluation_criteria"] = normalized_criteria
+
         prompt = self._render_template(
             self.evaluator_prompt,
-            scenario_data=self.scenario_data,
+            scenario_data=scenario_data,
         )
         conversation_messages = [
             {
