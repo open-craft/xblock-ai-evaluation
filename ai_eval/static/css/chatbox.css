@@ -518,6 +518,93 @@
   box-shadow: none;
 }
 
+.coach-report-card {
+  background: #07162b;
+  border-radius: 14px;
+  box-shadow: 0 18px 36px rgba(8, 23, 48, 0.35);
+  color: #f4f7ff;
+  margin-top: 1.5rem;
+  padding: 2.5rem 3rem;
+}
+
+.coach-report-card__header {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  margin-bottom: 1.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.coach-report-card__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.coach-report-card__section {
+  margin-bottom: 2rem;
+}
+
+.coach-report-card__section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+}
+
+.coach-report-card__blockquote {
+  margin: 0;
+  line-height: 1.7;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+}
+
+.coach-report-card__persona {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.coach-report-card__avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  object-fit: cover;
+  margin-bottom: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.coach-report-card__persona-name {
+  font-size: 1.15rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+.coach-report-card__persona-role {
+  margin: 0.35rem 0 0;
+  opacity: 0.75;
+}
+
+.coach-report-card__evaluation-section {
+  line-height: 1.7;
+}
+
+.coach-report-card__evaluation ul {
+  padding-left: 1.1rem;
+  margin-top: 1rem;
+}
+
+.coach-report-card__evaluation p {
+  margin-bottom: 1rem;
+}
+
+.coach-report-card__evaluation p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 960px) {
+  .coach-report-card {
+    padding: 2rem 1.5rem;
+  }
+}
+
 .coach-button.disabled,
 .coach-button:disabled,
 .coach-button--icon.disabled,

@@ -27,7 +27,14 @@ function CoachAIEvalXBlock(runtime, element, data) {
     attempts: data.attempts || {},
     allowReset: data.allow_reset,
     characters: data.characters || [],
+    reportVisible: false,
   };
+
+  const $workspacePane = $(".coach-pane--workspace", element);
+  const $workspaceHistory = $(".coach-history[data-character-index='0']", $workspacePane);
+  const $workspaceInputWrapper = $(".coach-input[data-character-index='0']", $workspacePane);
+  const $workspaceActions = $(".coach-actions", $workspacePane);
+  let $reportCard = null;
 
   const paneControllers = {};
   $(".coach-history", element).each(function() {
@@ -189,14 +196,52 @@ function CoachAIEvalXBlock(runtime, element, data) {
   };
 
   const toggleInputsForWorkspace = function(show) {
-    const $workspaceInput = $(".coach-input[data-character-index='0']", element);
-    if ($workspaceInput.length) {
+    if ($workspaceInputWrapper.length) {
       if (show) {
-        $workspaceInput.removeClass("coach-input--hidden");
+        $workspaceInputWrapper.removeClass("coach-input--hidden");
+        $workspaceInputWrapper.show();
       } else {
-        $workspaceInput.addClass("coach-input--hidden");
+        $workspaceInputWrapper.addClass("coach-input--hidden");
+        $workspaceInputWrapper.hide();
       }
     }
+  };
+
+  const showReportCard = function(response) {
+    if ($reportCard) {
+      $reportCard.remove();
+    }
+    $reportCard = $(response.report_html || "");
+    if ($reportCard.length) {
+      const evaluationMarkdown = response.evaluation_markdown || "";
+      if (evaluationMarkdown) {
+        const evaluationHTML = sanitizeHTML(evaluationMarkdown);
+        $reportCard.find(".coach-report-card__evaluation").html(evaluationHTML);
+      }
+      if ($workspaceHistory.length) {
+        $workspaceHistory.hide();
+      }
+      toggleInputsForWorkspace(false);
+      if ($workspaceActions.length) {
+        $workspaceActions.hide();
+      }
+      $workspacePane.append($reportCard);
+      state.reportVisible = true;
+    }
+  };
+
+  const hideReportCard = function() {
+    if ($reportCard) {
+      $reportCard.remove();
+      $reportCard = null;
+    }
+    if ($workspaceHistory.length) {
+      $workspaceHistory.show();
+    }
+    if ($workspaceActions.length) {
+      $workspaceActions.show();
+    }
+    state.reportVisible = false;
   };
 
   const setEvaluationEnabled = function(enable) {
@@ -278,12 +323,19 @@ function CoachAIEvalXBlock(runtime, element, data) {
   };
 
   const handleResponse = function(controller, response, userElement) {
+    const hasReport = Boolean(response && response.report_html);
     if (userElement) {
       userElement.removeClass("coach-message--pending");
     }
     setPaneBusy(controller, false);
-    setInputEnabled(controller, true);
-    if (response && response.message) {
+    if (!hasReport) {
+      setInputEnabled(controller, true);
+    }
+
+    if (hasReport) {
+      showReportCard(response);
+      announceStatus(controller.pane, translate("Evaluation ready."));
+    } else if (response && response.message) {
       appendMessage(controller, response.message);
       const name = response.message.character ? response.message.character.name : "";
       const announcement = name
@@ -291,6 +343,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
         : translate("New message received");
       announceStatus(controller.pane, announcement);
     }
+
     if (response && response.attempts) {
       state.attempts = response.attempts;
     }
@@ -387,6 +440,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
         if (response && response.attempts) {
           state.attempts = response.attempts;
         }
+        hideReportCard();
         setAllInputsEnabled(true);
         if (paneControllers[0]) {
           setPaneBusy(paneControllers[0], false);
@@ -432,6 +486,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
         if (response && response.attempts) {
           state.attempts = response.attempts;
         }
+        hideReportCard();
         if (paneControllers[0]) {
           setPaneBusy(paneControllers[0], false);
         }

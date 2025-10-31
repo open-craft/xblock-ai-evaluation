@@ -642,12 +642,24 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         })
         self.finished = True
         character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
+        report_html = self.loader.render_django_template(
+            "/templates/final_evaluation.html",
+            {
+                "self": self,
+                "final_submission": latest_fragment["user_message"],
+                "evaluator": self._get_character_data(0),
+            },
+        )
         return {
             "message": {
                 "character": character,
                 "content": message,
                 "pane": character["pane"],
             },
+            "final_submission": latest_fragment["user_message"],
+            "report_html": report_html,
+            "evaluation_markdown": message,
+            "show_report_card": True,
             "attempts": self._get_attempt_state(),
             "finished": self.finished,
         }
