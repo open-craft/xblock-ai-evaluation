@@ -253,6 +253,16 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         default=True,
     )
 
+    final_submission = String(
+        scope=Scope.user_state,
+        default="",
+    )
+
+    final_evaluation_markdown = String(
+        scope=Scope.user_state,
+        default="",
+    )
+
     max_attempts = Integer(
         display_name=_("Maximum attempts"),
         help=_("Total attempts a learner is allowed for evaluation"),
@@ -312,7 +322,21 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         ]
         return characters[character_index]
 
+    def _is_evaluation_fragment(self, fragment):
+        if fragment.get("is_evaluation"):
+            return True
+        if fragment.get("character_index") != 0:
+            return False
+        if fragment.get("user_message"):
+            return False
+        evaluation = self.final_evaluation_markdown or ""
+        if not evaluation:
+            return False
+        return fragment.get("character_message") == evaluation
+
     def _get_chat_fragment_messages(self, fragment):
+        if self._is_evaluation_fragment(fragment):
+            return []
         character_index = fragment["character_index"]
         pane = self._get_character_data(character_index)["pane"]
         messages = []
@@ -345,6 +369,33 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             chat_history = chat_histories[character_index]
             chat_history.extend(self._get_chat_fragment_messages(fragment))
         return chat_histories
+
+    def _render_final_report(self, final_submission):
+        return self.loader.render_django_template(
+            "/templates/final_evaluation.html",
+            {
+                "self": self,
+                "final_submission": final_submission,
+                "evaluator": self._get_character_data(0),
+            },
+        )
+
+    def _build_final_report_payload(self):
+        if not self.finished:
+            return None
+        final_submission = self.final_submission or ""
+        evaluation_markdown = self.final_evaluation_markdown or ""
+        if not final_submission or not evaluation_markdown:
+            return None
+        report_html = self._render_final_report(final_submission)
+        return {
+            "final_submission": final_submission,
+            "evaluation_markdown": evaluation_markdown,
+            "report_html": report_html,
+            "show_report_card": True,
+            "attempts": self._get_attempt_state(),
+            "finished": self.finished,
+        }
 
     def _llm_input(self, prompt, user_input=None):
         """Append the chat history to the given system prompt."""
@@ -460,6 +511,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             },
             "marked_html": marked_html,
         }
+        final_report = self._build_final_report_payload()
+        if final_report:
+            js_data["final_report"] = final_report
         frag.add_javascript(self.resource_string("static/js/src/coach_redesign.js"))
         frag.initialize_js("CoachAIEvalXBlock", js_data)
         return frag
@@ -558,6 +612,8 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         self.finished = False
         self.thread_map = {}
         self.input_open = True
+        self.final_submission = ""
+        self.final_evaluation_markdown = ""
         return {
             "chat_histories": self._get_chat_histories(),
             "attempts": self._get_attempt_state(),
@@ -572,6 +628,8 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             raise JsonHandlerError(403, "No attempts remaining.")
         self.finished = False
         self.input_open = True
+        self.final_submission = ""
+        self.final_evaluation_markdown = ""
         return {
             "attempts": self._get_attempt_state(),
             "finished": self.finished,
@@ -639,24 +697,20 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "character_index": 0,
             "user_message": "",
             "character_message": message,
+            "is_evaluation": True,
         })
         self.finished = True
+        self.final_submission = latest_fragment["user_message"]
+        self.final_evaluation_markdown = message
         character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
-        report_html = self.loader.render_django_template(
-            "/templates/final_evaluation.html",
-            {
-                "self": self,
-                "final_submission": latest_fragment["user_message"],
-                "evaluator": self._get_character_data(0),
-            },
-        )
+        report_html = self._render_final_report(self.final_submission)
         return {
             "message": {
                 "character": character,
                 "content": message,
                 "pane": character["pane"],
             },
-            "final_submission": latest_fragment["user_message"],
+            "final_submission": self.final_submission,
             "report_html": report_html,
             "evaluation_markdown": message,
             "show_report_card": True,

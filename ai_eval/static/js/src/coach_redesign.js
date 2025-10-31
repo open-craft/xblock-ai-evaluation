@@ -618,5 +618,16 @@ function CoachAIEvalXBlock(runtime, element, data) {
   runFuncAfterLoading(function init() {
     populateHistories(data.chat_histories);
     applyFinishedState(state.finished);
+    if (data.final_report && data.final_report.report_html) {
+      if (data.final_report.attempts) {
+        state.attempts = data.final_report.attempts;
+      }
+      showReportCard({
+        report_html: data.final_report.report_html,
+        evaluation_markdown: data.final_report.evaluation_markdown,
+        final_submission: data.final_report.final_submission,
+        attempts: state.attempts,
+      });
+    }
   });
 }
