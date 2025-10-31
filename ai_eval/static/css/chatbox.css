@@ -599,6 +599,60 @@
   margin-bottom: 0;
 }
 
+.coach-report-card__actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.coach-report-card__cta {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #f4f7ff;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0.75rem 1.75rem;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.coach-report-card__cta:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.coach-layout--report {
+  display: block;
+}
+
+.coach-layout--report .coach-pane--coach {
+  display: none;
+}
+
+.coach-layout--report .coach-pane--workspace {
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.coach-pane--report {
+  position: relative;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  min-height: auto;
+}
+
+.coach-pane--report .coach-report-card {
+  margin-top: 0;
+}
+
+.coach-pane--report .coach-pane__header,
+.coach-pane--report .coach-history,
+.coach-pane--report .coach-input,
+.coach-pane--report .coach-actions {
+  display: none !important;
+}
+
 @media (max-width: 960px) {
   .coach-report-card {
     padding: 2rem 1.5rem;

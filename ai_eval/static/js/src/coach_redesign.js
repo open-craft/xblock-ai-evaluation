@@ -30,6 +30,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
     reportVisible: false,
   };
 
+  const $layout = $(".coach-layout", element);
   const $workspacePane = $(".coach-pane--workspace", element);
   const $workspaceHistory = $(".coach-history[data-character-index='0']", $workspacePane);
   const $workspaceInputWrapper = $(".coach-input[data-character-index='0']", $workspacePane);
@@ -225,8 +226,29 @@ function CoachAIEvalXBlock(runtime, element, data) {
       if ($workspaceActions.length) {
         $workspaceActions.hide();
       }
+      if ($workspacePane.length) {
+        $workspacePane.addClass("coach-pane--report");
+      }
+      if ($layout.length) {
+        $layout.addClass("coach-layout--report");
+      }
+
+      const $cardActions = $reportCard.find(".coach-report-card__actions");
+      if ($cardActions.length) {
+        $cardActions.empty();
+        const attempts = response.attempts || {};
+        if (attempts.can_retry) {
+          const $cta = $('<button type="button" class="coach-report-card__cta">').text(translate("Try again"));
+          $cta.on("click", function() {
+            startNewAttempt();
+          });
+          $cardActions.append($cta);
+        }
+      }
+
       $workspacePane.append($reportCard);
       state.reportVisible = true;
+      setEvaluationEnabled(false);
     }
   };
 
@@ -240,6 +262,12 @@ function CoachAIEvalXBlock(runtime, element, data) {
     }
     if ($workspaceActions.length) {
       $workspaceActions.show();
+    }
+    if ($workspacePane.length) {
+      $workspacePane.removeClass("coach-pane--report");
+    }
+    if ($layout.length) {
+      $layout.removeClass("coach-layout--report");
     }
     state.reportVisible = false;
   };
@@ -294,10 +322,10 @@ function CoachAIEvalXBlock(runtime, element, data) {
     const attemptsRemaining = typeof attempts.attempts_remaining === "number"
       ? attempts.attempts_remaining
       : null;
-    const showInput = !state.finished && inputOpen && (attemptsRemaining === null || attemptsRemaining > 0);
+    const showInput = inputOpen && (attemptsRemaining === null || attemptsRemaining > 0);
     toggleInputsForWorkspace(showInput);
 
-    setEvaluationEnabled(!state.finished && !inputOpen);
+    setEvaluationEnabled(!inputOpen);
   };
 
   const applyFinishedState = function(finished) {
@@ -335,7 +363,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
     if (hasReport) {
       showReportCard(response);
       announceStatus(controller.pane, translate("Evaluation ready."));
-    } else if (response && response.message) {
+    }
+
+    if (response && response.message && !hasReport) {
       appendMessage(controller, response.message);
       const name = response.message.character ? response.message.character.name : "";
       const announcement = name
