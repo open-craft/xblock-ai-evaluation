@@ -451,7 +451,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "input_open": bool(input_open),
         }
 
-    def _get_thread_tag(self):
+    def _get_thread_tag(self, context="workspace"):
         """Build provider:model:prompt_hash tag for LLM thread continuity."""
         llm_service = get_llm_service()
         provider_tag = "custom" if isinstance(llm_service, CustomLLMService) else "default"
@@ -469,7 +469,8 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         _update_hash(self.scenario_title)
 
         prompt_hash = prompt_hasher.hexdigest()
-        return f"{provider_tag}:{self.model or ''}:{prompt_hash}"
+        context = context or "workspace"
+        return f"{provider_tag}:{self.model or ''}:{prompt_hash}:{context}"
 
     def student_view(self, context=None):
         """
@@ -569,9 +570,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             scenario_data=self.scenario_data,
             character_data=self._get_character_data(character_index),
         )
+        thread_context = f"character{character_index}"
         message = self.get_llm_response(
             self._llm_input(prompt, user_input),
-            tag=self._get_thread_tag(),
+            tag=self._get_thread_tag(thread_context),
         )
         if self.blacklist:
             if re.search(fr"\b({'|'.join(map(re.escape, self.blacklist))})\b",
@@ -608,9 +610,18 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         attempts_state = self._get_attempt_state()
         if self.finished and attempts_state["attempts_remaining"] == 0 and attempts_state["max_attempts"]:
             raise JsonHandlerError(403, "No attempts remaining.")
-        self.chat_history = []
+        self.chat_history = [
+            fragment
+            for fragment in self.chat_history
+            if fragment.get("character_index") != 1
+        ]
         self.finished = False
-        self.thread_map = {}
+        if self.thread_map:
+            self.thread_map = {
+                key: value
+                for key, value in self.thread_map.items()
+                if not key.endswith(":character1")
+            }
         self.input_open = True
         self.final_submission = ""
         self.final_evaluation_markdown = ""
@@ -691,7 +702,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
         message = self.get_llm_response(
             _evaluator_messages(),
-            tag=self._get_thread_tag(),
+            tag=self._get_thread_tag("evaluator"),
         )
         self.chat_history.append({
             "character_index": 0,
