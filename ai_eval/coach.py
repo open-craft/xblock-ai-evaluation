@@ -243,6 +243,21 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         scope=Scope.user_state,
     )
 
+    workspace_history = List(
+        scope=Scope.user_state,
+        default=[],
+    )
+
+    coach_history = List(
+        scope=Scope.user_state,
+        default=[],
+    )
+
+    evaluation_fragments = List(
+        scope=Scope.user_state,
+        default=[],
+    )
+
     attempts_used = Integer(
         scope=Scope.user_state,
         default=0,
@@ -322,6 +337,59 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         ]
         return characters[character_index]
 
+    def _ensure_histories(self):
+        """Lazy-initialize split histories, migrating legacy chat_history if required."""
+        if getattr(self, "_histories_ready", False):
+            return
+        workspace = list(self.workspace_history or [])
+        coach = list(self.coach_history or [])
+        evaluations = list(getattr(self, "evaluation_fragments", []) or [])
+        legacy = list(self.chat_history or [])
+        if legacy:
+            for fragment in legacy:
+                fragment = dict(fragment)
+                if fragment.get("is_evaluation") or (
+                    not fragment.get("user_message")
+                    and fragment.get("character_index") == 0
+                    and (self.final_evaluation_markdown or "")
+                    and fragment.get("character_message") == self.final_evaluation_markdown
+                ):
+                    fragment["is_evaluation"] = True
+                    evaluations.append(fragment)
+                    continue
+                if fragment.get("character_index") == 1:
+                    coach.append(fragment)
+                else:
+                    workspace.append(fragment)
+            self.chat_history = []
+        self.workspace_history = workspace
+        self.coach_history = coach
+        self.evaluation_fragments = evaluations
+        self._histories_ready = True
+
+    def _record_fragment(self, character_index, user_message, character_message, **extra):
+        """Persist a conversation fragment into the appropriate history list."""
+        self._ensure_histories()
+        fragment = {
+            "character_index": character_index,
+            "user_message": user_message,
+            "character_message": character_message,
+        }
+        fragment.update(extra)
+        if fragment.get("is_evaluation"):
+            evaluations = list(self.evaluation_fragments or [])
+            evaluations.append(fragment)
+            self.evaluation_fragments = evaluations
+            return
+        if character_index == 1:
+            coach = list(self.coach_history or [])
+            coach.append(fragment)
+            self.coach_history = coach
+        else:
+            workspace = list(self.workspace_history or [])
+            workspace.append(fragment)
+            self.workspace_history = workspace
+
     def _is_evaluation_fragment(self, fragment):
         if fragment.get("is_evaluation"):
             return True
@@ -363,11 +431,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def _get_chat_histories(self):
         """Get chat histories separated by character."""
+        self._ensure_histories()
         chat_histories = [[], []]
-        for fragment in self.chat_history:
-            character_index = fragment["character_index"]
-            chat_history = chat_histories[character_index]
-            chat_history.extend(self._get_chat_fragment_messages(fragment))
+        for fragment in self.workspace_history or []:
+            chat_histories[0].extend(self._get_chat_fragment_messages(fragment))
+        for fragment in self.coach_history or []:
+            chat_histories[1].extend(self._get_chat_fragment_messages(fragment))
         return chat_histories
 
     def _render_final_report(self, final_submission):
@@ -397,15 +466,19 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "finished": self.finished,
         }
 
-    def _llm_input(self, prompt, user_input=None):
-        """Append the chat history to the given system prompt."""
+    def _messages_for_character(self, character_index, user_input=None):
+        """Build LLM message payload for the requested character."""
+        self._ensure_histories()
+        history_fragments = (
+            self.workspace_history if character_index == 0 else self.coach_history
+        ) or []
         chat_history = []
         if self.initial_message:
             chat_history.append({
                 "character": self._get_character_data(0),
                 "content": self.initial_message,
             })
-        for fragment in self.chat_history:
+        for fragment in history_fragments:
             chat_history.extend(self._get_chat_fragment_messages(fragment))
         if user_input is not None:
             chat_history.append({
@@ -413,15 +486,26 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "content": user_input,
             })
 
+        prompt = self._render_template(
+            [
+                self.character_1_prompt,
+                self.character_2_prompt,
+            ][character_index],
+            scenario_data=self.scenario_data,
+            character_data=self._get_character_data(character_index),
+        )
         prompt += "\n\n" + self._render_template(
             self.conversation_format,
             messages=chat_history,
         )
-        yield {"role": "system", "content": prompt}
-        if self.model == SupportedModels.CLAUDE_SONNET.value:
-            # Claude needs a dummy user reply before the first
-            # assistant reply.
-            yield {"role": "user", "content": "."}
+
+        def _generate():
+            yield {"role": "system", "content": prompt}
+            if self.model == SupportedModels.CLAUDE_SONNET.value:
+                # Claude needs a dummy user reply before the first assistant reply.
+                yield {"role": "user", "content": "."}
+
+        return _generate()
 
     def _get_field_display_name(self, field_name):
         return self.fields[field_name].display_name
@@ -560,19 +644,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self.attempts_used = (self.attempts_used or 0) + 1
             self.input_open = False
 
-        # Hardcoded at 2 characters for now but designed to be extensible.
-        template = [
-            self.character_1_prompt,
-            self.character_2_prompt,
-        ][character_index]
-        prompt = self._render_template(
-            template,
-            scenario_data=self.scenario_data,
-            character_data=self._get_character_data(character_index),
-        )
+        self._ensure_histories()
         thread_context = f"character{character_index}"
         message = self.get_llm_response(
-            self._llm_input(prompt, user_input),
+            self._messages_for_character(character_index, user_input),
             tag=self._get_thread_tag(thread_context),
         )
         if self.blacklist:
@@ -586,11 +661,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             if m:
                 message = m.group(1)
 
-        self.chat_history.append({
-            "character_index": character_index,
-            "user_message": user_input,
-            "character_message": message,
-        })
+        self._record_fragment(character_index, user_input, message)
         character = self._get_character_data(character_index)
         return {
             "message": {
@@ -610,11 +681,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         attempts_state = self._get_attempt_state()
         if self.finished and attempts_state["attempts_remaining"] == 0 and attempts_state["max_attempts"]:
             raise JsonHandlerError(403, "No attempts remaining.")
-        self.chat_history = [
-            fragment
-            for fragment in self.chat_history
-            if fragment.get("character_index") != 1
-        ]
+        self._ensure_histories()
+        self.coach_history = []
+        self.evaluation_fragments = []
         self.finished = False
         if self.thread_map:
             self.thread_map = {
@@ -637,10 +706,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         max_attempts = self.max_attempts or 0
         if max_attempts and self.attempts_used >= max_attempts:
             raise JsonHandlerError(403, "No attempts remaining.")
+        self._ensure_histories()
         self.finished = False
         self.input_open = True
         self.final_submission = ""
         self.final_evaluation_markdown = ""
+        self.evaluation_fragments = []
         return {
             "attempts": self._get_attempt_state(),
             "finished": self.finished,
@@ -659,14 +730,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if self.input_open:
             raise JsonHandlerError(400, "No learner response available for evaluation.")
 
-        latest_fragment = next(
-            (
-                fragment
-                for fragment in reversed(self.chat_history)
-                if (fragment.get("user_message") or "").strip()
-            ),
-            None,
-        )
+        self._ensure_histories()
+        latest_fragment = None
+        for fragment in reversed(self.workspace_history or []):
+            if (fragment.get("user_message") or "").strip():
+                latest_fragment = fragment
+                break
         if not latest_fragment:
             raise JsonHandlerError(400, "No learner response available for evaluation.")
 
@@ -704,12 +773,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             _evaluator_messages(),
             tag=self._get_thread_tag("evaluator"),
         )
-        self.chat_history.append({
-            "character_index": 0,
-            "user_message": "",
-            "character_message": message,
-            "is_evaluation": True,
-        })
+        self._record_fragment(0, "", message, is_evaluation=True)
         self.finished = True
         self.final_submission = latest_fragment["user_message"]
         self.final_evaluation_markdown = message
