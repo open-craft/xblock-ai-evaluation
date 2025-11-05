@@ -305,17 +305,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "max_attempts",
     )
 
-    # def studio_view(self, context):
-    #     """
-    #     Render a form for editing this XBlock
-    #     """
-    #     fragment = super().studio_view(context)
-    #     # fragment.add_javascript(self.resource_string("static/js/src/coach_edit.js"))
-    #     # CoachAIEvalXBlock() in coach_edit.js will call
-    #     # StudioEditableXBlockMixin().
-    #     # fragment.initialize_js("")
-    #     return fragment
-
     def _render_template(self, template, **context):
         return self._jinja_env.from_string(template).render(context)
 
@@ -556,6 +545,19 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         context = context or "workspace"
         return f"{provider_tag}:{self.model or ''}:{prompt_hash}:{context}"
 
+    def _clear_thread_contexts(self, contexts):
+        """Remove cached thread ids for the provided context names."""
+        if not self.thread_map:
+            return
+        suffixes = tuple(f":{ctx}" for ctx in contexts if ctx)
+        if not suffixes:
+            return
+        self.thread_map = {
+            key: value
+            for key, value in self.thread_map.items()
+            if not key.endswith(suffixes)
+        }
+
     def student_view(self, context=None):
         """
         The primary view of the MultiAgentAIEvalXBlock, shown to students
@@ -685,12 +687,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         self.coach_history = []
         self.evaluation_fragments = []
         self.finished = False
-        if self.thread_map:
-            self.thread_map = {
-                key: value
-                for key, value in self.thread_map.items()
-                if not key.endswith(":character1")
-            }
+        self._clear_thread_contexts(["character1", "evaluator"])
         self.input_open = True
         self.final_submission = ""
         self.final_evaluation_markdown = ""
@@ -712,6 +709,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         self.final_submission = ""
         self.final_evaluation_markdown = ""
         self.evaluation_fragments = []
+        self._clear_thread_contexts(["evaluator"])
         return {
             "attempts": self._get_attempt_state(),
             "finished": self.finished,

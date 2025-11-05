@@ -233,18 +233,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
         $layout.addClass("coach-layout--report");
       }
 
-      const $cardActions = $reportCard.find(".coach-report-card__actions");
-      if ($cardActions.length) {
-        $cardActions.empty();
-        const attempts = response.attempts || {};
-        if (attempts.can_retry) {
-          const $cta = $('<button type="button" class="coach-report-card__cta">').text(translate("Try again"));
-          $cta.on("click", function() {
-            startNewAttempt();
-          });
-          $cardActions.append($cta);
-        }
-      }
+      $reportCard.find(".coach-report-card__actions").remove();
 
       $workspacePane.append($reportCard);
       state.reportVisible = true;
@@ -494,12 +483,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
     if (!state.allowReset || !$resetButton.length) {
       return;
     }
-    setAllInputsEnabled(false);
-    if (paneControllers[0]) {
-      setPaneBusy(paneControllers[0], true);
-    }
     if (paneControllers[1]) {
       setPaneBusy(paneControllers[1], true);
+      setInputEnabled(paneControllers[1], false);
     }
     announceStatus("workspace", translate("Resetting conversation…"));
 
@@ -517,24 +503,18 @@ function CoachAIEvalXBlock(runtime, element, data) {
           state.attempts = response.attempts;
         }
         hideReportCard();
-        if (paneControllers[0]) {
-          setPaneBusy(paneControllers[0], false);
-        }
+        setAllInputsEnabled(true);
+        state.finished = Boolean(response && response.finished);
+        updateAttemptUI();
         if (paneControllers[1]) {
           setPaneBusy(paneControllers[1], false);
         }
-        state.finished = Boolean(response && response.finished);
-        setAllInputsEnabled(true);
-        updateAttemptUI();
       },
       error: function() {
-        if (paneControllers[0]) {
-          setPaneBusy(paneControllers[0], false);
-        }
         if (paneControllers[1]) {
           setPaneBusy(paneControllers[1], false);
+          setInputEnabled(paneControllers[1], true);
         }
-        setAllInputsEnabled(true);
         announceStatus("workspace", translate("Unable to reset conversation."));
         alert(translate("An error has occurred."));
       },
