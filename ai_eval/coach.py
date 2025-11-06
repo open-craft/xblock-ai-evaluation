@@ -10,7 +10,6 @@ from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
-from xblock.validation import ValidationMessage
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
@@ -308,7 +307,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def _render_template(self, template, **context):
         return self._jinja_env.from_string(template).render(context)
 
-    def _get_character_data(self, character_index):
+    def _get_character_data(self, character_index):  # pylint: disable=missing-function-docstring
         # Hardcoded at 2 characters but extensible.
         characters = [
             {
@@ -342,7 +341,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 if fragment.get("is_evaluation") or (
                     not fragment.get("user_message")
                     and fragment.get("character_index") == 0
-                    and (self.final_evaluation_markdown or "")
+                    and self.final_evaluation_markdown
                     and fragment.get("character_message") == self.final_evaluation_markdown
                 ):
                     fragment["is_evaluation"] = True
@@ -356,7 +355,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         self.workspace_history = workspace
         self.coach_history = coach
         self.evaluation_fragments = evaluations
-        self._histories_ready = True
+        self._histories_ready = True  # pylint: disable=attribute-defined-outside-init
 
     def _record_fragment(self, character_index, user_message, character_message, **extra):
         """
@@ -383,7 +382,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             workspace.append(fragment)
             self.workspace_history = workspace
 
-    def _is_evaluation_fragment(self, fragment):
+    def _is_evaluation_fragment(self, fragment):  # pylint: disable=missing-function-docstring
         if fragment.get("is_evaluation"):
             return True
         if fragment.get("character_index") != 0:
@@ -395,7 +394,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             return False
         return fragment.get("character_message") == evaluation
 
-    def _get_chat_fragment_messages(self, fragment):
+    def _get_chat_fragment_messages(self, fragment):  # pylint: disable=missing-function-docstring
         if self._is_evaluation_fragment(fragment):
             return []
         character_index = fragment["character_index"]
@@ -444,7 +443,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             },
         )
 
-    def _build_final_report_payload(self):
+    def _build_final_report_payload(self):  # pylint: disable=missing-function-docstring
         if not self.finished:
             return None
         final_submission = self.final_submission or ""
@@ -513,10 +512,8 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         max_attempts = self.max_attempts or 0
         attempts_used = self.attempts_used or 0
-        if max_attempts < 0:
-            max_attempts = 0
-        if attempts_used < 0:
-            attempts_used = 0
+        max_attempts = max(max_attempts, 0)
+        attempts_used = max(attempts_used, 0)
         attempts_remaining = max_attempts - attempts_used if max_attempts else None
         if attempts_remaining is not None:
             attempts_remaining = max(attempts_remaining, 0)
@@ -620,7 +617,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         return frag
 
     @XBlock.json_handler
-    def get_character_response(self, data, suffix=""):  # pylint: disable=unused-argument
+    def get_character_response(self, data, suffix=""):
         """
         Generate the next message in the interaction.
         """
