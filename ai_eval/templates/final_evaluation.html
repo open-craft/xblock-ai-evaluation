@@ -14,10 +14,9 @@
                  alt="{% if evaluator.name %}{% blocktrans with name=evaluator.name %}Avatar for {{ name }}{% endblocktrans %}{% else %}{% trans 'Evaluator avatar' %}{% endif %}">
         {% endif %}
         {% if evaluator.name %}
-            <h3 class="coach-report-card__persona-name">{{ evaluator.name }}</h3>
-        {% endif %}
-        {% if evaluator.role %}
-            <p class="coach-report-card__persona-role">{{ evaluator.role }}</p>
+            <h3 class="coach-report-card__persona-heading">{% blocktrans with name=evaluator.name %}{{ name }}’s Evaluation{% endblocktrans %}</h3>
+        {% else %}
+            <h3 class="coach-report-card__persona-heading">{% trans "Evaluation" %}</h3>
         {% endif %}
     </section>
     <section class="coach-report-card__section coach-report-card__evaluation-section">

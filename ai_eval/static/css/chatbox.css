@@ -525,18 +525,21 @@
   color: #f4f7ff;
   margin-top: 1.5rem;
   padding: 2.5rem 3rem;
+  text-align: center;
 }
 
 .coach-report-card__header {
   border-bottom: 1px solid rgba(148, 163, 184, 0.25);
   margin-bottom: 1.75rem;
   padding-bottom: 0.75rem;
+  text-align: center;
 }
 
 .coach-report-card__title {
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
+  color: #ffffff !important;
 }
 
 .coach-report-card__section {
@@ -545,16 +548,20 @@
 
 .coach-report-card__section-title {
   font-size: 1.1rem;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 0.75rem 0;
+  text-align: center;
+  color: #ffffff !important;
 }
 
 .coach-report-card__blockquote {
-  margin: 0;
+  margin: 0 auto;
   line-height: 1.7;
-  background: rgba(255, 255, 255, 0.08);
-  padding: 1rem 1.25rem;
-  border-radius: 10px;
+  max-width: 720px;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  text-align: center;
 }
 
 .coach-report-card__persona {
@@ -571,19 +578,39 @@
   border: 2px solid rgba(255, 255, 255, 0.4);
 }
 
-.coach-report-card__persona-name {
-  font-size: 1.15rem;
-  margin: 0;
-  font-weight: 600;
-}
-
-.coach-report-card__persona-role {
-  margin: 0.35rem 0 0;
-  opacity: 0.75;
+.coach-report-card__persona-heading {
+  font-size: 1.2rem;
+  margin: 0.25rem 0 0;
+  font-weight: 700;
+  text-align: center;
+  color: #ffffff !important;
 }
 
 .coach-report-card__evaluation-section {
   line-height: 1.7;
+}
+
+.coach-report-card__evaluation {
+  max-width: 780px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.coach-report-card__evaluation h1,
+.coach-report-card__evaluation h2,
+.coach-report-card__evaluation h3 {
+  color: #ffffff !important;
+  text-align: center;
+}
+
+.coach-report-card__evaluation p {
+  text-align: center;
+}
+
+.coach-report-card__evaluation ul {
+  padding-left: 0;
+  list-style-position: inside;
+  text-align: center;
 }
 
 .coach-report-card__evaluation ul {
