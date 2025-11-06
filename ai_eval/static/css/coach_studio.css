@@ -1,0 +1,53 @@
+/* Coach XBlock - Studio edit layout enhancements (scoped to editor body) */
+
+/* Stack each field vertically: label -> help -> input */
+.xblock-editor .wrapper-comp-setting,
+.xblock-editor .list-input.settings-list .setting {
+  display: block;
+  clear: both;
+  margin-bottom: 1.25rem;
+}
+
+.xblock-editor .wrapper-comp-setting .setting-label,
+.xblock-editor .wrapper-comp-setting .setting-input {
+  float: none !important;
+  width: 100% !important;
+}
+
+.xblock-editor .wrapper-comp-setting .setting-label label,
+.xblock-editor .wrapper-comp-setting .setting-label .label {
+  display: block;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+}
+
+/* Help/description text under the label */
+.xblock-editor .wrapper-comp-setting .setting-label .tip,
+.xblock-editor .wrapper-comp-setting .setting-label .help,
+.xblock-editor .wrapper-comp-setting .setting-label .setting-help {
+  display: block;
+  margin: 0 0 0.5rem 0;
+  color: #6b7280; /* slate-500 */
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+/* Inputs span full width */
+.xblock-editor .wrapper-comp-setting .setting-input input[type="text"],
+.xblock-editor .wrapper-comp-setting .setting-input input[type="number"],
+.xblock-editor .wrapper-comp-setting .setting-input select,
+.xblock-editor .wrapper-comp-setting .setting-input textarea {
+  width: 100% !important;
+  max-width: none;
+  border: 1px solid #d1d5db; /* gray-300 */
+  border-radius: 6px;
+  padding: 0.65rem 0.75rem;
+  box-shadow: none;
+}
+
+/* Space multi-line editors consistently */
+.xblock-editor .wrapper-comp-setting .setting-input textarea {
+  min-height: 120px;
+}

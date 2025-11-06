@@ -304,6 +304,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "max_attempts",
     )
 
+    def studio_view(self, context):
+        """Render Studio edit view with styling only (no extra wrapper)."""
+        fragment = super().studio_view(context)
+        try:
+            fragment.add_css(self.resource_string("static/css/coach_studio.css"))
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+        return fragment
+
     def _render_template(self, template, **context):
         return self._jinja_env.from_string(template).render(context)
 
