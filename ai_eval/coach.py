@@ -327,7 +327,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         return characters[character_index]
 
     def _ensure_histories(self):
-        """Lazy-initialize split histories, migrating legacy chat_history if required."""
+        """
+        Initialize chat histories.
+        """
         if getattr(self, "_histories_ready", False):
             return
         workspace = list(self.workspace_history or [])
@@ -357,7 +359,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         self._histories_ready = True
 
     def _record_fragment(self, character_index, user_message, character_message, **extra):
-        """Persist a conversation fragment into the appropriate history list."""
+        """
+        Persist a conversation fragment into the appropriate history list.
+        """
         self._ensure_histories()
         fragment = {
             "character_index": character_index,
@@ -419,7 +423,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         return messages
 
     def _get_chat_histories(self):
-        """Get chat histories separated by character."""
+        """
+        Get chat histories separated by character.
+        """
         self._ensure_histories()
         chat_histories = [[], []]
         for fragment in self.workspace_history or []:
@@ -456,7 +462,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         }
 
     def _messages_for_character(self, character_index, user_input=None):
-        """Build LLM message payload for the requested character."""
+        """
+        Build LLM message payload for the requested character.
+        """
         self._ensure_histories()
         history_fragments = (
             self.workspace_history if character_index == 0 else self.coach_history
@@ -500,7 +508,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         return self.fields[field_name].display_name
 
     def _get_attempt_state(self):
-        """Return attempt usage details for the frontend."""
+        """
+        Return attempt usage details for the frontend.
+        """
         max_attempts = self.max_attempts or 0
         attempts_used = self.attempts_used or 0
         if max_attempts < 0:
@@ -525,7 +535,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         }
 
     def _get_thread_tag(self, context="workspace"):
-        """Build provider:model:prompt_hash tag for LLM thread continuity."""
+        """
+        Build provider:model:prompt_hash tag for LLM thread continuity.
+        """
         llm_service = get_llm_service()
         provider_tag = "custom" if isinstance(llm_service, CustomLLMService) else "default"
 
@@ -546,7 +558,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         return f"{provider_tag}:{self.model or ''}:{prompt_hash}:{context}"
 
     def _clear_thread_contexts(self, contexts):
-        """Remove cached thread ids for the provided context names."""
+        """
+        Remove cached thread ids for the provided context names.
+        """
         if not self.thread_map:
             return
         suffixes = tuple(f":{ctx}" for ctx in contexts if ctx)
@@ -601,13 +615,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         final_report = self._build_final_report_payload()
         if final_report:
             js_data["final_report"] = final_report
-        frag.add_javascript(self.resource_string("static/js/src/coach_redesign.js"))
+        frag.add_javascript(self.resource_string("static/js/src/coach.js"))
         frag.initialize_js("CoachAIEvalXBlock", js_data)
         return frag
 
     @XBlock.json_handler
     def get_character_response(self, data, suffix=""):  # pylint: disable=unused-argument
-        """Generate the next message in the interaction."""
+        """
+        Generate the next message in the interaction.
+        """
         if self.finished:
             raise JsonHandlerError(403, "The session has ended.")
 
@@ -677,7 +693,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     @XBlock.json_handler
     def reset(self, data, suffix=""):
-        """Reset the chat history."""
+        """
+        Reset the chat history.
+        """
         if not self.allow_reset:
             raise JsonHandlerError(403, "Reset is disabled.")
         attempts_state = self._get_attempt_state()
@@ -688,7 +706,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         self.evaluation_fragments = []
         self.finished = False
         self._clear_thread_contexts(["character1", "evaluator"])
-        self.input_open = True
         self.final_submission = ""
         self.final_evaluation_markdown = ""
         return {
@@ -699,7 +716,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     @XBlock.json_handler
     def resume_attempt(self, data, suffix=""):
-        """Reopen the session for another attempt without clearing history."""
+        """
+        Reopen the session for another attempt without clearing history.
+        """
         max_attempts = self.max_attempts or 0
         if max_attempts and self.attempts_used >= max_attempts:
             raise JsonHandlerError(403, "No attempts remaining.")
