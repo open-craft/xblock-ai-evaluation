@@ -14,7 +14,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
     ? ngettext
     : (singular, plural, count) => (count === 1 ? singular : plural);
 
-  const $element = $(element);
   const $sendButtons = $(".coach-send-button", element);
   const $inputs = $(".coach-input__textarea", element);
   const $tryAgainButton = $(".coach-try-again", element);
@@ -27,7 +26,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
     attempts: data.attempts || {},
     allowReset: data.allow_reset,
     characters: data.characters || [],
-    reportVisible: false,
   };
 
   const $layout = $(".coach-layout", element);
@@ -60,14 +58,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
 
   const sanitizeHTML = function(content) {
     return stripScriptTags(MarkdownToHTML(content || ""));
-  };
-
-  const paneFromIndex = function(index) {
-    return paneControllers[index] ? paneControllers[index].pane : "workspace";
-  };
-
-  const getCharacterForIndex = function(index) {
-    return state.characters ? state.characters[index] : null;
   };
 
   const initialsForName = function(name) {
@@ -236,7 +226,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
       $reportCard.find(".coach-report-card__actions").remove();
 
       $workspacePane.append($reportCard);
-      state.reportVisible = true;
       setEvaluationEnabled(false);
     }
   };
@@ -258,7 +247,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
     if ($layout.length) {
       $layout.removeClass("coach-layout--report");
     }
-    state.reportVisible = false;
   };
 
   const setEvaluationEnabled = function(enable) {

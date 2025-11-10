@@ -20,7 +20,7 @@ from .supported_models import SupportedModels
 
 SAMPLE_CHARACTER_PROMPT = textwrap.dedent("""
     You are {{ character_data.name }}.
-    In the given conversation, you are speaking to USER, who is described as: USER_DATA.
+    In the given conversation, you are speaking to the student.
 
     Personality details:
     Key competencies:
@@ -97,12 +97,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
-    scenario_title = String(
-        display_name=_("Scenario title"),
-        default="",
-        scope=Scope.settings,
-    )
-
     initial_message = String(
         display_name=_("Initial message"),
         default="",
@@ -122,13 +116,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     workspace_title = String(
         display_name=_("Workspace title"),
+        help=_("Title shown above the left pane (main character)"),
         default=_("Add your answer"),
         scope=Scope.settings,
     )
 
     coach_title = String(
         display_name=_("Coach title"),
-        default=_("Tutor"),
+        help=_("Title shown above the right pane (coach)"),
+        default=_("Coach"),
         scope=Scope.settings,
     )
 
@@ -141,57 +137,63 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     )
 
     character_1_avatar = String(
-        display_name=_("Character #1 avatar URL"),
-        help=_("URL for character #1 avatar image"),
+        display_name=_("Main character avatar URL"),
+        help=_("URL for the main character (left pane) avatar image"),
         scope=Scope.settings,
         default="",
     )
 
     character_2_avatar = String(
-        display_name=_("Character #2 avatar URL"),
-        help=_("URL for character #2 avatar image"),
+        display_name=_("Coach avatar URL"),
+        help=_("URL for the coach (right pane) avatar image"),
         scope=Scope.settings,
         default="",
     )
 
     character_1_name = String(
-        display_name=_("Character #1 name"),
-        help=_("Name of character #1"),
+        display_name=_("Main character name"),
+        help=_("Name of the main character (left pane)"),
         scope=Scope.settings,
         default="",
     )
 
     character_1_role = String(
-        display_name=_("Character #1 role"),
-        help=_("Role of character #1"),
+        display_name=_("Main character role"),
+        help=_("Role of the main character (left pane)"),
         scope=Scope.settings,
         default="Main character",
     )
 
     character_1_prompt = String(
-        display_name=_("Character #1 prompt"),
-        help=_("Prompt to instruct the AI model to act as character #1"),
+        display_name=_("Main character prompt"),
+        help=_(
+            "Defines how the main character (left pane) behaves. "
+            "You can use Jinja variables: character_data, scenario_data."
+        ),
         scope=Scope.settings,
         default=SAMPLE_CHARACTER_PROMPT,
     )
 
     character_2_name = String(
-        display_name=_("Character #2 name"),
-        help=_("Name of character #2"),
+        display_name=_("Coach name"),
+        help=_("Name of the coach (right pane)"),
         scope=Scope.settings,
         default="",
     )
 
     character_2_role = String(
-        display_name=_("Character #2 role"),
-        help=_("Role of character #2"),
+        display_name=_("Coach role"),
+        help=_("Role of the coach (right pane)"),
         scope=Scope.settings,
         default="Coach",
     )
 
     character_2_prompt = String(
-        display_name=_("Character #2 prompt"),
-        help=_("Prompt to instruct the AI model to act as character #2"),
+        display_name=_("Coach prompt"),
+        help=_(
+            "Defines how the coach (right pane) behaves. "
+            "You can use Jinja variables: character_data, scenario_data."
+        ),
         scope=Scope.settings,
         default=SAMPLE_CHARACTER_PROMPT,
     )
@@ -557,7 +559,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         _update_hash(self.character_1_prompt)
         _update_hash(self.character_2_prompt)
         _update_hash(self.evaluator_prompt)
-        _update_hash(self.scenario_title)
 
         prompt_hash = prompt_hasher.hexdigest()
         context = context or "workspace"
@@ -592,7 +593,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "/templates/coach_layout.html",
                 {
                     "self": self,
-                    "question_text": f"<h3><b>{self.scenario_title}</b></h3>",
                     "intro_text": self.intro_text,
                     "characters": characters,
                 },
