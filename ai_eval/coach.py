@@ -78,7 +78,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     """
 
-    _jinja_env = SandboxedEnvironment(undefined=jinja2.StrictUndefined)
+    _jinja_env = SandboxedEnvironment(
+        undefined=jinja2.StrictUndefined,
+        line_statement_prefix=None,
+        line_comment_prefix=None,
+    )
 
     display_name = String(
         display_name=_("Display Name"),
@@ -90,7 +94,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     evaluator_prompt = String(
         display_name=_("Evaluator prompt"),
         help=_(
-            "Prompt used to instruct the model how to evaluate the learner"
+            "Jinja2 template prompt used to instructs the model how to evaluate learners. "
+            "Context: scenario_data (dict: case_details, learning_objectives, evaluation_criteria). "
+            "Only the latest learner submission is considered"
+            "Use Jinja syntax (e.g., '{% for %}...{% endfor %}', '{{ variable }}')"
+            "Docs: https://jinja.palletsprojects.com/en/stable/templates/"
         ),
         multiline_editor=True,
         default=DEFAULT_EVALUATOR_PROMPT,
