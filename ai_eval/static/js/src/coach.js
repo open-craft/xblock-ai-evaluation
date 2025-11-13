@@ -24,7 +24,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
   const state = {
     finished: Boolean(data.finished),
     attempts: data.attempts || {},
-    allowReset: data.allow_reset,
     characters: data.characters || [],
   };
 
@@ -292,9 +291,12 @@ function CoachAIEvalXBlock(runtime, element, data) {
 
     const inputOpen = attempts.input_open !== undefined ? Boolean(attempts.input_open) : true;
     const canRetry = attempts.can_retry && !inputOpen;
+    const hasMaxAttempts = attempts.max_attempts && attempts.max_attempts > 0;
+    if ($tryAgainButton.length) {
+      if (hasMaxAttempts) { $tryAgainButton.show(); } else { $tryAgainButton.hide(); }
+    }
     setTryAgainEnabled(Boolean(canRetry));
-    const canReset = attempts.can_retry || !inputOpen;
-    setResetEnabled(Boolean(canReset));
+    setResetEnabled(true);
 
     const attemptsRemaining = typeof attempts.attempts_remaining === "number"
       ? attempts.attempts_remaining
@@ -321,6 +323,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
       controller.$messages.empty();
       if (controller.index === 0 && data.initial_message && data.initial_message.content) {
         appendMessage(controller, data.initial_message);
+      }
+      if (controller.index === 1 && data.coach_initial_message && data.coach_initial_message.content) {
+        appendMessage(controller, data.coach_initial_message);
       }
       const messages = histories && histories[controller.index] ? histories[controller.index] : [];
       messages.forEach((message) => appendMessage(controller, message));
@@ -468,7 +473,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
   };
 
   const resetCoachPane = function() {
-    if (!state.allowReset || !$resetButton.length) {
+    if (!$resetButton.length) {
       return;
     }
     if (paneControllers[1]) {
@@ -490,9 +495,10 @@ function CoachAIEvalXBlock(runtime, element, data) {
         if (response && response.attempts) {
           state.attempts = response.attempts;
         }
-        hideReportCard();
-        // Do not reopen Workspace input on reset; only re-enable Coach input.
         state.finished = Boolean(response && response.finished);
+        if (!state.finished) {
+          hideReportCard();
+        }
         if (paneControllers[1]) {
           setInputEnabled(paneControllers[1], true);
         }

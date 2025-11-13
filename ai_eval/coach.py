@@ -94,11 +94,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     evaluator_prompt = String(
         display_name=_("Evaluator prompt"),
         help=_(
-            "Jinja2 template prompt used to instructs the model how to evaluate learners. "
-            "Context: scenario_data (dict: case_details, learning_objectives, evaluation_criteria). "
-            "Only the latest learner submission is considered"
-            "Use Jinja syntax (e.g., '{% for %}...{% endfor %}', '{{ variable }}')"
-            "Docs: https://jinja.palletsprojects.com/en/stable/templates/"
+            "Prompt used to instructs the model how to evaluate learners. "
+            "You can use Jinja variables (e.g. scenario_data.evaluation_criteria). "
+            "Learn more: https://jinja.palletsprojects.com/en/stable/templates/"
         ),
         multiline_editor=True,
         default=DEFAULT_EVALUATOR_PROMPT,
@@ -107,13 +105,32 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     initial_message = String(
         display_name=_("Initial message"),
+        help=_(
+            "First message in the Workspace (left) pane from the main character. "
+            "Markdown supported. Also sent to the model as the first assistant message."
+        ),
+        default="",
+        scope=Scope.settings,
+    )
+
+    coach_initial_message = String(
+        display_name=_("Coach initial message"),
+        help=_(
+            "First message in the Coach (right) pane. Markdown supported. "
+            "Also sent to the coach model as the first assistant message."
+        ),
         default="",
         scope=Scope.settings,
     )
 
     scenario_data = Dict(
         display_name=_("Scenario data"),
-        help=_("Arbitrary data accessible in prompt templates"),
+        help=_(
+            "Structured scenario context for prompts (characters and evaluator). "
+            "It provides the case background, learning objectives, and rubric the evaluator scores against. "
+            "Expected keys: case_details (str), learning_objectives (list[str]), "
+            "evaluation_criteria (list[str or {name: str}])."
+        ),
         default={
             "case_details": "",
             "learning_objectives": [],
@@ -178,6 +195,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "Defines how the main character (left pane) behaves. "
             "You can use Jinja variables: character_data, scenario_data."
         ),
+        multiline_editor=True,
         scope=Scope.settings,
         default=SAMPLE_CHARACTER_PROMPT,
     )
@@ -202,15 +220,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "Defines how the coach (right pane) behaves. "
             "You can use Jinja variables: character_data, scenario_data."
         ),
+        multiline_editor=True,
         scope=Scope.settings,
         default=SAMPLE_CHARACTER_PROMPT,
-    )
-
-    allow_reset = Boolean(
-        display_name=_("Allow reset"),
-        help=_("Allow the learner to reset the chat"),
-        scope=Scope.settings,
-        default=True,
     )
 
     conversation_format = String(
@@ -296,6 +308,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     editable_fields = AIEvalXBlock.editable_fields + (
         "initial_message",
+        "coach_initial_message",
         "scenario_data",
         "workspace_title",
         "coach_title",
@@ -309,7 +322,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "character_2_prompt",
         "character_2_avatar",
         "evaluator_prompt",
-        "allow_reset",
         "blacklist",
         "max_attempts",
     )
@@ -350,10 +362,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         if getattr(self, "_histories_ready", False):
             return
-        workspace = list(self.workspace_history or [])
-        coach = list(self.coach_history or [])
-        evaluations = list(getattr(self, "evaluation_fragments", []) or [])
-        legacy = list(self.chat_history or [])
+        workspace = self.workspace_history
+        coach = self.coach_history
+        evaluations = self.evaluation_fragments
+        legacy = self.chat_history
         if legacy:
             for fragment in legacy:
                 fragment = dict(fragment)
@@ -488,10 +500,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self.workspace_history if character_index == 0 else self.coach_history
         ) or []
         chat_history = []
-        if self.initial_message:
+        if character_index == 0 and self.initial_message:
             chat_history.append({
                 "character": self._get_character_data(0),
                 "content": self.initial_message,
+            })
+        if character_index == 1 and self.coach_initial_message:
+            chat_history.append({
+                "character": self._get_character_data(1),
+                "content": self.coach_initial_message,
             })
         for fragment in history_fragments:
             chat_history.extend(self._get_chat_fragment_messages(fragment))
@@ -536,9 +553,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         attempts_remaining = max_attempts - attempts_used if max_attempts else None
         if attempts_remaining is not None:
             attempts_remaining = max(attempts_remaining, 0)
-        can_retry = True
-        if max_attempts:
-            can_retry = attempts_used < max_attempts
+        can_retry = True if not max_attempts else (attempts_used < max_attempts)
         input_open = self.input_open
         if input_open is None:
             input_open = True
@@ -546,7 +561,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "max_attempts": max_attempts,
             "attempts_used": attempts_used,
             "attempts_remaining": attempts_remaining,
-            "can_retry": can_retry and self.allow_reset,
+            "can_retry": can_retry,
             "input_open": bool(input_open),
         }
 
@@ -615,9 +630,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "character": self._get_character_data(0),
                 "content": self.initial_message,
             },
+            "coach_initial_message": {
+                "character": self._get_character_data(1),
+                "content": getattr(self, 'coach_initial_message', ""),
+            },
             "characters": characters,
             "finished": self.finished,
-            "allow_reset": self.allow_reset,
             "attempts": self._get_attempt_state(),
             "max_attempts": self.max_attempts,
             "titles": {
@@ -710,18 +728,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Reset the chat history.
         """
-        if not self.allow_reset:
-            raise JsonHandlerError(403, "Reset is disabled.")
-        attempts_state = self._get_attempt_state()
-        if self.finished and attempts_state["attempts_remaining"] == 0 and attempts_state["max_attempts"]:
-            raise JsonHandlerError(403, "No attempts remaining.")
         self._ensure_histories()
         self.coach_history = []
-        self.evaluation_fragments = []
-        self.finished = False
-        self._clear_thread_contexts(["character1", "evaluator"])
-        self.final_submission = ""
-        self.final_evaluation_markdown = ""
+        self._clear_thread_contexts(["character1"])
         return {
             "chat_histories": self._get_chat_histories(),
             "attempts": self._get_attempt_state(),
