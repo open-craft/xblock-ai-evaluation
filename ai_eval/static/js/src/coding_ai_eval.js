@@ -17,15 +17,157 @@ function CodingAIEvalXBlock(runtime, element, data) {
   const iframe = $("#monaco", element)[0];
   const submitButton = $("#submit-button", element);
   const resetButton = $("#reset-button", element);
-  const AIFeeback = $("#ai-feedback", element);
+  const aiFeedbackPanel = $("#ai-feedback-panel", element);
   const stdout = $(".stdout", element);
   const stderr = $(".stderr", element);
   const htmlRenderIframe = $(".html-render", element);
+  const resultContainer = $(".result", element);
+  const statusRegion = $("#coding-status", element);
+  const tabButtons = $(".result-tab-btn", element);
+  const tabPanels = $(".tabcontent", element);
 
   const MAX_JUDGE0_RETRY_ITER = 5;
   const WAIT_TIME_MS = 1000;
 
+  function announceStatus(message) {
+    if (!statusRegion.length) {
+      return;
+    }
+    statusRegion.text("");
+    if (message) {
+      statusRegion.text(message);
+    }
+  }
+
+  function setBusy(isBusy) {
+    if (!resultContainer.length) {
+      return;
+    }
+    if (isBusy) {
+      resultContainer.attr("aria-busy", "true");
+    } else {
+      resultContainer.removeAttr("aria-busy");
+    }
+  }
+
+  function setProcessingState(isProcessing, options = {}) {
+    const showSpinner = options.showSpinner !== false;
+    if (isProcessing) {
+      if (showSpinner && !$(".submit-loader", element).length) {
+        submitButton.append('<i class=\"fa fa-spinner fa-spin submit-loader\"></i>');
+      }
+      submitButton.prop("disabled", true).addClass("disabled-btn");
+      resetButton.prop("disabled", true).addClass("disabled-btn");
+      setBusy(true);
+    } else {
+      $(".submit-loader", element).remove();
+      submitButton.prop("disabled", false).removeClass("disabled-btn");
+      resetButton.prop("disabled", false).removeClass("disabled-btn");
+      setBusy(false);
+    }
+  }
+
+  function markTabNotification(tabId, hasNewContent) {
+    const tab = $("#" + tabId, element);
+    if (!tab.length) {
+      return;
+    }
+    if (hasNewContent && tab.attr("aria-selected") !== "true") {
+      tab.addClass("result-tab-btn--notify");
+    } else {
+      tab.removeClass("result-tab-btn--notify");
+    }
+  }
+
+  function activateTab(tabId, options = {}) {
+    const focus = options.focus === true;
+    const announceMessage = options.announceMessage;
+
+    tabButtons.each(function () {
+      const tab = $(this);
+      const isActive = tab.attr("id") === tabId;
+      tab.attr({
+        "aria-selected": isActive ? "true" : "false",
+        tabindex: isActive ? "0" : "-1",
+      });
+      tab.toggleClass("active", isActive);
+      if (isActive) {
+        tab.removeClass("result-tab-btn--notify");
+        if (focus) {
+          tab.trigger("focus");
+        }
+      }
+    });
+
+    tabPanels.each(function () {
+      const panel = $(this);
+      const isActivePanel = panel.attr("aria-labelledby") === tabId;
+      if (isActivePanel) {
+        panel.removeAttr("hidden");
+        panel.attr("aria-hidden", "false");
+      } else {
+        panel.attr("hidden", "hidden");
+        panel.attr("aria-hidden", "true");
+      }
+    });
+
+    if (announceMessage) {
+      announceStatus(announceMessage);
+    }
+  }
+
+  function setupTabs() {
+    if (!tabButtons.length) {
+      return;
+    }
+    const initiallySelected = tabButtons.filter('[aria-selected=\"true\"]').attr("id") || tabButtons.first().attr("id");
+    activateTab(initiallySelected);
+
+    tabButtons.each(function () {
+      const tab = $(this);
+      const isSelected = tab.attr("aria-selected") === "true";
+      tab.attr("tabindex", isSelected ? "0" : "-1");
+    });
+
+    tabButtons.on("click", function (event) {
+      event.preventDefault();
+      activateTab(this.id, { focus: true });
+    });
+
+    tabButtons.on("keydown", function (event) {
+      const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"];
+      if (!keys.includes(event.key)) {
+        return;
+      }
+      event.preventDefault();
+      const currentIndex = tabButtons.index(this);
+      let targetIndex = currentIndex;
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+          targetIndex = (currentIndex + 1) % tabButtons.length;
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+          targetIndex = (currentIndex - 1 + tabButtons.length) % tabButtons.length;
+          break;
+        case "Home":
+          targetIndex = 0;
+          break;
+        case "End":
+          targetIndex = tabButtons.length - 1;
+          break;
+        default:
+          break;
+      }
+      const targetTab = tabButtons.get(targetIndex);
+      activateTab(targetTab.id, { focus: true });
+    });
+  }
+
   $(function () {
+    setupTabs();
+
     // The newer runtime uses the 'data-usage' attribute, while the LMS uses 'data-usage-id'
     // A Jquery object can sometimes be returned e.g. after a studio field edit, we handle it with ?.[0]
     const xblockUsageId =
@@ -72,13 +214,11 @@ function CodingAIEvalXBlock(runtime, element, data) {
           data: JSON.stringify({ submission_id: data.submission_id }),
         })
           .then(function (result) {
-            console.log("result", result, retries)
             if (result.status.id === 1 || result.status.id === 2) {
               // https://ce.judge0.com/#statuses-and-languages-status-get 
               // Retry if status is 1 (In Queue) or 2 (Processing)
               if (retries < MAX_JUDGE0_RETRY_ITER) {
                 retries++;
-                console.log("Judge0 fetch result retry attempt:", retries);
                 setTimeout(function () {
                   attempt();
                 }, WAIT_TIME_MS);
@@ -95,7 +235,6 @@ function CodingAIEvalXBlock(runtime, element, data) {
 
           })
           .fail(function (error) {
-            console.log("Error: ", error);
             deferred.reject(new Error("An error occurred while trying to fetch Judge0 submission result."));
           });
       }
@@ -112,72 +251,119 @@ function CodingAIEvalXBlock(runtime, element, data) {
           stdout: data.stdout,
           stderr: data.stderr,
         }),
-        success: function (data) {
-          console.log(data);
-          AIFeeback.html(MarkdownToHTML(data.response));
-          $("#ai-feedback-tab", element).click();
+        success: function (response) {
+          aiFeedbackPanel.html(MarkdownToHTML(response.response));
+          markTabNotification("ai-feedback-tab", true);
+          announceStatus(gettext("AI feedback ready. Activate the AI feedback tab to review."));
         },
       });
     }
 
     resetButton.click(() => {
+      if (resetButton.prop("disabled")) {
+        return;
+      }
+      setProcessingState(true, { showSpinner: false });
+      announceStatus(gettext("Resetting editor..."));
       $.ajax({
         url: resetHandlerURL,
         method: "POST",
         data: JSON.stringify({}),
         success: function (data) {
           iframe.contentWindow.editor.setValue("");
-          AIFeeback.html("");
+          aiFeedbackPanel.html("");
+          markTabNotification("ai-feedback-tab", false);
           if (data.language !== HTML_CSS) {
             stdout.text("");
             stderr.text("");
+          } else if (htmlRenderIframe.length) {
+            htmlRenderIframe.attr("srcdoc", "");
+          }
+          activateTab("output-tab");
+          setProcessingState(false, { showSpinner: false });
+          announceStatus(gettext("Editor reset. Previous output cleared."));
+          try {
+            iframe.contentWindow.editor.focus();
+          } catch (error) {
+            // ignore focus errors
           }
         },
-        error: function(xhr) {
-          console.error('Error:', xhr);
-          try {
-            const response = JSON.parse(xhr.responseText);
-            alert(response.error || "A problem occurred during reset.");
-          } catch (e) {
-            alert("A problem occurred during reset.");
+        error: function (xhr) {
+          let message = gettext("A problem occurred during reset.");
+          if (xhr && xhr.responseText) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response.error) {
+                message = response.error;
+              }
+            } catch (e) {
+              // keep default
+            }
           }
-        }
+          setProcessingState(false, { showSpinner: false });
+          announceStatus(message);
+          alert(message);
+        },
       });
-
     });
 
     submitButton.click(() => {
-      const code = iframe.contentWindow.editor.getValue();
-      if (!code?.length) {
+      if (submitButton.prop("disabled")) {
         return;
       }
-      disableSubmitButton();
-      var deferred = null;
+      const code = iframe.contentWindow.editor.getValue();
+      if (!code?.length) {
+        announceStatus(gettext("Enter code before submitting."));
+        try {
+          iframe.contentWindow.editor.focus();
+        } catch (error) {
+          // ignore
+        }
+        return;
+      }
+      markTabNotification("ai-feedback-tab", false);
+      announceStatus(gettext("Submitting code..."));
+      setProcessingState(true);
+      let deferred = null;
       if (data.language === HTML_CSS) {
-        // no need to submit HTML code, we directly get LLM feedback
+        announceStatus(gettext("Generating AI feedback..."));
         deferred = getLLMFeedback({ stdout: "", stderr: "" });
       } else {
         deferred = submitCode()
-          .then(function (data) {
-            return delay(WAIT_TIME_MS * 2, data);
+          .then(function (submission) {
+            announceStatus(gettext("Code submitted. Checking execution results..."));
+            return delay(WAIT_TIME_MS * 2, submission);
           })
           .then(getSubmissionResult)
-          .then(getLLMFeedback);
+          .then(function (result) {
+            announceStatus(gettext("Execution complete. Output tab updated."));
+            return getLLMFeedback(result);
+          });
       }
 
       deferred
-        .done(function (data) {
-          enableSubmitButton();
+        .done(function () {
+          setProcessingState(false);
         })
-        .fail(function (xhr) {
-          console.log("Error: ", xhr);
-          enableSubmitButton();
-          try {
-            const response = JSON.parse(xhr.responseText);
-            alert(response.error || "A problem occurred while submitting the code.");
-          } catch (e) {
-            alert("A problem occurred while submitting the code.");
+        .fail(function (error) {
+          setProcessingState(false);
+          let message = gettext("A problem occurred while submitting the code.");
+          if (error) {
+            if (error.responseText) {
+              try {
+                const response = JSON.parse(error.responseText);
+                if (response.error) {
+                  message = response.error;
+                }
+              } catch (e) {
+                // keep default
+              }
+            } else if (error.message) {
+              message = error.message;
+            }
           }
+          announceStatus(message);
+          alert(message);
         });
     });
 
@@ -192,7 +378,11 @@ function CodingAIEvalXBlock(runtime, element, data) {
             iframe.contentWindow.editor.setValue(data.code);
           }
 
-          AIFeeback.html(MarkdownToHTML(data.ai_evaluation || ""));
+          const existingFeedback = data.ai_evaluation || "";
+          aiFeedbackPanel.html(MarkdownToHTML(existingFeedback));
+          if (existingFeedback) {
+            markTabNotification("ai-feedback-tab", true);
+          }
           if (data.language === HTML_CSS) {
             // render HTML/CSS into iframe
             if (data.code?.length) {
@@ -220,26 +410,4 @@ function CodingAIEvalXBlock(runtime, element, data) {
     }
   });
 
-  function disableSubmitButton() {
-    submitButton.append('<i class="fa fa-spinner fa-spin submit-loader"></i>');
-    submitButton.prop("disabled", true);
-    submitButton.addClass("disabled-btn");
-  }
-
-  function enableSubmitButton() {
-    $(".submit-loader", element).remove();
-    submitButton.prop("disabled", false);
-    submitButton.removeClass("disabled-btn");
-  }
-
-  // basic tabs
-  $(".tablinks", element).click((event) => {
-    $(".tabcontent", element).hide();
-    $(".tablinks", element).removeClass("active");
-    $(event.target).addClass("active");
-    const contentID = "#" + $(event.target).data("id");
-    $(contentID, element).show();
-  });
-  // default tab
-  $("#defaultOpen", element).click();
 }

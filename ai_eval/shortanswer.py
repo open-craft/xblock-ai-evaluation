@@ -1,10 +1,13 @@
 """Short answers Xblock with AI evaluation."""
 
 import logging
+import hashlib
 import urllib.parse
 import urllib.request
 from multiprocessing.dummy import Pool
 from xml.sax import saxutils
+
+import chardet
 
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
@@ -14,7 +17,8 @@ from xblock.fields import Boolean, Dict, Integer, List, String, Scope
 from xblock.validation import ValidationMessage
 
 from .base import AIEvalXBlock
-from .llm_services import TIMEOUT_ERROR_MESSAGE
+from .llm import get_llm_service
+from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 
 
 logger = logging.getLogger(__name__)
@@ -25,8 +29,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     Short Answer Xblock.
     """
 
-    USER_KEY = "USER"
-    LLM_KEY = "LLM"
     ATTACHMENT_PARALLEL_DOWNLOADS = 5
 
     display_name = String(
@@ -82,17 +84,21 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         default=False,
     )
 
-    messages = Dict(
-        help=_("Dictionary with chat messages"),
-        scope=Scope.user_state,
-        default={USER_KEY: [], LLM_KEY: []},
-    )
-
     attachment_urls = List(
         display_name=_("Attachment URLs"),
         help=_("Attachments to include with the evaluation prompt"),
         scope=Scope.settings,
         resettable_editor=False,
+    )
+
+    # XXX: Deprecated.
+    messages = Dict(
+        scope=Scope.user_state,
+    )
+
+    sessions = List(
+        scope=Scope.user_state,
+        default=[[]],
     )
 
     editable_fields = AIEvalXBlock.editable_fields + (
@@ -103,6 +109,22 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         "character_image",
         "attachment_urls",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.messages:
+            for user_msg, assistant_msg in zip(self.messages["USER"],
+                                               self.messages["LLM"]):
+                self.sessions[-1].append({
+                    "source": "user",
+                    "content": user_msg or ".",
+                })
+                self.sessions[-1].append({
+                    "source": "llm",
+                    "content": assistant_msg,
+                })
+            self.messages = {}
+            self.save()
 
     def validate_field_data(self, validation, data):
         """
@@ -123,6 +145,15 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 ValidationMessage(
                     ValidationMessage.ERROR,
                     _("max responses must be an integer between 1 and 15"),
+                )
+            )
+
+        try:
+            self._get_attachments(data.attachment_urls)
+        except Exception:  # pylint: disable=broad-exception-caught
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR, _("Error downloading attachments"),
                 )
             )
 
@@ -153,7 +184,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         js_data = {
             "question": self.question,
-            "messages": self.messages,
+            "messages": self.sessions[-1],
             "max_responses": self.max_responses,
             "marked_html": marked_html,
         }
@@ -162,15 +193,17 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
     def _download_attachment(self, url):
         with urllib.request.urlopen(url) as f:
-            return f.read().decode('utf-8')
+            data = f.read()
+            encoding = chardet.detect(data)['encoding']
+            return data.decode(encoding)
 
     def _filename_for_url(self, url):
         return urllib.parse.urlparse(url).path.split('/')[-1]
 
-    def _get_attachments(self):
+    def _get_attachments(self, attachment_urls):
         pool = Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS)
-        attachments = pool.map(self._download_attachment, self.attachment_urls)
-        filenames = map(self._filename_for_url, self.attachment_urls)
+        attachments = pool.map(self._download_attachment, attachment_urls)
+        filenames = map(self._filename_for_url, attachment_urls)
         return zip(filenames, attachments)
 
     @XBlock.json_handler
@@ -179,14 +212,32 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         user_submission = str(data["user_input"])
 
         attachments = []
-        for filename, contents in self._get_attachments():
+        attachment_hash_inputs = []
+        for filename, contents in self._get_attachments(self.attachment_urls):
+            # Build system prompt attachment section (HTML-like) as before
             attachments.append(f"""
                 <attachment>
                     <filename>{saxutils.escape(filename)}</filename>
                     <contents>{saxutils.escape(contents)}</contents>
                 </attachment>
             """)
+            # For tagging, hash filename + contents
+            attachment_hash_inputs.append(f"{filename}|{contents}")
         attachments = '\n'.join(attachments)
+
+        # Compute a tag to identify compatible reuse across provider/model/prompt
+        # Include evaluation prompt, question, and attachment content hashes
+        prompt_hasher = hashlib.sha256()
+        prompt_hasher.update((self.evaluation_prompt or "").strip().encode("utf-8"))
+        prompt_hasher.update((self.question or "").strip().encode("utf-8"))
+        for item in attachment_hash_inputs:
+            prompt_hasher.update(item.encode("utf-8"))
+        prompt_hash = prompt_hasher.hexdigest()
+
+        # Determine provider tag based on service type
+        llm_service = get_llm_service()
+        provider_tag = "custom" if isinstance(llm_service, CustomLLMService) else "default"
+        current_tag = f"{provider_tag}:{self.model}:{prompt_hash}"
 
         system_msg = {
             "role": "system",
@@ -204,14 +255,19 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         # add previous messages
         # the first AI role is 'system' which defines the LLM's personnality and behavior.
         # subsequent roles are 'assistant' and 'user'
-        for user_msg, assistant_msg in zip(self.messages[self.USER_KEY],
-                                           self.messages[self.LLM_KEY]):
-            messages.append({"content": user_msg or ".", "role": "user"})
-            messages.append({"content": assistant_msg, "role": "assistant"})
+        for message in self.sessions[-1]:
+            if message["source"] == "user":
+                role = "user"
+            else:
+                role = "assistant"
+            messages.append({
+                "role": role,
+                "content": message["content"] or ".",
+            })
         messages.append({"role": "user", "content": user_submission})
 
         try:
-            response = self.get_llm_response(messages)
+            response = self.get_llm_response(messages, tag=current_tag)
         except Exception as e:
             logger.error(
                 f"Failed while making LLM request using model {self.model}. Error: {e}",
@@ -222,8 +278,14 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
         if response:
-            self.messages[self.USER_KEY].append(user_submission)
-            self.messages[self.LLM_KEY].append(response)
+            self.sessions[-1].append({
+                "source": "user",
+                "content": user_submission,
+            })
+            self.sessions[-1].append({
+                "source": "llm",
+                "content": response,
+            })
             return {"response": response}
 
         raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")
@@ -235,7 +297,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         """
         if not self.allow_reset:
             raise JsonHandlerError(403, "Reset is disabled.")
-        self.messages = {self.USER_KEY: [], self.LLM_KEY: []}
+        self.thread_map = {}
+        self.sessions.append([])
         return {}
 
     @staticmethod

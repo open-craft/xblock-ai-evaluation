@@ -1,9 +1,9 @@
 # Core requirements for using this application
 -c constraints.txt
 
+celery
 django-statici18n
 XBlock[django]
-litellm==0.14.0
-openai==0.28.1
+litellm==1.77.5
 Jinja2
 pydantic==2.11.7

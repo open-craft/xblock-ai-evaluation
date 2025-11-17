@@ -3,7 +3,11 @@ Utilities
 """
 
 from dataclasses import dataclass
-import requests
+
+
+# Default timeout (in seconds) for outbound HTTP requests made by backends.
+# Adjust here to change the global default behavior.
+DEFAULT_HTTP_TIMEOUT = 30
 
 
 @dataclass
@@ -17,10 +21,10 @@ class ProgrammimgLanguage:
 class LanguageLabels:
     """Language labels as seen by users."""
 
-    Python = "Python"
-    JavaScript = "JavaScript"
-    Java = "Java"
-    CPP = "C++"
+    Python = "Python (3.8.1)"
+    JavaScript = "JavaScript (Node.js 12.14.0)"
+    Java = "Java (OpenJDK 13.0.1)"
+    CPP = "C++ (GCC 9.2.0)"
     HTML_CSS = "HTML/CSS"
 
 
@@ -43,42 +47,4 @@ SUPPORTED_LANGUAGE_MAP = {
     LanguageLabels.HTML_CSS: ProgrammimgLanguage(
         monaco_id="html", judge0_id=-1
     ),  # no exec
-}
-
-
-JUDGE0_BASE_CE_URL = "https://judge0-ce.p.rapidapi.com"
-
-
-def submit_code(api_key: str, code: str, language: str) -> str:
-    """
-    Submit code to the judge0 API.
-    """
-    url = f"{JUDGE0_BASE_CE_URL}/submissions?base64_encoded=false&wait=false"
-    headers = {"content-type": "application/json", "x-rapidapi-key": api_key}
-
-    data = {
-        "source_code": code,
-        "language_id": SUPPORTED_LANGUAGE_MAP[language].judge0_id,
     }
-
-    response = requests.post(url, headers=headers, json=data, timeout=10)
-    response.raise_for_status()
-    result = response.json()
-    sub_id = result["token"]
-
-    return sub_id
-
-
-def get_submission_result(api_key: str, submission_id: str):
-    """
-    Get result from Judge0 submission.
-    """
-
-    url = f"{JUDGE0_BASE_CE_URL}/submissions/{submission_id}?base64_encoded=false&fields=*"
-    headers = {"content-type": "application/json", "x-rapidapi-key": api_key}
-
-    response = requests.get(url, headers=headers, timeout=10)
-    response.raise_for_status()
-    result = response.json()
-
-    return result

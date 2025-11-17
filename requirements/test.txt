@@ -12,23 +12,30 @@ aiohttp==3.12.15
     # via
     #   -r requirements/base.txt
     #   litellm
-    #   openai
 aiosignal==1.4.0
     # via
     #   -r requirements/base.txt
     #   aiohttp
+amqp==5.3.1
+    # via
+    #   -r requirements/base.txt
+    #   kombu
 annotated-types==0.7.0
     # via
     #   -r requirements/base.txt
     #   pydantic
+anyio==4.11.0
+    # via
+    #   -r requirements/base.txt
+    #   httpx
+    #   openai
 appdirs==1.4.4
     # via
     #   -r requirements/base.txt
     #   fs
-    #   litellm
 arrow==1.3.0
     # via cookiecutter
-asgiref==3.9.1
+asgiref==3.9.2
     # via
     #   -r requirements/base.txt
     #   django
@@ -36,42 +43,70 @@ attrs==25.3.0
     # via
     #   -r requirements/base.txt
     #   aiohttp
+    #   jsonschema
+    #   referencing
+billiard==4.2.2
+    # via
+    #   -r requirements/base.txt
+    #   celery
 binaryornot==0.4.4
     # via cookiecutter
-boto3==1.40.0
+boto3==1.40.44
     # via
     #   -r requirements/base.txt
     #   fs-s3fs
-botocore==1.40.0
+botocore==1.40.44
     # via
     #   -r requirements/base.txt
     #   boto3
     #   s3transfer
-certifi==2023.11.17
+celery==5.5.3
+    # via -r requirements/base.txt
+certifi==2025.8.3
     # via
     #   -r requirements/base.txt
-    #   litellm
+    #   httpcore
+    #   httpx
     #   requests
 chardet==5.2.0
     # via binaryornot
-charset-normalizer==3.4.2
+charset-normalizer==3.4.3
     # via
     #   -r requirements/base.txt
     #   requests
-click==8.2.1
+click==8.3.0
     # via
     #   -r requirements/base.txt
+    #   celery
+    #   click-didyoumean
+    #   click-plugins
+    #   click-repl
     #   cookiecutter
     #   litellm
+click-didyoumean==0.3.1
+    # via
+    #   -r requirements/base.txt
+    #   celery
+click-plugins==1.1.1.2
+    # via
+    #   -r requirements/base.txt
+    #   celery
+click-repl==0.3.0
+    # via
+    #   -r requirements/base.txt
+    #   celery
 cookiecutter==2.6.0
     # via xblock-sdk
-coverage[toml]==7.10.1
+coverage[toml]==7.10.7
     # via pytest-cov
 ddt==1.7.2
     # via -r requirements/test.in
-django==4.2.23
+distro==1.9.0
     # via
-    #   -c https:/raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
+    #   -r requirements/base.txt
+    #   openai
+    # via
+    #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/base.txt
     #   django-appconf
     #   django-statici18n
@@ -86,7 +121,11 @@ django-statici18n==2.6.0
     # via -r requirements/base.txt
 edx-i18n-tools==1.9.0
     # via -r requirements/test.in
-filelock==3.18.0
+fastuuid==0.13.5
+    # via
+    #   -r requirements/base.txt
+    #   litellm
+filelock==3.19.1
     # via
     #   -r requirements/base.txt
     #   huggingface-hub
@@ -106,21 +145,36 @@ fs-s3fs==1.1.1
     #   -r requirements/base.txt
     #   openedx-django-pyfs
     #   xblock-sdk
-fsspec==2025.7.0
+fsspec==2025.9.0
     # via
     #   -r requirements/base.txt
     #   huggingface-hub
-hf-xet==1.1.5
+h11==0.16.0
+    # via
+    #   -r requirements/base.txt
+    #   httpcore
+hf-xet==1.1.10
     # via
     #   -r requirements/base.txt
     #   huggingface-hub
-huggingface-hub==0.34.3
+httpcore==1.0.9
+    # via
+    #   -r requirements/base.txt
+    #   httpx
+httpx==0.28.1
+    # via
+    #   -r requirements/base.txt
+    #   litellm
+    #   openai
+huggingface-hub==0.35.3
     # via
     #   -r requirements/base.txt
     #   tokenizers
 idna==3.10
     # via
     #   -r requirements/base.txt
+    #   anyio
+    #   httpx
     #   requests
     #   yarl
 importlib-metadata==8.7.0
@@ -134,33 +188,49 @@ jinja2==3.1.6
     #   -r requirements/base.txt
     #   cookiecutter
     #   litellm
+jiter==0.11.0
+    # via
+    #   -r requirements/base.txt
+    #   openai
 jmespath==1.0.1
     # via
     #   -r requirements/base.txt
     #   boto3
     #   botocore
+jsonschema==4.25.1
+    # via
+    #   -r requirements/base.txt
+    #   litellm
+jsonschema-specifications==2025.9.1
+    # via
+    #   -r requirements/base.txt
+    #   jsonschema
+kombu==5.5.4
+    # via
+    #   -r requirements/base.txt
+    #   celery
 lazy==1.6
     # via
     #   -r requirements/base.txt
     #   xblock
-litellm==0.14.0
+litellm==1.77.5
     # via -r requirements/base.txt
-lxml[html-clean]==6.0.0
+lxml[html-clean]==6.0.2
     # via
     #   -r requirements/base.txt
     #   edx-i18n-tools
     #   lxml-html-clean
     #   xblock
     #   xblock-sdk
-lxml-html-clean==0.4.2
+lxml-html-clean==0.4.3
     # via lxml
 mako==1.3.10
     # via
     #   -r requirements/base.txt
     #   xblock
-markdown-it-py==3.0.0
+markdown-it-py==4.0.0
     # via rich
-markupsafe==3.0.2
+markupsafe==3.0.3
     # via
     #   -r requirements/base.txt
     #   jinja2
@@ -170,12 +240,12 @@ mdurl==0.1.2
     # via markdown-it-py
 mock==5.2.0
     # via -r requirements/test.in
-multidict==6.6.3
+multidict==6.6.4
     # via
     #   -r requirements/base.txt
     #   aiohttp
     #   yarl
-openai==0.28.1
+openai==2.1.0
     # via
     #   -r requirements/base.txt
     #   litellm
@@ -188,6 +258,7 @@ packaging==25.0
     # via
     #   -r requirements/base.txt
     #   huggingface-hub
+    #   kombu
     #   pytest
 path==16.16.0
     # via edx-i18n-tools
@@ -197,13 +268,20 @@ pluggy==1.6.0
     #   pytest-cov
 polib==1.2.0
     # via edx-i18n-tools
+prompt-toolkit==3.0.52
+    # via
+    #   -r requirements/base.txt
+    #   click-repl
 propcache==0.3.2
     # via
     #   -r requirements/base.txt
     #   aiohttp
     #   yarl
 pydantic==2.11.7
-    # via -r requirements/base.txt
+    # via
+    #   -r requirements/base.txt
+    #   litellm
+    #   openai
 pydantic-core==2.33.2
     # via
     #   -r requirements/base.txt
@@ -214,11 +292,11 @@ pygments==2.19.2
     #   rich
 pypng==0.20220715.0
     # via xblock-sdk
-pytest==8.4.1
+pytest==8.4.2
     # via
     #   pytest-cov
     #   pytest-django
-pytest-cov==6.2.1
+pytest-cov==7.0.0
     # via -r requirements/test.in
 pytest-django==4.11.1
     # via -r requirements/test.in
@@ -227,6 +305,7 @@ python-dateutil==2.9.0.post0
     #   -r requirements/base.txt
     #   arrow
     #   botocore
+    #   celery
     #   xblock
 python-dotenv==1.1.1
     # via
@@ -238,32 +317,41 @@ pytz==2025.2
     # via
     #   -r requirements/base.txt
     #   xblock
-pyyaml==6.0.2
+pyyaml==6.0.3
     # via
     #   -r requirements/base.txt
     #   cookiecutter
     #   edx-i18n-tools
     #   huggingface-hub
     #   xblock
-regex==2025.7.34
+referencing==0.36.2
+    # via
+    #   -r requirements/base.txt
+    #   jsonschema
+    #   jsonschema-specifications
+regex==2025.9.18
     # via
     #   -r requirements/base.txt
     #   tiktoken
-requests==2.32.4
+requests==2.32.5
     # via
     #   -r requirements/base.txt
     #   cookiecutter
     #   huggingface-hub
-    #   openai
     #   tiktoken
     #   xblock-sdk
 rich==14.1.0
     # via cookiecutter
-s3transfer==0.13.1
+rpds-py==0.27.1
+    # via
+    #   -r requirements/base.txt
+    #   jsonschema
+    #   referencing
+s3transfer==0.14.0
     # via
     #   -r requirements/base.txt
     #   boto3
-simplejson==3.20.1
+simplejson==3.20.2
     # via
     #   -r requirements/base.txt
     #   xblock
@@ -274,17 +362,22 @@ six==1.17.0
     #   fs
     #   fs-s3fs
     #   python-dateutil
+sniffio==1.3.1
+    # via
+    #   -r requirements/base.txt
+    #   anyio
+    #   openai
 sqlparse==0.5.3
     # via
     #   -r requirements/base.txt
     #   django
 text-unidecode==1.3
     # via python-slugify
-tiktoken==0.9.0
+tiktoken==0.11.0
     # via
     #   -r requirements/base.txt
     #   litellm
-tokenizers==0.21.4
+tokenizers==0.22.1
     # via
     #   -r requirements/base.txt
     #   litellm
@@ -293,25 +386,42 @@ tqdm==4.67.1
     #   -r requirements/base.txt
     #   huggingface-hub
     #   openai
-types-python-dateutil==2.9.0.20250708
+types-python-dateutil==2.9.0.20250822
     # via arrow
-typing-extensions==4.14.1
+typing-extensions==4.15.0
     # via
     #   -r requirements/base.txt
     #   aiosignal
+    #   anyio
     #   huggingface-hub
+    #   openai
     #   pydantic
     #   pydantic-core
+    #   referencing
     #   typing-inspection
-typing-inspection==0.4.1
+typing-inspection==0.4.2
     # via
     #   -r requirements/base.txt
     #   pydantic
+tzdata==2025.2
+    # via
+    #   -r requirements/base.txt
+    #   kombu
 urllib3==2.5.0
     # via
     #   -r requirements/base.txt
     #   botocore
     #   requests
+vine==5.1.0
+    # via
+    #   -r requirements/base.txt
+    #   amqp
+    #   celery
+    #   kombu
+wcwidth==0.2.14
+    # via
+    #   -r requirements/base.txt
+    #   prompt-toolkit
 web-fragments==3.1.0
     # via
     #   -r requirements/base.txt

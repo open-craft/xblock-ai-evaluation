@@ -93,6 +93,65 @@ CUSTOM_LLM_CLIENT_SECRET = "your-client-secret"
 Your custom service must implement the expected OAuth2 client‑credentials flow and provide JSON endpoints
 for listing models, obtaining completions, and fetching tokens as used by `CustomLLMService`.
 
+#### Optional provider threads (conversation IDs)
+
+For deployments using a custom LLM service, you can enable provider‑side threads to cache context between turns. This is optional and disabled by default. When enabled, the LMS/XBlock remains the canonical chat history as that ensures vendor flexibility and continuity; provider threads are treated as a cache.
+
+- Site configuration (under `ai_eval`):
+  - `PROVIDER_SUPPORTS_THREADS`: boolean, default `false`. When `true`, `CustomLLMService` attempts to reuse a provider conversation ID.
+- XBlock user state (managed automatically):
+  - `thread_map`: a dictionary mapping `tag -> conversation_id`, where `tag = provider:model:prompt_hash`. This allows multiple concurrent provider threads per learner per XBlock, one per distinct prompt/model context.
+
+Reset clears `thread_map`. If a provider ignores threads, behavior remains stateless.
+
+Compatibility and fallback
+- Not all vendors/models support `conversation_id`. The default service path (via LiteLLM chat completions) does not use provider threads; calls remain stateless.
+- If threads are unsupported or ignored by a provider, the code still works and behaves statelessly.
+- With a custom provider that supports threads, the first turn sends full context and later turns send only the latest user input along with the cached `conversation_id`.
+
+### Custom Code Execution Service (advanced)
+
+The Coding XBlock can route code execution to a third‑party service instead of Judge0. The service is expected to be asynchronous, exposing a submit endpoint that returns a submission identifier, and a results endpoint that returns the execution result when available. Configure this via Django settings:
+
+```python
+# e.g., in Tutor's extra settings
+AI_EVAL_CODE_EXECUTION_BACKEND = {
+    'backend': 'custom',
+    'custom_config': {
+        'submit_endpoint': 'https://code-exec.example.com/api/submit',
+        'results_endpoint': 'https://code-exec.example.com/api/results/{submission_id}',
+        'languages_endpoint': 'https://code-exec.example.com/api/languages',
+        'api_key': 'example-key',
+        # For Bearer tokens (default): Authorization: Bearer <token>
+        'auth_header_name': 'Authorization',
+        'auth_scheme': 'Bearer',
+        # Networking
+        'timeout': 30,
+    },
+}
+```
+
+Header examples
+- Bearer (default): `Authorization: Bearer <API_KEY>` (use `auth_header_name='Authorization'`, `auth_scheme='Bearer'`)
+- Vendor header without scheme: `X-API-Key: <API_KEY>` (use `auth_header_name='X-API-Key'`, `auth_scheme=''`)
+
+Notes
+- Asynchronous model: `submit_endpoint` should return an identifier (e.g., `submission_id` or `id`) that is later used to poll `results_endpoint`.
+- `results_endpoint` must include `{submission_id}` and return execution status and outputs when ready.
+- `languages_endpoint` is called during initialization to verify supported languages.
+- To use Judge0, remove the custom backend settings or set `backend='judge0'`. Provide the Judge0 API key in the XBlock configuration. Optionally set `judge0_config.base_url`; otherwise the default RapidAPI endpoint is used.
+
+Example Judge0 configuration
+```python
+# Optional override for Judge0 base URL; API key is set per XBlock instance
+AI_EVAL_CODE_EXECUTION_BACKEND = {
+    'backend': 'judge0',
+    'judge0_config': {
+        'base_url': 'https://judge0-ce.p.rapidapi.com',
+    },
+}
+```
+
 ## Dependencies
 - [Judge0 API](https://judge0.com/)
 - [Monaco editor](https://github.com/microsoft/monaco-editor)

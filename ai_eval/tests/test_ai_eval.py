@@ -3,6 +3,8 @@ Testing module.
 """
 # pylint: disable=redefined-outer-name,protected-access
 
+import urllib.request
+import io
 from unittest.mock import Mock, patch
 
 import pytest
@@ -17,13 +19,23 @@ from ai_eval import (
 )
 from ai_eval.base import AIEvalXBlock
 from ai_eval.supported_models import SupportedModels
+from ai_eval.backends.factory import BackendFactory
+from ai_eval.backends.judge0 import Judge0Backend
+from ai_eval.backends.custom import CustomServiceBackend
+from ai_eval.utils import SUPPORTED_LANGUAGE_MAP, LanguageLabels
 
 
 @pytest.fixture
 def coding_block_data():
     """Fixture for coding block test data."""
+    monaco_html = AIEvalXBlock.loader.render_django_template(
+        "/templates/monaco.html",
+        {
+            "monaco_language": SUPPORTED_LANGUAGE_MAP[LanguageLabels.Python].monaco_id,
+        },
+    )
     return {
-        "language": "Python",
+        "language": "Python (3.8.1)",
         "question": "ca va?",
         "code": "",
         "ai_evaluation": "",
@@ -31,13 +43,7 @@ def coding_block_data():
         "marked_html": '<!doctype html>\n<html lang="en">\n<head></head>\n<body>\n    <script '
         'type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/marked/13.0.2/marked'
         '.min.js"></script>\n</body>\n</html>',
-        "monaco_html": '<!doctype html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n'
-        '  <title>Monaco Editor</title>\n</head>\n<body style="margin: 0;">\n  <div class="monaco"'
-        ' style="width: 100vw; height: 100vh;"></div>\n  <script type="module">\n    import * as'
-        ' monaco from "https://cdn.jsdelivr.net/npm/monaco-editor@0.49.0/+esm";\n\n    window.editor '
-        '= monaco.editor.create(document.querySelector(".monaco"), {\n      language: "python",\n    '
-        "  minimap: { enabled: false },\n      lineNumbersMinChars: 2,\n      folding: false,\n    });\n\n"
-        "    window.parent.postMessage('__USAGE_ID_PLACEHOLDER__', '*');\n  </script>\n</body>\n</html>\n",
+        "monaco_html": monaco_html,
     }
 
 
@@ -46,7 +52,7 @@ def shortanswer_block_data():
     """Fixture for short answer block test data."""
     return {
         "question": "ca va?",
-        "messages": {"USER": [], "LLM": []},
+        "sessions": [[{"source": "user", "content": "hi"}]],
         "max_responses": 3,
         "marked_html": (
             '<!doctype html>\n<html lang="en">\n<head></head>\n<body>\n'
@@ -87,7 +93,10 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
     """Test the basic view loads for ShortAnswerAIEvalXBlock."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     frag = block.student_view()
-    assert frag.json_init_args == shortanswer_block_data
+    expected_args = shortanswer_block_data.copy()
+    del expected_args["sessions"]
+    expected_args["messages"] = shortanswer_block_data["sessions"][-1]
+    assert frag.json_init_args == expected_args
     assert '<div class="shortanswer_block">' in frag.content
 
 
@@ -96,23 +105,21 @@ def test_shortanswer_reset_allowed(shortanswer_block_data):
     data = {
         **shortanswer_block_data,
         "allow_reset": True,
-        "messages": {"USER": ["Hello"], "LLM": ["Hello"]},
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    # Pre-populate thread map to verify reset clears it
+    block.thread_map = {"provider:model:tag": "abc123"}
     block.reset.__wrapped__(block, data={})
-    assert block.messages == {"USER": [], "LLM": []}
+    assert block.sessions == [shortanswer_block_data["sessions"][0], []]
+    assert not block.thread_map
 
 
 def test_shortanswer_reset_forbidden(shortanswer_block_data):
     """Test the reset function when forbidden."""
-    data = {
-        **shortanswer_block_data,
-        "messages": {"USER": ["Hello"], "LLM": ["Hello"]},
-    }
-    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     with pytest.raises(JsonHandlerError):
         block.reset.__wrapped__(block, data={})
-    assert block.messages == {"USER": ["Hello"], "LLM": ["Hello"]}
+    assert block.sessions == shortanswer_block_data["sessions"]
 
 
 def test_character_image(shortanswer_block_data):
@@ -137,12 +144,28 @@ def test_shortanswer_attachments(shortanswer_block_data):
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
     block._download_attachment = Mock(return_value="file contents <&>")
-    block.get_llm_response = Mock(return_value=".")
-    block.get_response.__wrapped__(block, data={"user_input": "."})
-    messages = block.get_llm_response.call_args.args[0]
+    with patch('ai_eval.shortanswer.get_llm_service') as mock_service, \
+         patch('ai_eval.llm.get_llm_service') as mock_llm_service, \
+         patch('ai_eval.base.get_site_configuration_value', return_value=None), \
+         patch('ai_eval.base.get_llm_response') as mocked:
+        mock_service.return_value = Mock()
+        mock_service.return_value.supports_threads.return_value = False
+        mock_llm_service.return_value = mock_service.return_value
+        mocked.return_value = (".", None)
+        block.get_response.__wrapped__(block, data={"user_input": "."})
+        # Extract the messages argument passed into get_llm_response
+        messages = mocked.call_args.kwargs.get('messages') or mocked.call_args.args[2]
     prompt = messages[0]["content"]
     assert "<filename>1.txt</filename>" in prompt
     assert "<contents>file contents &lt;&amp;&gt;</contents>" in prompt
+
+
+def test_shortanswer_attachments_encoding(shortanswer_block_data):
+    """Test attachments for ShortAnswerAIEvalXBlock."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    urllib.request.urlopen = Mock(return_value=io.BytesIO("á".encode('latin-1')))
+    contents = block._download_attachment("http://example.com/1.txt")
+    assert contents == "á"
 
 
 def test_multiagent_block_finished():
@@ -198,6 +221,188 @@ def test_multiagent_block_evaluator_response():
 
 
 @pytest.mark.parametrize(
+    "backend_config, expected_backend_class",
+    [
+        # Default to judge0 when no custom config
+        ({}, Judge0Backend),
+        # Use custom backend when configured
+        ({'backend': 'custom', 'custom_config': {'base_url': 'http://test.com'}}, CustomServiceBackend),
+        # Use judge0 when explicitly set
+        ({'backend': 'judge0', 'judge0_config': {}}, Judge0Backend),
+    ],
+)
+def test_backend_factory_selection(backend_config, expected_backend_class):
+    """Test BackendFactory returns correct backend based on Django settings."""
+    with patch('django.conf.settings') as mock_settings:
+        mock_settings.AI_EVAL_CODE_EXECUTION_BACKEND = backend_config
+        backend = BackendFactory.get_backend(api_key="test-key")
+        assert isinstance(backend, expected_backend_class)
+
+
+def test_judge0_backend_initialization():
+    """Test Judge0Backend initializes with correct API key."""
+    backend = Judge0Backend(api_key="test-key")
+    assert backend.api_key == "test-key"
+    assert backend.base_url == "https://judge0-ce.p.rapidapi.com"
+
+
+def test_judge0_backend_with_custom_base_url():
+    """Test Judge0Backend initializes with custom base URL."""
+    backend = Judge0Backend(api_key="test-key", base_url="http://localhost:2358")
+    assert backend.api_key == "test-key"
+    assert backend.base_url == "http://localhost:2358"
+
+
+@patch('ai_eval.backends.custom.requests.get')
+def test_custom_backend_initialization(mock_get):
+    """Test CustomServiceBackend initializes with correct config."""
+    mock_response = Mock()
+    mock_response.json.return_value = [
+        {"id": "92", "name": "Python (3.8.1)"},
+        {"id": "93", "name": "JavaScript (Node.js 12.14.0)"},
+        {"id": "91", "name": "Java (OpenJDK 13.0.1)"},
+        {"id": "54", "name": "C++ (GCC 9.2.0)"}
+    ]
+    mock_response.raise_for_status = Mock()
+    mock_get.return_value = mock_response
+    backend = CustomServiceBackend(
+        submit_endpoint="http://test.com/submit",
+        results_endpoint="http://test.com/results/{submission_id}",
+        languages_endpoint="http://test.com/languages",
+        api_key="test-key",
+        timeout=60
+    )
+    assert backend.submit_endpoint == "http://test.com/submit"
+    assert backend.results_endpoint == "http://test.com/results/{submission_id}"
+    assert backend.languages_endpoint == "http://test.com/languages"
+    assert backend.api_key == "test-key"
+    assert backend.timeout == 60
+
+
+@patch('ai_eval.backends.judge0.requests.post')
+def test_judge0_submit_code(mock_post):
+    """Test Judge0Backend.submit_code method."""
+    mock_response = Mock()
+    mock_response.json.return_value = {"token": "test-token"}
+    mock_response.raise_for_status = Mock()
+    mock_post.return_value = mock_response
+
+    backend = Judge0Backend(api_key="test-key")
+    submission_id = backend.submit_code("print('hello')", "Python (3.8.1)")
+
+    assert submission_id == "test-token"
+    mock_post.assert_called_once()
+
+
+@patch('ai_eval.backends.judge0.requests.get')
+def test_judge0_get_result(mock_get):
+    """Test Judge0Backend.get_result method."""
+    mock_response = Mock()
+    mock_response.json.return_value = {
+        "status": {"id": 3, "description": "Accepted"},
+        "stdout": "hello\n",
+        "stderr": None,
+        "compile_output": None,
+        "time": "0.01",
+        "memory": "1024"
+    }
+    mock_response.raise_for_status = Mock()
+    mock_get.return_value = mock_response
+
+    backend = Judge0Backend(api_key="test-key")
+    result = backend.get_result("test-token")
+
+    assert result["status"]["description"] == "Accepted"
+    assert result["stdout"] == "hello\n"
+    mock_get.assert_called_once()
+
+
+@patch('ai_eval.backends.custom.requests.get')
+@patch('ai_eval.backends.custom.requests.post')
+def test_custom_submit_code(mock_post, mock_get):
+    """Test CustomServiceBackend.submit_code method."""
+    lang_resp = Mock()
+    lang_resp.json.return_value = [
+        {"name": "Python (3.8.1)"},
+        {"name": "JavaScript (Node.js 12.14.0)"},
+        {"name": "Java (OpenJDK 13.0.1)"},
+        {"name": "C++ (GCC 9.2.0)"}
+    ]
+    lang_resp.raise_for_status = Mock()
+    mock_get.return_value = lang_resp
+
+    mock_response = Mock()
+    mock_response.json.return_value = {"submission_id": "test-token"}
+    mock_response.raise_for_status = Mock()
+    mock_post.return_value = mock_response
+
+    backend = CustomServiceBackend(
+        submit_endpoint="http://test.com/submit",
+        results_endpoint="http://test.com/results/{submission_id}",
+        languages_endpoint="http://test.com/languages"
+    )
+    submission_id = backend.submit_code("print('hello')", "Python (3.8.1)")
+
+    assert submission_id == "test-token"
+    mock_post.assert_called_once()
+
+
+@patch('ai_eval.backends.custom.requests.get')
+def test_custom_backend_language_validation_fails(mock_get):
+    """Test CustomServiceBackend raises error for unsupported languages."""
+    mock_response = Mock()
+    mock_response.json.return_value = [
+        {"name": "Python (3.8.1)"}  # Only Python supported
+    ]
+    mock_response.raise_for_status = Mock()
+    mock_get.return_value = mock_response
+
+    with pytest.raises(ValueError) as exc_info:
+        backend = CustomServiceBackend(
+            submit_endpoint="http://test.com/submit",
+            results_endpoint="http://test.com/results/{submission_id}",
+            languages_endpoint="http://test.com/languages",
+            api_key="test-key"
+        )
+        backend._ensure_languages_validated()
+
+    assert "does not support languages" in str(exc_info.value)
+
+
+@patch('ai_eval.backends.custom.requests.get')
+def test_custom_get_result(mock_get):
+    """Test CustomServiceBackend.get_result method."""
+    lang_resp = Mock()
+    lang_resp.json.return_value = [
+        {"name": "Python (3.8.1)"},
+        {"name": "JavaScript (Node.js 12.14.0)"},
+        {"name": "Java (OpenJDK 13.0.1)"},
+        {"name": "C++ (GCC 9.2.0)"}
+    ]
+    lang_resp.raise_for_status = Mock()
+
+    result_resp = Mock()
+    result_resp.json.return_value = {
+        "status": "Completed",
+        "stdout": "hello\n",
+        "stderr": None
+    }
+    result_resp.raise_for_status = Mock()
+    mock_get.side_effect = [lang_resp, result_resp]
+
+    backend = CustomServiceBackend(
+        submit_endpoint="http://test.com/submit",
+        results_endpoint="http://test.com/results/{submission_id}",
+        languages_endpoint="http://test.com/languages"
+    )
+    result = backend.get_result("test-token")
+
+    assert result["status"]["description"] == "Completed"
+    assert result["stdout"] == "hello\n"
+    assert mock_get.call_count == 2
+
+
+@pytest.mark.parametrize(
     "xblock_key, site_config_key, settings_dict, expected_result",
     [
         # XBlock field is prioritized
@@ -247,3 +452,31 @@ def test_get_model_api_url_delegates(mock_get_config, ai_eval_block):
     """Test that get_model_api_url delegates to _get_model_config_value."""
     assert ai_eval_block.get_model_api_url() == "test-url"
     mock_get_config.assert_called_once_with("api_url", None)
+
+
+@patch('ai_eval.coding_ai_eval.BackendFactory.get_backend')
+def test_coding_block_submit_code_uses_backend(mock_get_backend, coding_block_data):
+    """Test CodingAIEvalXBlock.submit_code_handler uses backend system."""
+    mock_backend = Mock()
+    mock_backend.submit_code.return_value = "test-submission-id"
+    mock_get_backend.return_value = mock_backend
+
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    result = block.submit_code_handler.__wrapped__(block, data={"user_code": "print('hello')"})
+
+    assert result == {"submission_id": "test-submission-id"}
+    mock_backend.submit_code.assert_called_once_with("print('hello')", "Python (3.8.1)")
+
+
+@patch('ai_eval.coding_ai_eval.BackendFactory.get_backend')
+def test_coding_block_get_submission_result_uses_backend(mock_get_backend, coding_block_data):
+    """Test CodingAIEvalXBlock.get_submission_result_handler uses backend system."""
+    mock_backend = Mock()
+    mock_backend.get_result.return_value = {"status": "Accepted"}
+    mock_get_backend.return_value = mock_backend
+
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    result = block.get_submission_result_handler.__wrapped__(block, data={"submission_id": "test-id"})
+
+    assert result == {"status": "Accepted"}
+    mock_backend.get_result.assert_called_once_with("test-id")

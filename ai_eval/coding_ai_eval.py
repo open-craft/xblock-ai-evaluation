@@ -3,21 +3,21 @@
 import logging
 import pkg_resources
 
+from django.conf import settings
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
-from xblock.fields import Dict, Scope, String
+from xblock.fields import Dict, List, Scope, String
 from xblock.validation import ValidationMessage
 
 from .base import AIEvalXBlock
 from .llm_services import TIMEOUT_ERROR_MESSAGE
 from .utils import (
-    submit_code,
-    get_submission_result,
     SUPPORTED_LANGUAGE_MAP,
     LanguageLabels,
 )
+from .backends.factory import BackendFactory
 
 logger = logging.getLogger(__name__)
 
@@ -84,10 +84,13 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
-    messages = Dict(
+    # XXX: deprecated
+    messages = Dict(scope=Scope.user_state)
+
+    sessions = List(
         help=_("Dictionary with messages"),
         scope=Scope.user_state,
-        default={USER_RESPONSE: "", AI_EVALUATION: "", CODE_EXEC_RESULT: {}},
+        default=[{USER_RESPONSE: "", AI_EVALUATION: "", CODE_EXEC_RESULT: {}}],
     )
 
     editable_fields = AIEvalXBlock.editable_fields + (
@@ -96,6 +99,13 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         "judge0_api_key",
         "language",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.messages:
+            self.sessions = [self.messages]
+            self.messages = {}
+            self.save()
 
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
@@ -130,9 +140,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         js_data = {
             "monaco_html": monaco_html,
             "question": self.question,
-            "code": self.messages[USER_RESPONSE],
-            "ai_evaluation": self.messages[AI_EVALUATION],
-            "code_exec_result": self.messages[CODE_EXEC_RESULT],
+            "code": self.sessions[-1][USER_RESPONSE],
+            "ai_evaluation": self.sessions[-1][AI_EVALUATION],
+            "code_exec_result": self.sessions[-1][CODE_EXEC_RESULT],
             "marked_html": marked_html,
             "language": self.language,
         }
@@ -168,7 +178,14 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 )
             )
 
-        if data.language != LanguageLabels.HTML_CSS and not data.judge0_api_key:
+        # Only enforce Judge0 API key when Judge0 backend is selected (or default)
+        backend_config = getattr(settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', {})
+        backend_name = backend_config.get('backend', 'judge0')
+        if (
+            data.language != LanguageLabels.HTML_CSS
+            and backend_name != 'custom'
+            and not data.judge0_api_key
+        ):
             validation.add(
                 ValidationMessage(
                     ValidationMessage.ERROR, _("Judge0 API key is mandatory")
@@ -230,9 +247,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
             raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
         if response:
-            self.messages[USER_RESPONSE] = data["code"]
-            self.messages[AI_EVALUATION] = response
-            self.messages[CODE_EXEC_RESULT] = {
+            self.sessions[-1][USER_RESPONSE] = data["code"]
+            self.sessions[-1][AI_EVALUATION] = response
+            self.sessions[-1][CODE_EXEC_RESULT] = {
                 "stdout": data["stdout"],
                 "stderr": data["stderr"],
             }
@@ -243,11 +260,10 @@ class CodingAIEvalXBlock(AIEvalXBlock):
     @XBlock.json_handler
     def submit_code_handler(self, data, suffix=""):  # pylint: disable=unused-argument
         """
-        Submit code to Judge0.
+        Submit code for execution.
         """
-        submission_id = submit_code(
-            self.judge0_api_key, data["user_code"], self.language
-        )
+        backend = BackendFactory.get_backend(self.judge0_api_key)
+        submission_id = backend.submit_code(data["user_code"], self.language)
         return {"submission_id": submission_id}
 
     @XBlock.json_handler
@@ -255,7 +271,11 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         """
         Reset the Xblock.
         """
-        self.messages = {USER_RESPONSE: "", AI_EVALUATION: "", CODE_EXEC_RESULT: {}}
+        self.sessions.append({
+            USER_RESPONSE: "",
+            AI_EVALUATION: "",
+            CODE_EXEC_RESULT: {},
+        })
         return {"message": "reset successful."}
 
     @XBlock.json_handler
@@ -265,8 +285,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         """
         Get code submission result.
         """
+        backend = BackendFactory.get_backend(self.judge0_api_key)
         submission_id = data["submission_id"]
-        return get_submission_result(self.judge0_api_key, submission_id)
+        return backend.get_result(submission_id)
 
     @staticmethod
     def workbench_scenarios():

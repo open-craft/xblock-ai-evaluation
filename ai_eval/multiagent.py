@@ -284,9 +284,15 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         default=False,
     )
 
+    # XXX: Deprecated.
     chat_history = List(
         scope=Scope.user_state,
         default=[],
+    )
+
+    sessions = List(
+        scope=Scope.user_state,
+        default=[[]],
     )
 
     editable_fields = AIEvalXBlock.editable_fields + (
@@ -301,6 +307,13 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         "allow_reset",
         "blacklist",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.chat_history:
+            self.sessions = [self.chat_history]
+            self.chat_history = []
+            self.save()
 
     def studio_view(self, context):
         """
@@ -352,7 +365,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         # history with an LLM completion, with each message having a "role"
         # of "user" or "assistant".
         for message in itertools.chain(initial_messages,
-                                       self.chat_history,
+                                       self.sessions[-1],
                                        [user_message]):
             if message["role"] == "assistant":
                 agent = message["extra"].get("role") or ""
@@ -503,7 +516,7 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
                 main_data = self._get_character_data(main_name)
                 break
         js_data = {
-            "messages": self.chat_history,
+            "messages": self.sessions[-1],
             "main_character_agent": main_agent,
             "main_character_data": {
                 "name": main_data.get("name", main_name),
@@ -625,10 +638,10 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
             character_data = character_data.copy()
             character_data.setdefault("name", character_name)
 
-        self.chat_history.append({"role": "user", "content": user_input})
+        self.sessions[-1].append({"role": "user", "content": user_input})
         extra = {"is_evaluator": is_evaluator, "role": agent,
                  "character_data": character_data}
-        self.chat_history.append({"role": "assistant", "content": message,
+        self.sessions[-1].append({"role": "assistant", "content": message,
                                   "extra": extra})
         return {
             "message": message,
@@ -646,6 +659,6 @@ class MultiAgentAIEvalXBlock(AIEvalXBlock):
         """Reset the chat history."""
         if not self.allow_reset:
             raise JsonHandlerError(403, "Reset is disabled.")
-        self.chat_history = []
+        self.sessions.append([])
         self.finished = False
         return {}
