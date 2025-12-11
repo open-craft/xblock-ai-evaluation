@@ -208,6 +208,8 @@
   color: #1f2933;
   font-size: 1rem;
   line-height: 1.5;
+  /* Preserve author-entered line breaks in introductory text */
+  white-space: pre-line;
 }
 
 .coach-layout {
@@ -694,6 +696,17 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.coach-global-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 1rem;
+}
+
+.coach-global-actions .coach-button--secondary {
+  background: #e4ebf5;
+  color: #1f2933;
 }
 
 .coach-actions {

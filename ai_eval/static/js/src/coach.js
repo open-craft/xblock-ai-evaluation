@@ -5,7 +5,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
   loadMarkedInIframe(data.marked_html);
 
   const handlerUrl = runtime.handlerUrl(element, "get_character_response");
-  const resetHandlerUrl = runtime.handlerUrl(element, "reset");
+  const resetAllHandlerUrl = runtime.handlerUrl(element, "reset_all");
   const resumeAttemptHandlerUrl = runtime.handlerUrl(element, "resume_attempt");
   const evaluatorHandlerUrl = runtime.handlerUrl(element, "get_evaluator_response");
 
@@ -18,7 +18,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
   const $inputs = $(".coach-input__textarea", element);
   const $tryAgainButton = $(".coach-try-again", element);
   const $submitEvaluation = $(".coach-submit-evaluation", element);
-  const $resetButton = $(".coach-reset-button", element);
+  const $resetAllButton = $(".coach-reset-all", element);
   const $attemptLabel = $(".coach-attempts__label", element);
 
   const state = {
@@ -262,13 +262,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
     }
   };
 
-  const setResetEnabled = function(enable) {
-    if ($resetButton.length) {
-      $resetButton.prop("disabled", !enable);
-      $resetButton.toggleClass("disabled", !enable);
-    }
-  };
-
   const updateAttemptUI = function() {
     const attempts = state.attempts || {};
     let label = "";
@@ -296,7 +289,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
       if (hasMaxAttempts) { $tryAgainButton.show(); } else { $tryAgainButton.hide(); }
     }
     setTryAgainEnabled(Boolean(canRetry));
-    setResetEnabled(true);
 
     const attemptsRemaining = typeof attempts.attempts_remaining === "number"
       ? attempts.attempts_remaining
@@ -472,18 +464,19 @@ function CoachAIEvalXBlock(runtime, element, data) {
     });
   };
 
-  const resetCoachPane = function() {
-    if (!$resetButton.length) {
+  const resetAllConversations = function() {
+    if ($resetAllButton.length === 0) {
       return;
     }
-    if (paneControllers[1]) {
-      setPaneBusy(paneControllers[1], true);
-      setInputEnabled(paneControllers[1], false);
+    if (Object.values(paneControllers).some((controller) => controller.busy)) {
+      return;
     }
+    setAllInputsEnabled(false);
+    Object.values(paneControllers).forEach((controller) => setPaneBusy(controller, true));
     announceStatus("workspace", translate("Resetting conversation…"));
 
     $.ajax({
-      url: resetHandlerUrl,
+      url: resetAllHandlerUrl,
       method: "POST",
       data: JSON.stringify({}),
       success: function(response) {
@@ -496,22 +489,16 @@ function CoachAIEvalXBlock(runtime, element, data) {
           state.attempts = response.attempts;
         }
         state.finished = Boolean(response && response.finished);
-        if (!state.finished) {
-          hideReportCard();
-        }
-        if (paneControllers[1]) {
-          setInputEnabled(paneControllers[1], true);
-        }
+        hideReportCard();
+        setAllInputsEnabled(true);
+        Object.values(paneControllers).forEach((controller) => setPaneBusy(controller, false));
         updateAttemptUI();
-        if (paneControllers[1]) {
-          setPaneBusy(paneControllers[1], false);
-        }
+        announceStatus("workspace", translate("Conversation reset."));
       },
       error: function() {
-        if (paneControllers[1]) {
-          setPaneBusy(paneControllers[1], false);
-          setInputEnabled(paneControllers[1], true);
-        }
+        setAllInputsEnabled(true);
+        Object.values(paneControllers).forEach((controller) => setPaneBusy(controller, false));
+        updateAttemptUI();
         announceStatus("workspace", translate("Unable to reset conversation."));
         alert(translate("An error has occurred."));
       },
@@ -580,9 +567,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
     });
   }
 
-  if ($resetButton.length) {
-    $resetButton.on("click", function() {
-      resetCoachPane();
+  if ($resetAllButton.length) {
+    $resetAllButton.on("click", function() {
+      resetAllConversations();
     });
   }
 

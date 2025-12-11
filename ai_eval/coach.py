@@ -306,6 +306,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
+    allow_reset = Boolean(
+        display_name=_("Allow reset"),
+        help=_(
+            "If enabled, learners can reset the entire activity (both panes and attempts)."
+        ),
+        default=False,
+        scope=Scope.settings,
+    )
+
     editable_fields = AIEvalXBlock.editable_fields + (
         "initial_message",
         "coach_initial_message",
@@ -324,6 +333,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "evaluator_prompt",
         "blacklist",
         "max_attempts",
+        "allow_reset",
     )
 
     def studio_view(self, context):
@@ -724,13 +734,23 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         }
 
     @XBlock.json_handler
-    def reset(self, data, suffix=""):
+    def reset_all(self, data, suffix=""):
         """
-        Reset the chat history.
+        Reset both workspace and coach conversations and attempt state.
+
+        This is a full learner reset: clears histories, evaluation artifacts,
+        attempts, and cached provider thread IDs.
         """
         self._ensure_histories()
+        self.workspace_history = []
         self.coach_history = []
-        self._clear_thread_contexts(["character1"])
+        self.evaluation_fragments = []
+        self.finished = False
+        self.input_open = True
+        self.attempts_used = 0
+        self.final_submission = ""
+        self.final_evaluation_markdown = ""
+        self.thread_map = {}
         return {
             "chat_histories": self._get_chat_histories(),
             "attempts": self._get_attempt_state(),

@@ -58,9 +58,6 @@
         <aside class="coach-pane coach-pane--coach" aria-label="{% blocktrans %}Coach conversation{% endblocktrans %}">
             <header class="coach-pane__header">
                 <h2 class="coach-pane__title coach-pane__title--coach">{{ self.coach_title }}</h2>
-                <button type="button" class="coach-link-button coach-reset-button">
-                    {% trans "Reset" %}
-                </button>
             </header>
             <div class="coach-history" data-character-index="1" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false">
                 <div class="coach-messages" data-pane="coach"></div>
@@ -86,4 +83,12 @@
             </div>
         </aside>
     </div>
+
+    {% if self.allow_reset %}
+        <div class="coach-global-actions">
+            <button type="button" class="coach-button coach-button--secondary coach-reset-all">
+                {% trans "Reset" %}
+            </button>
+        </div>
+    {% endif %}
 </div>
