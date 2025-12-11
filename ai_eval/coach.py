@@ -692,17 +692,13 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
         if character_index == 0:
             max_attempts = self.max_attempts or 0
-            input_open = self.input_open
-            if input_open is None:
-                input_open = True
-            if not input_open:
-                raise JsonHandlerError(403, "No active attempt.")
             if not trimmed_input:
                 raise JsonHandlerError(400, "Input cannot be empty.")
             if max_attempts and self.attempts_used >= max_attempts:
                 raise JsonHandlerError(403, "No attempts remaining.")
             self.attempts_used = (self.attempts_used or 0) + 1
-            self.input_open = False
+            if max_attempts and self.attempts_used >= max_attempts:
+                self.input_open = False
 
         self._ensure_histories()
         thread_context = f"character{character_index}"
@@ -758,26 +754,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         }
 
     @XBlock.json_handler
-    def resume_attempt(self, data, suffix=""):
-        """
-        Reopen the session for another attempt without clearing history.
-        """
-        max_attempts = self.max_attempts or 0
-        if max_attempts and self.attempts_used >= max_attempts:
-            raise JsonHandlerError(403, "No attempts remaining.")
-        self._ensure_histories()
-        self.finished = False
-        self.input_open = True
-        self.final_submission = ""
-        self.final_evaluation_markdown = ""
-        self.evaluation_fragments = []
-        self._clear_thread_contexts(["evaluator"])
-        return {
-            "attempts": self._get_attempt_state(),
-            "finished": self.finished,
-        }
-
-    @XBlock.json_handler
     def get_evaluator_response(self, data, suffix=""):
         """
 
@@ -787,8 +763,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         if self.finished:
             raise JsonHandlerError(403, "The session has ended.")
-        if self.input_open:
-            raise JsonHandlerError(400, "No learner response available for evaluation.")
 
         self._ensure_histories()
         latest_fragment = None
@@ -835,6 +809,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         )
         self._record_fragment(0, "", message, is_evaluation=True)
         self.finished = True
+        self.input_open = False
         self.final_submission = latest_fragment["user_message"]
         self.final_evaluation_markdown = message
         character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
