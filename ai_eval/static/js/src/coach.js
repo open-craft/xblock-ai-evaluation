@@ -262,10 +262,10 @@ function CoachAIEvalXBlock(runtime, element, data) {
         ? Math.max(attempts.attempts_remaining, 0)
         : 0;
       warning = remaining === 1;
-      label = translatePlural("%(count)s attempt left", "%(count)s attempts left", remaining)
+      label = translatePlural("%(count)s response left", "%(count)s responses left", remaining)
         .replace("%(count)s", remaining);
     } else {
-      label = translate("Unlimited attempts");
+      label = translate("Unlimited responses");
     }
 
     if ($attemptLabel.length) {
