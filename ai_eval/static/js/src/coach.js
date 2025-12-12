@@ -18,11 +18,16 @@ function CoachAIEvalXBlock(runtime, element, data) {
   const $submitEvaluation = $(".coach-submit-evaluation", element);
   const $resetAllButton = $(".coach-reset-all", element);
   const $attemptLabel = $(".coach-attempts__label", element);
+  const $backToReportButton = $(".coach-back-to-report", element);
+  const $globalActions = $(".coach-global-actions", element);
 
   const state = {
     finished: Boolean(data.finished),
     attempts: data.attempts || {},
     characters: data.characters || [],
+    mode: "chat",
+    hasReport: false,
+    reportPayload: null,
   };
 
   const $layout = $(".coach-layout", element);
@@ -195,6 +200,58 @@ function CoachAIEvalXBlock(runtime, element, data) {
     }
   };
 
+  const setBackToReportVisible = function(visible) {
+    if ($backToReportButton.length) {
+      if (visible) {
+        $backToReportButton.show();
+      } else {
+        $backToReportButton.hide();
+      }
+    }
+  };
+
+  const setGlobalResetVisible = function(visible) {
+    if ($globalActions.length) {
+      if (visible) {
+        $globalActions.show();
+      } else {
+        $globalActions.hide();
+      }
+    }
+  };
+
+  const enterReportMode = function(payload) {
+    state.mode = "report";
+    setBackToReportVisible(false);
+    setGlobalResetVisible(true);
+    showReportCard(payload || {});
+    setAllInputsEnabled(false);
+    announceStatus("workspace", translate("Evaluation report shown."));
+  };
+
+  const enterReviewMode = function() {
+    state.mode = "review";
+    hideReportCard();
+    setBackToReportVisible(Boolean(state.hasReport));
+    setGlobalResetVisible(false);
+    toggleInputsForWorkspace(true);
+    setAllInputsEnabled(false);
+    setEvaluationEnabled(false);
+    announceStatus("workspace", translate("Reviewing conversation."));
+    if ($backToReportButton.length) {
+      $backToReportButton.focus();
+    }
+  };
+
+  const enterChatMode = function() {
+    state.mode = "chat";
+    hideReportCard();
+    setBackToReportVisible(false);
+    setGlobalResetVisible(true);
+    setAllInputsEnabled(true);
+    updateAttemptUI();
+  };
+
   const showReportCard = function(response) {
     if ($reportCard) {
       $reportCard.remove();
@@ -219,8 +276,12 @@ function CoachAIEvalXBlock(runtime, element, data) {
       if ($layout.length) {
         $layout.addClass("coach-layout--report");
       }
-
-      $reportCard.find(".coach-report-card__actions").remove();
+      const $reviewButton = $reportCard.find(".coach-review-conversation");
+      if ($reviewButton.length) {
+        $reviewButton.off("click").on("click", function() {
+          enterReviewMode();
+        });
+      }
 
       $workspacePane.append($reportCard);
       setEvaluationEnabled(false);
@@ -278,13 +339,15 @@ function CoachAIEvalXBlock(runtime, element, data) {
     const attemptsRemaining = typeof attempts.attempts_remaining === "number"
       ? attempts.attempts_remaining
       : null;
-    const showInput = (attemptsRemaining === null || attemptsRemaining > 0) && !state.finished;
+    const showInput = state.mode === "review"
+      ? true
+      : ((attemptsRemaining === null || attemptsRemaining > 0) && !state.finished);
     toggleInputsForWorkspace(showInput);
     if (paneControllers[0]) {
-      setInputEnabled(paneControllers[0], showInput);
+      setInputEnabled(paneControllers[0], state.mode === "review" ? false : showInput);
     }
     const hasSubmission = (attempts.attempts_used || 0) > 0;
-    setEvaluationEnabled(hasSubmission && !state.finished);
+    setEvaluationEnabled(hasSubmission && !state.finished && state.mode === "chat");
   };
 
   const applyFinishedState = function(finished) {
@@ -323,7 +386,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
     }
 
     if (hasReport) {
-      showReportCard(response);
+      enterReportMode(state.reportPayload || response);
       announceStatus(controller.pane, translate("Evaluation ready."));
     }
 
@@ -374,6 +437,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
       return;
     }
     if (state.finished) {
+      return;
+    }
+    if (state.mode !== "chat") {
       return;
     }
     if (index === 0) {
@@ -434,6 +500,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
       method: "POST",
       data: JSON.stringify({}),
       success: function(response) {
+        state.mode = "chat";
+        state.hasReport = false;
+        state.reportPayload = null;
         if (response && response.chat_histories) {
           populateHistories(response.chat_histories);
         } else {
@@ -444,6 +513,8 @@ function CoachAIEvalXBlock(runtime, element, data) {
         }
         state.finished = Boolean(response && response.finished);
         hideReportCard();
+        setBackToReportVisible(false);
+        setGlobalResetVisible(true);
         setAllInputsEnabled(true);
         Object.values(paneControllers).forEach((controller) => setPaneBusy(controller, false));
         updateAttemptUI();
@@ -463,6 +534,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
     if (state.finished) {
       return;
     }
+    if (state.mode !== "chat") {
+      return;
+    }
     if (paneControllers[0]) {
       setPaneBusy(paneControllers[0], true);
     }
@@ -476,6 +550,16 @@ function CoachAIEvalXBlock(runtime, element, data) {
       data: JSON.stringify({}),
       success: function(response) {
         if (paneControllers[0]) {
+          if (response && response.report_html) {
+            state.hasReport = true;
+            state.reportPayload = {
+              report_html: response.report_html,
+              evaluation_markdown: response.evaluation_markdown,
+              final_submission: response.final_submission,
+              attempts: response.attempts,
+              finished: response.finished,
+            };
+          }
           handleResponse(paneControllers[0], response, null);
           setPaneBusy(paneControllers[0], false);
         }
@@ -521,6 +605,15 @@ function CoachAIEvalXBlock(runtime, element, data) {
     });
   }
 
+  if ($backToReportButton.length) {
+    $backToReportButton.on("click", function() {
+      if (!state.hasReport || !state.reportPayload) {
+        return;
+      }
+      enterReportMode(state.reportPayload);
+    });
+  }
+
   if ($submitEvaluation.length) {
     $submitEvaluation.on("click", function() {
       submitForEvaluation();
@@ -531,15 +624,20 @@ function CoachAIEvalXBlock(runtime, element, data) {
     populateHistories(data.chat_histories);
     applyFinishedState(state.finished);
     if (data.final_report && data.final_report.report_html) {
-      if (data.final_report.attempts) {
-        state.attempts = data.final_report.attempts;
-      }
-      showReportCard({
+      state.hasReport = true;
+      state.reportPayload = {
         report_html: data.final_report.report_html,
         evaluation_markdown: data.final_report.evaluation_markdown,
         final_submission: data.final_report.final_submission,
-        attempts: state.attempts,
-      });
+        attempts: data.final_report.attempts || state.attempts,
+        finished: state.finished,
+      };
+      if (data.final_report.attempts) {
+        state.attempts = data.final_report.attempts;
+      }
+      enterReportMode(state.reportPayload);
+    } else {
+      enterChatMode();
     }
   });
 }
