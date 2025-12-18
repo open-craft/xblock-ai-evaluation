@@ -169,30 +169,6 @@
   font-size: small;
 }
 
-.chat-wrapper {
-  display: flex;
-  min-height: 350px;
-}
-
-.chat-chatbox-half {
-  border-left: 1px solid;
-  display: flex;
-  flex-flow: column;
-  margin-left: 10px;
-  padding-left: 10px;
-  width: 50%;
-}
-
-.chat-chatbox-half .chat-history {
-  flex-grow: 1;
-  min-height: auto;
-  max-height: none;
-}
-
-.chat-chatbox-half:first-child {
-  border-left: none;
-}
-
 /* Coach redesign styles */
 
 .coach-block {
@@ -258,17 +234,6 @@
 
 .coach-pane__title--coach {
   color: #1f2933;
-}
-
-.coach-link-button {
-  background: none;
-  border: none;
-  padding: 0;
-  color: #2563eb;
-  font-weight: 500;
-  font-size: 0.9rem;
-  cursor: pointer;
-  text-decoration: underline;
 }
 
 .coach-history {
@@ -508,7 +473,7 @@
 .coach-mode--review .coach-back-to-report {
   background: #0b74de !important;
   color: #ffffff !important;
-  border: 2px solid rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
   box-shadow: none !important;
   text-shadow: none !important;
   filter: none !important;
@@ -549,11 +514,6 @@
 .coach-button--secondary {
   background: rgba(255, 255, 255, 0.16);
   color: #f5f8ff;
-}
-
-.coach-pane--coach .coach-button--secondary {
-  background: #e4ebf5;
-  color: #1f2933;
 }
 
 .coach-button--icon {
@@ -660,21 +620,14 @@
 
 .coach-report-card__evaluation p {
   text-align: center;
-}
-
-.coach-report-card__evaluation ul {
-  padding-left: 0;
-  list-style-position: inside;
-  text-align: center;
+  margin-bottom: 1rem;
 }
 
 .coach-report-card__evaluation ul {
   padding-left: 1.1rem;
+  list-style-position: inside;
   margin-top: 1rem;
-}
-
-.coach-report-card__evaluation p {
-  margin-bottom: 1rem;
+  text-align: center;
 }
 
 .coach-report-card__evaluation p:last-child {
@@ -691,22 +644,6 @@
 .coach-report-card__actions .coach-button--secondary {
   background: #e4ebf5;
   color: #1f2933;
-}
-
-.coach-report-card__cta {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  color: #f4f7ff;
-  cursor: pointer;
-  font-weight: 600;
-  padding: 0.75rem 1.75rem;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.coach-report-card__cta:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-1px);
 }
 
 .coach-layout--report {
@@ -776,6 +713,10 @@
   flex-wrap: wrap;
 }
 
+.coach-mode--review .coach-actions {
+  justify-content: center;
+}
+
 .coach-attempts {
   display: flex;
   align-items: center;
@@ -789,10 +730,6 @@
 
 .coach-attempts__label--warning {
   color: #fbbf24;
-}
-
-.coach-pane--coach .coach-attempts__label--warning {
-  color: #b43403;
 }
 
 @media (max-width: 960px) {
