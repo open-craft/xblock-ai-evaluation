@@ -502,7 +502,30 @@
   box-shadow: none !important;
   text-shadow: none !important;
   filter: none !important;
-  color: #1111 !important;
+  color: #1f2933;
+}
+
+.coach-mode--review .coach-back-to-report {
+  background: #0b74de !important;
+  color: #ffffff !important;
+  border: 2px solid rgba(255, 255, 255, 0.65) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+.coach-mode--review .coach-back-to-report:hover {
+  background: #0a6ad0 !important;
+  border-color: rgba(255, 255, 255, 0.75) !important;
+  transform: none;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+.coach-mode--review .coach-back-to-report:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
 }
 
 .coach-back-to-report:focus-visible {

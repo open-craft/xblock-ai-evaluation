@@ -20,11 +20,11 @@ function CoachAIEvalXBlock(runtime, element, data) {
   const $attemptLabel = $(".coach-attempts__label", element);
   const $backToReportButton = $(".coach-back-to-report", element);
   const $globalActions = $(".coach-global-actions", element);
+  const $blockRoot = $(".coach-block", element).first();
 
   const state = {
     finished: Boolean(data.finished),
     attempts: data.attempts || {},
-    characters: data.characters || [],
     mode: "chat",
     hasReport: false,
     reportPayload: null,
@@ -34,7 +34,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
   const $workspacePane = $(".coach-pane--workspace", element);
   const $workspaceHistory = $(".coach-history[data-character-index='0']", $workspacePane);
   const $workspaceInputWrapper = $(".coach-input[data-character-index='0']", $workspacePane);
+  const $coachInputWrapper = $(".coach-input[data-character-index='1']", element);
   const $workspaceActions = $(".coach-actions", $workspacePane);
+  const $attemptsWrapper = $(".coach-attempts", $workspacePane);
   let $reportCard = null;
 
   const paneControllers = {};
@@ -188,15 +190,16 @@ function CoachAIEvalXBlock(runtime, element, data) {
     });
   };
 
-  const toggleInputsForWorkspace = function(show) {
-    if ($workspaceInputWrapper.length) {
-      if (show) {
-        $workspaceInputWrapper.removeClass("coach-input--hidden");
-        $workspaceInputWrapper.show();
-      } else {
-        $workspaceInputWrapper.addClass("coach-input--hidden");
-        $workspaceInputWrapper.hide();
-      }
+  const toggleInputWrapper = function($wrapper, show) {
+    if (!$wrapper || !$wrapper.length) {
+      return;
+    }
+    if (show) {
+      $wrapper.removeClass("coach-input--hidden");
+      $wrapper.show();
+    } else {
+      $wrapper.addClass("coach-input--hidden");
+      $wrapper.hide();
     }
   };
 
@@ -207,6 +210,38 @@ function CoachAIEvalXBlock(runtime, element, data) {
       } else {
         $backToReportButton.hide();
       }
+    }
+  };
+
+  const setWorkspaceActionsForReview = function(isReview) {
+    if ($attemptsWrapper.length) {
+      if (isReview) { $attemptsWrapper.hide(); } else { $attemptsWrapper.show(); }
+    }
+    if ($submitEvaluation.length) {
+      if (isReview) { $submitEvaluation.hide(); } else { $submitEvaluation.show(); }
+    }
+    setBackToReportVisible(isReview && Boolean(state.hasReport));
+  };
+
+  const setModeClass = function(mode) {
+    if (!$blockRoot.length) {
+      return;
+    }
+    $blockRoot.removeClass("coach-mode--review");
+    if (mode === "review") {
+      $blockRoot.addClass("coach-mode--review");
+    }
+  };
+
+  const setInputsForMode = function() {
+    const enableChatInputs = state.mode === "chat" && !state.finished;
+    if (!enableChatInputs) {
+      setAllInputsEnabled(false);
+      return;
+    }
+    // Only the coach pane needs explicit enabling here; workspace enabling/visibility is attempt-driven.
+    if (paneControllers[1]) {
+      setInputEnabled(paneControllers[1], true);
     }
   };
 
@@ -222,20 +257,22 @@ function CoachAIEvalXBlock(runtime, element, data) {
 
   const enterReportMode = function(payload) {
     state.mode = "report";
-    setBackToReportVisible(false);
+    setModeClass("report");
     setGlobalResetVisible(true);
     showReportCard(payload || {});
-    setAllInputsEnabled(false);
+    setInputsForMode();
     announceStatus("workspace", translate("Evaluation report shown."));
   };
 
   const enterReviewMode = function() {
     state.mode = "review";
+    setModeClass("review");
     hideReportCard();
-    setBackToReportVisible(Boolean(state.hasReport));
+    setWorkspaceActionsForReview(true);
     setGlobalResetVisible(false);
-    toggleInputsForWorkspace(true);
-    setAllInputsEnabled(false);
+    toggleInputWrapper($workspaceInputWrapper, false);
+    toggleInputWrapper($coachInputWrapper, false);
+    setInputsForMode();
     setEvaluationEnabled(false);
     announceStatus("workspace", translate("Reviewing conversation."));
     if ($backToReportButton.length) {
@@ -245,10 +282,12 @@ function CoachAIEvalXBlock(runtime, element, data) {
 
   const enterChatMode = function() {
     state.mode = "chat";
+    setModeClass("chat");
     hideReportCard();
-    setBackToReportVisible(false);
+    setWorkspaceActionsForReview(false);
     setGlobalResetVisible(true);
-    setAllInputsEnabled(true);
+    setInputsForMode();
+    toggleInputWrapper($coachInputWrapper, !state.finished);
     updateAttemptUI();
   };
 
@@ -266,7 +305,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
       if ($workspaceHistory.length) {
         $workspaceHistory.hide();
       }
-      toggleInputsForWorkspace(false);
+      toggleInputWrapper($workspaceInputWrapper, false);
       if ($workspaceActions.length) {
         $workspaceActions.hide();
       }
@@ -315,6 +354,9 @@ function CoachAIEvalXBlock(runtime, element, data) {
   };
 
   const updateAttemptUI = function() {
+    if (state.mode !== "chat") {
+      return;
+    }
     const attempts = state.attempts || {};
     let label = "";
     let warning = false;
@@ -334,17 +376,15 @@ function CoachAIEvalXBlock(runtime, element, data) {
       $attemptLabel.toggleClass("coach-attempts__label--warning", warning);
     }
 
-    const hasMaxAttempts = attempts.max_attempts && attempts.max_attempts > 0;
-
     const attemptsRemaining = typeof attempts.attempts_remaining === "number"
       ? attempts.attempts_remaining
       : null;
-    const showInput = state.mode === "review"
-      ? true
-      : ((attemptsRemaining === null || attemptsRemaining > 0) && !state.finished);
-    toggleInputsForWorkspace(showInput);
+    const showInput = state.mode === "chat"
+      && (attemptsRemaining === null || attemptsRemaining > 0)
+      && !state.finished;
+    toggleInputWrapper($workspaceInputWrapper, showInput);
     if (paneControllers[0]) {
-      setInputEnabled(paneControllers[0], state.mode === "review" ? false : showInput);
+      setInputEnabled(paneControllers[0], showInput);
     }
     const hasSubmission = (attempts.attempts_used || 0) > 0;
     setEvaluationEnabled(hasSubmission && !state.finished && state.mode === "chat");
@@ -352,11 +392,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
 
   const applyFinishedState = function(finished) {
     state.finished = finished;
-    if (finished) {
-      setAllInputsEnabled(false);
-    } else {
-      setAllInputsEnabled(true);
-    }
+    setInputsForMode();
     updateAttemptUI();
   };
 
@@ -381,9 +417,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
       userElement.removeClass("coach-message--pending");
     }
     setPaneBusy(controller, false);
-    if (!hasReport) {
-      setInputEnabled(controller, true);
-    }
 
     if (hasReport) {
       enterReportMode(state.reportPayload || response);
@@ -405,18 +438,17 @@ function CoachAIEvalXBlock(runtime, element, data) {
     if (typeof response.finished !== "undefined") {
       applyFinishedState(Boolean(response.finished));
     } else {
+      setInputsForMode();
       updateAttemptUI();
     }
   };
 
-  const handleError = function(controller, userElement, originalInput, enableInputs) {
+  const handleError = function(controller, userElement, originalInput) {
     if (userElement) {
       userElement.remove();
     }
     setPaneBusy(controller, false);
-    if (enableInputs) {
-      setInputEnabled(controller, true);
-    }
+    setInputEnabled(controller, true);
     if (originalInput !== null && typeof originalInput !== "undefined") {
       const $textarea = $inputs.filter(`[data-character-index="${controller.index}"]`);
       $textarea.val(originalInput);
@@ -479,7 +511,7 @@ function CoachAIEvalXBlock(runtime, element, data) {
         handleResponse(controller, response, userMessageEl);
       },
       error: function() {
-        handleError(controller, userMessageEl, originalInput, true);
+        handleError(controller, userMessageEl, originalInput);
       },
     });
   };
@@ -513,9 +545,10 @@ function CoachAIEvalXBlock(runtime, element, data) {
         }
         state.finished = Boolean(response && response.finished);
         hideReportCard();
-        setBackToReportVisible(false);
+        setWorkspaceActionsForReview(false);
         setGlobalResetVisible(true);
-        setAllInputsEnabled(true);
+        setInputsForMode();
+        toggleInputWrapper($coachInputWrapper, !state.finished);
         Object.values(paneControllers).forEach((controller) => setPaneBusy(controller, false));
         updateAttemptUI();
         announceStatus("workspace", translate("Conversation reset."));
@@ -561,7 +594,6 @@ function CoachAIEvalXBlock(runtime, element, data) {
             };
           }
           handleResponse(paneControllers[0], response, null);
-          setPaneBusy(paneControllers[0], false);
         }
       },
       error: function() {
