@@ -3,13 +3,16 @@
 import hashlib
 import re
 import textwrap
+import typing
 
 import jinja2
+import pydantic
 from django.utils.translation import gettext_noop as _
 from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
+from xblock.validation import ValidationMessage
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
@@ -68,6 +71,16 @@ DEFAULT_CONVERSATION_FORMAT = textwrap.dedent("""
         {% endfor %}
     </conversation>
 """)
+
+
+class EvaluationCriterion(pydantic.BaseModel):
+    name: pydantic.StrictStr
+
+
+class CoachScenarioData(pydantic.BaseModel):
+    case_details: pydantic.StrictStr
+    learning_objectives: typing.List[pydantic.StrictStr]
+    evaluation_criteria: typing.List[EvaluationCriterion]
 
 
 class CoachAIEvalXBlock(AIEvalXBlock):
@@ -129,7 +142,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "Structured scenario context for prompts (characters and evaluator). "
             "It provides the case background, learning objectives, and rubric the evaluator scores against. "
             "Expected keys: case_details (str), learning_objectives (list[str]), "
-            "evaluation_criteria (list[str or {name: str}])."
+            "evaluation_criteria (list[{name: str}])."
         ),
         default={
             "case_details": "",
@@ -347,6 +360,88 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def _render_template(self, template, **context):
         return self._jinja_env.from_string(template).render(context)
+
+    def _get_field_display_name(self, field_name):
+        return self.fields[field_name].display_name
+
+    def validate_field_data(self, validation, data):
+        """Validate field data."""
+        super().validate_field_data(validation, data)
+
+        scenario_data = data.scenario_data
+        if not isinstance(scenario_data, dict):
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR,
+                    (
+                        f"{self._get_field_display_name('scenario_data')}: "
+                        "must be a JSON object (dictionary)."
+                    ),
+                )
+            )
+            scenario_data = {}
+
+        try:
+            CoachScenarioData(**scenario_data)
+        except pydantic.ValidationError as e:  # pylint: disable=unused-variable
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR,
+                    (
+                        f"{self._get_field_display_name('scenario_data')}: "
+                        "structure is invalid. Expected keys: "
+                        "case_details (str), learning_objectives (list[str]), "
+                        "evaluation_criteria (list[{name: str}])."
+                    ),
+                )
+            )
+
+        # Validate templates early (StrictUndefined): catches missing keys/typos.
+        try:
+            self._render_template(
+                data.conversation_format,
+                messages=[{"character": {"name": "", "role": ""}, "content": ""}],
+            )
+        except jinja2.TemplateError as e:
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR,
+                    f"{self._get_field_display_name('conversation_format')}: {e}",
+                )
+            )
+
+        for prompt_field, pane in [
+            ("character_1_prompt", "workspace"),
+            ("character_2_prompt", "coach"),
+        ]:
+            try:
+                self._render_template(
+                    getattr(data, prompt_field),
+                    character_data={
+                        "name": "",
+                        "role": "",
+                        "avatar": "",
+                        "pane": pane,
+                    },
+                    scenario_data=scenario_data,
+                )
+            except jinja2.TemplateError as e:
+                validation.add(
+                    ValidationMessage(
+                        ValidationMessage.ERROR,
+                        f"{self._get_field_display_name(prompt_field)}: {e}",
+                    )
+                )
+
+        try:
+            self._render_template(data.evaluator_prompt, scenario_data=scenario_data)
+        except jinja2.TemplateError as e:
+            validation.add(
+                ValidationMessage(
+                    ValidationMessage.ERROR,
+                    f"{self._get_field_display_name('evaluator_prompt')}: {e}",
+                )
+            )
 
     def _get_character_data(self, character_index):  # pylint: disable=missing-function-docstring
         # Hardcoded at 2 characters but extensible.
@@ -774,14 +869,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             raise JsonHandlerError(400, "No learner response available for evaluation.")
 
         scenario_data = dict(self.scenario_data or {})
-        raw_criteria = scenario_data.get("evaluation_criteria") or []
-        normalized_criteria = []
-        for criterion in raw_criteria:
-            if isinstance(criterion, dict):
-                normalized_criteria.append(criterion)
-            else:
-                normalized_criteria.append({"name": str(criterion)})
-        scenario_data["evaluation_criteria"] = normalized_criteria
 
         prompt = self._render_template(
             self.evaluator_prompt,
