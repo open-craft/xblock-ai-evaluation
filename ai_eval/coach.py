@@ -273,10 +273,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         default=False,
     )
 
-    chat_history = List(
-        scope=Scope.user_state,
-    )
-
     workspace_history = List(
         scope=Scope.user_state,
         default=[],
@@ -467,30 +463,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         if getattr(self, "_histories_ready", False):
             return
-        workspace = self.workspace_history
-        coach = self.coach_history
-        evaluations = self.evaluation_fragments
-        legacy = self.chat_history
-        if legacy:
-            for fragment in legacy:
-                fragment = dict(fragment)
-                if fragment.get("is_evaluation") or (
-                    not fragment.get("user_message")
-                    and fragment.get("character_index") == 0
-                    and self.final_evaluation_markdown
-                    and fragment.get("character_message") == self.final_evaluation_markdown
-                ):
-                    fragment["is_evaluation"] = True
-                    evaluations.append(fragment)
-                    continue
-                if fragment.get("character_index") == 1:
-                    coach.append(fragment)
-                else:
-                    workspace.append(fragment)
-            self.chat_history = []
-        self.workspace_history = workspace
-        self.coach_history = coach
-        self.evaluation_fragments = evaluations
+        if not isinstance(self.workspace_history, list):
+            self.workspace_history = []
+        if not isinstance(self.coach_history, list):
+            self.coach_history = []
+        if not isinstance(self.evaluation_fragments, list):
+            self.evaluation_fragments = []
         self._histories_ready = True  # pylint: disable=attribute-defined-outside-init
 
     def _record_fragment(self, character_index, user_message, character_message, **extra):
@@ -643,9 +621,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 yield {"role": "user", "content": "."}
 
         return _generate()
-
-    def _get_field_display_name(self, field_name):
-        return self.fields[field_name].display_name
 
     def _get_attempt_state(self):
         """
