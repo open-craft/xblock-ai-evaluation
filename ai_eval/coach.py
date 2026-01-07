@@ -145,9 +145,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "evaluation_criteria (list[{name: str}])."
         ),
         default={
-            "case_details": "",
-            "learning_objectives": [],
-            "evaluation_criteria": [],
+            "case_details": "A short example paragraph, as an exercise demonstrating creativity and good sentence structure. The topic does not matter.",
+            "learning_objectives": ["1 paragraph of 1-5 sentences.", "Demonstrate creative use of words."],
+            "evaluation_criteria": [{"name": "Following instructions"}, {"name": "Creativity"}, {"name": "Sentence structure"}],
         },
         scope=Scope.settings,
     )
@@ -168,7 +168,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     intro_text = String(
         display_name=_("Introductory text"),
-        help=_("Optional introductory paragraph shown above the chat panes."),
+        help=_("Optional introductory paragraph shown above the chat panes. HTML is allowed here."),
         default="",
         scope=Scope.settings,
         multiline_editor=True,
