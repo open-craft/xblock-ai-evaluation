@@ -1,0 +1,30 @@
+{% load i18n %}
+<div class="coach-report-card">
+    <header class="coach-report-card__header">
+        <h2 class="coach-report-card__title">{% trans "Evaluation" %}</h2>
+    </header>
+    <section class="coach-report-card__section coach-report-card__submission">
+        <h3 class="coach-report-card__section-title">{% trans "Your final submission" %}</h3>
+        <p class="coach-report-card__blockquote">{{ final_submission|linebreaksbr }}</p>
+    </section>
+    <section class="coach-report-card__persona">
+        {% if evaluator.avatar %}
+            <img class="coach-report-card__avatar"
+                 src="{{ evaluator.avatar }}"
+                 alt="{% if evaluator.name %}{% blocktrans with name=evaluator.name %}Avatar for {{ name }}{% endblocktrans %}{% else %}{% trans 'Evaluator avatar' %}{% endif %}">
+        {% endif %}
+        {% if evaluator.name %}
+            <h3 class="coach-report-card__persona-heading">{% blocktrans with name=evaluator.name %}{{ name }}’s Evaluation{% endblocktrans %}</h3>
+        {% else %}
+            <h3 class="coach-report-card__persona-heading">{% trans "Evaluation" %}</h3>
+        {% endif %}
+    </section>
+    <section class="coach-report-card__section coach-report-card__evaluation-section">
+        <div class="coach-report-card__evaluation"></div>
+    </section>
+    <div class="coach-report-card__actions">
+        <button type="button" class="coach-button coach-button--secondary coach-review-conversation">
+            {% trans "Review conversation" %}
+        </button>
+    </div>
+</div>

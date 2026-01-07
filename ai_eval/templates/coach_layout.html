@@ -1,0 +1,96 @@
+{% load i18n %}
+<div class="coach-block">
+    {% if intro_text %}
+        <div class="coach-intro">
+            {{ intro_text | safe }}
+        </div>
+    {% endif %}
+    {% if question_text %}
+        <div class="coach-question">
+            <div class="question-text">
+                {{ question_text | safe }}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="coach-layout">
+        <section class="coach-pane coach-pane--workspace" aria-label="{% blocktrans %}Learner workspace{% endblocktrans %}">
+            <header class="coach-pane__header">
+                <h2 class="coach-pane__title coach-pane__title--workspace">{{ self.workspace_title }}</h2>
+            </header>
+            <div class="coach-history" data-character-index="0" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false">
+                <div class="coach-messages" data-pane="workspace"></div>
+                <div class="coach-spinner" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="sr-only coach-status coach-status--workspace" role="status" aria-live="polite"></div>
+            <div class="coach-input" data-character-index="0">
+                <label for="coach-workspace-input" class="sr-only">{% trans "Start typing your answer" %}</label>
+                <textarea id="coach-workspace-input"
+                          class="coach-input__textarea"
+                          placeholder="{% trans 'Start typing your answer' %}"
+                          maxlength="1000"
+                          rows="1"
+                          data-character-index="0"></textarea>
+                <button type="button"
+                        class="coach-button coach-button--icon coach-send-button"
+                        aria-label="{% trans 'Send message' %}"
+                        data-character-index="0">
+                    <i class="fa fa-paper-plane" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="coach-actions">
+                <div class="coach-attempts">
+                    <span class="coach-attempts__label" aria-live="polite"></span>
+                </div>
+                <button type="button"
+                        class="coach-button coach-button--secondary coach-back-to-report"
+                        style="display: none;"
+                        aria-label="{% trans 'Back to evaluation report' %}">
+                    {% trans "Back to report" %}
+                </button>
+                <button type="button"
+                        class="coach-button coach-button--primary coach-submit-evaluation">
+                    {% trans "Submit for evaluation" %}
+                </button>
+            </div>
+        </section>
+
+        <aside class="coach-pane coach-pane--coach" aria-label="{% blocktrans %}Coach conversation{% endblocktrans %}">
+            <header class="coach-pane__header">
+                <h2 class="coach-pane__title coach-pane__title--coach">{{ self.coach_title }}</h2>
+            </header>
+            <div class="coach-history" data-character-index="1" role="log" aria-live="polite" aria-relevant="additions text" aria-atomic="false">
+                <div class="coach-messages" data-pane="coach"></div>
+                <div class="coach-spinner" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+            <div class="sr-only coach-status coach-status--coach" role="status" aria-live="polite"></div>
+            <div class="coach-input" data-character-index="1">
+                <label for="coach-side-input" class="sr-only">{% trans "Ask the coach a question" %}</label>
+                <textarea id="coach-side-input"
+                          class="coach-input__textarea"
+                          placeholder="{% trans 'Ask the coach a question' %}"
+                          maxlength="1000"
+                          rows="1"
+                          data-character-index="1"></textarea>
+                <button type="button"
+                        class="coach-button coach-button--icon coach-send-button"
+                        aria-label="{% trans 'Send message to coach' %}"
+                        data-character-index="1">
+                    <i class="fa fa-paper-plane" aria-hidden="true"></i>
+                </button>
+            </div>
+        </aside>
+    </div>
+
+    {% if self.allow_reset %}
+        <div class="coach-global-actions">
+            <button type="button" class="coach-button coach-button--secondary coach-reset-all">
+                {% trans "Reset" %}
+            </button>
+        </div>
+    {% endif %}
+</div>

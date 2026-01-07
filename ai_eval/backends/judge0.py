@@ -17,6 +17,7 @@ class Judge0Backend(CodeExecutionBackend):
     """
     Judge0 code execution backend.
     """
+
     def __init__(self, api_key: str = "", base_url: str = None):
         self.api_key = api_key
         self.base_url = base_url or "https://judge0-ce.p.rapidapi.com"
