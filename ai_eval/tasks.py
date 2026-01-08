@@ -20,11 +20,70 @@ logger = get_task_logger(__name__)
 
 User = get_user_model()
 
+_BASE_HEADER = (
+    "Section",
+    "Subsection",
+    "Unit",
+    "Location",
+    "Display Name",
+    "Username",
+    "User E-mail",
+    "Conversation",
+    "Source",
+    "Message",
+)
+
 _BLOCK_CATEGORIES = [
     'coding_ai_eval',
     'multiagent_ai_eval',
     'shortanswer_ai_eval',
 ]
+
+
+def _get_course_display_name(course_id):
+    """
+    Return a human-readable course title for `course_id`.
+
+    Best-effort: on any error, fall back to `str(course_id)`.
+    """
+    for getter in (
+        _get_course_display_name_from_course_overview,
+        _get_course_display_name_from_modulestore,
+    ):
+        try:
+            display_name = getter(course_id)
+        except Exception:  # pylint: disable=broad-exception-caught
+            display_name = None
+        if display_name:
+            return str(display_name)
+    return str(course_id)
+
+
+def _get_course_display_name_from_course_overview(course_id):
+    # pylint: disable=import-error,import-outside-toplevel
+    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
+
+    overview = CourseOverview.get_from_id(course_id)
+    return getattr(overview, "display_name", None)
+
+
+def _get_course_display_name_from_modulestore(course_id):
+    # pylint: disable=import-error,import-outside-toplevel
+    from xmodule.modulestore.django import modulestore
+
+    course = modulestore().get_course(course_id)
+    return getattr(course, "display_name", None) or getattr(
+        course, "display_name_with_default", None
+    )
+
+
+def _build_export_rows(course_display_name, data_rows_iter):
+    """
+    Build an export row iterator, prefixing each row with `course_display_name`.
+    """
+    header = ("Course Name",) + _BASE_HEADER
+    prefixed_data_rows = ((course_display_name,) + row for row in data_rows_iter)
+    return itertools.chain([header], prefixed_data_rows)
 
 
 @shared_task()
@@ -40,14 +99,11 @@ def export_data(course_id_str):
     start_timestamp = time.time()
 
     course_id = CourseKey.from_string(course_id_str)
+    course_display_name = _get_course_display_name(course_id)
 
     logger.debug("Beginning data export")
 
-    header = ("Section", "Subsection", "Unit", "Location",
-              "Display Name", "Username", "User E-mail", "Conversation",
-              "Source", "Message")
-
-    rows = itertools.chain([header], _extract_all_data(course_id))
+    rows = _build_export_rows(course_display_name, _extract_all_data(course_id))
 
     report_store = ReportStore.from_config(config_name='GRADES_DOWNLOAD')
 

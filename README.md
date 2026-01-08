@@ -1,9 +1,10 @@
 ## Introduction
 
-This repository hosts two Open edX XBlocks: 
+This repository hosts several Open edX XBlocks, including:
 
 1. **Short Answer with AI Evaluation**: This XBlock allows students to submit short answers, which are then evaluated with the help of a large language model (LLM).
 2. **Coding with AI Evaluation**: This XBlock allows students to submit code in a text editor. The code is executed via a third-party API (currently using [Judge0](https://judge0.com/)), and both the code and its output are sent to an LLM for feedback.
+3. **AI Eval Export (staff tool)**: This XBlock allows course staff to export learner conversations/sessions from supported AI Eval XBlocks as a CSV.
 
 ## Screeshots
 
@@ -26,11 +27,20 @@ This repository hosts two Open edX XBlocks:
 
 2. Launch Tutor.
 
-3. In the Open edX platform, navigate to `Settings > Advanced Settings` and add `shortanswer_ai_eval` and `coding_ai_eval` to the `Advanced Module List`.
+3. In the Open edX platform, navigate to `Settings > Advanced Settings` and add `shortanswer_ai_eval` and `coding_ai_eval` to the `Advanced Module List`. If you want the export tool, also add `ai_eval_export`.
 
 4. Add either XBlock using the `Advanced` button in the `Add New Component` section of Studio.
 
 5. Configure the added Xblock and make sure to add correct API keys. You can format your question and prompts using [Markdown](https://marked.js.org/demo/).
+
+### Export Tool (ai_eval_export)
+
+The `ai_eval_export` XBlock is a preconfigured, staff-only tool for exporting learner conversation/session history from supported AI Eval XBlocks in a course.
+
+- Enable it by adding `ai_eval_export` to the course `Advanced Module List`, then add it to a unit via the Studio “Advanced” component picker.
+- It only works from the LMS (Studio/CMS uses different Celery queues), and it only renders for course staff.
+- Clicking “Start export” generates a CSV and provides a download link when ready.
+- The CSV includes a `Course Name` column (human-readable course title) and includes `Location` to identify the specific XBlock usage within the course.
 
 ### API Configuration
 
