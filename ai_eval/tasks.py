@@ -21,6 +21,7 @@ logger = get_task_logger(__name__)
 User = get_user_model()
 
 _BASE_HEADER = (
+    "Course Name",
     "Section",
     "Subsection",
     "Unit",
@@ -87,7 +88,7 @@ def _build_export_rows(course_display_name, data_rows_iter):
     """
     Build an export row iterator, prefixing each row with `course_display_name`.
     """
-    header = ("Course Name",) + _BASE_HEADER
+    header = _BASE_HEADER
     prefixed_data_rows = ((course_display_name,) + row for row in data_rows_iter)
     return itertools.chain([header], prefixed_data_rows)
 
@@ -186,12 +187,8 @@ def _iter_coach_messages(block, workspace_history, coach_history, evaluation_fra
 
     Ordering is best-effort: workspace first, then coach, then evaluation fragments.
     """
-    main_role = getattr(block, "character_1_role", None) or getattr(
-        block, "character_1_name", None
-    ) or "Main character"
-    coach_role = getattr(block, "character_2_role", None) or getattr(
-        block, "character_2_name", None
-    ) or "Coach"
+    main_role = block.character_1_role or "Main character"
+    coach_role = block.character_2_role or "Coach"
 
     def _iter_fragments(fragments, assistant_role):
         for fragment in fragments or []:
@@ -250,7 +247,7 @@ def _extract_data(block):
                     block.display_name,
                     user.username,
                     user.email or "",
-                    1,
+                    None,
                     source,
                     content,
                 )
