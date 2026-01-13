@@ -136,6 +136,45 @@ class CustomLLMService(LLMServiceBase):
         self._ensure_token()
         return {'Authorization': f'Bearer {self._access_token}'}
 
+    @staticmethod
+    def _parse_models_field(raw_models):
+        """
+        Parse the value of a top-level "models" field into a list of model ids/names.
+        """
+        if isinstance(raw_models, list):
+            return [str(m) for m in raw_models]
+        if isinstance(raw_models, str):
+            return [str(raw_models)]
+        if isinstance(raw_models, dict):
+            parsed_models = []
+            for key, val in raw_models.items():
+                if isinstance(val, dict):
+                    candidate = val.get("name") or val.get("id") or key
+                elif isinstance(val, str) and val.strip():
+                    candidate = val
+                else:
+                    candidate = key
+                parsed_models.append(str(candidate))
+            return parsed_models
+        return []
+
+    @classmethod
+    def _parse_models_response(cls, data):
+        """
+        Parse a models endpoint JSON response into a list of model ids/names.
+        """
+        if isinstance(data, dict):
+            if "models" in data:
+                return cls._parse_models_field(data["models"])
+            if isinstance(data.get("data"), list):
+                return [str(m.get("id", str(m))) for m in data["data"]]
+            return []
+        if isinstance(data, list):
+            return [str(m) for m in data]
+        if isinstance(data, str):
+            return [str(data)]
+        return []
+
     def get_response(
             self,
             model,
@@ -196,32 +235,7 @@ class CustomLLMService(LLMServiceBase):
             response.raise_for_status()
             data = response.json()
 
-            models = []
-
-            if isinstance(data, dict):
-                if "models" in data:
-                    raw_models = data["models"]
-                    if isinstance(raw_models, list):
-                        models = [str(m) for m in raw_models]
-                    elif isinstance(raw_models, str):
-                        models = [str(raw_models)]
-                    elif isinstance(raw_models, dict):
-                        parsed_models = []
-                        for key, val in raw_models.items():
-                            if isinstance(val, dict):
-                                candidate = val.get("name") or val.get("id") or key
-                            elif isinstance(val, str) and val.strip():
-                                candidate = val
-                            else:
-                                candidate = key
-                            parsed_models.append(str(candidate))
-                        models = parsed_models
-                elif "data" in data and isinstance(data["data"], list):
-                    models = [str(m.get("id", str(m))) for m in data["data"]]
-            elif isinstance(data, list):
-                models = [str(m) for m in data]
-            elif isinstance(data, str):
-                models = [str(data)]
+            models = self._parse_models_response(data)
 
             # Filter out non-string model names and empty strings
             models = [m for m in models if isinstance(m, str) and m.strip()]
