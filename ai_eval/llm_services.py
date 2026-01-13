@@ -200,10 +200,22 @@ class CustomLLMService(LLMServiceBase):
 
             if isinstance(data, dict):
                 if "models" in data:
-                    if isinstance(data["models"], list):
-                        models = [str(m) for m in data["models"]]
-                    elif isinstance(data["models"], str):
-                        models = [str(data["models"])]
+                    raw_models = data["models"]
+                    if isinstance(raw_models, list):
+                        models = [str(m) for m in raw_models]
+                    elif isinstance(raw_models, str):
+                        models = [str(raw_models)]
+                    elif isinstance(raw_models, dict):
+                        parsed_models = []
+                        for key, val in raw_models.items():
+                            if isinstance(val, dict):
+                                candidate = val.get("name") or val.get("id") or key
+                            elif isinstance(val, str) and val.strip():
+                                candidate = val
+                            else:
+                                candidate = key
+                            parsed_models.append(str(candidate))
+                        models = parsed_models
                 elif "data" in data and isinstance(data["data"], list):
                     models = [str(m.get("id", str(m))) for m in data["data"]]
             elif isinstance(data, list):
