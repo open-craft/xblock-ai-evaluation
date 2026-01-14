@@ -19,6 +19,7 @@ from ai_eval import (
 )
 from ai_eval.base import AIEvalXBlock
 from ai_eval.supported_models import SupportedModels
+from ai_eval.llm_services import CustomLLMService
 from ai_eval.backends.factory import BackendFactory
 from ai_eval.backends.judge0 import Judge0Backend
 from ai_eval.backends.custom import CustomServiceBackend
@@ -218,6 +219,33 @@ def test_multiagent_block_evaluator_response():
     assert resp["message"] == "evaluator response"
     assert resp["finished"]
     assert resp["is_evaluator"]
+
+
+def test_custom_llm_models_dict_response_parsed():
+    """Custom service supports {"models": {id: {...}}} response bodies."""
+    service = CustomLLMService(
+        models_url="https://example.com/models",
+        completions_url="https://example.com/completions",
+        token_url="https://example.com/token",
+        client_id="client",
+        client_secret="secret",
+    )
+    service._get_headers = Mock(return_value={"Authorization": "Bearer token"})  # pylint: disable=protected-access
+
+    mocked_response = Mock()
+    mocked_response.json.return_value = {
+        "models": {
+            "Meta-Llama4-Maverick": {
+                "name": "Meta-Llama4-Maverick",
+                "display_name": "Maverick (Llama 4)",
+            },
+            "gpt-4o": {"display_name": "GPT-4o"},
+        }
+    }
+    mocked_response.raise_for_status.return_value = None
+
+    with patch("ai_eval.llm_services.requests.get", return_value=mocked_response):
+        assert service.get_available_models() == ["Meta-Llama4-Maverick", "gpt-4o"]
 
 
 @pytest.mark.parametrize(
