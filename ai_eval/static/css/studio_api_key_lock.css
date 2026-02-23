@@ -1,0 +1,24 @@
+/* Keep locked API-key settings visually disabled even on hover/focus in Studio. */
+.xblock-studio_view .ai-eval-locked-entry .field-data-control,
+.xblock-studio_view .ai-eval-locked-entry .field-data-control:hover,
+.xblock-studio_view .ai-eval-locked-entry .field-data-control:focus {
+    background-color: #f2f2f2 !important;
+    border-color: #b2b2b2 !important;
+    color: #4c4c4c !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+}
+
+.xblock-studio_view .ai-eval-locked-entry:hover {
+    background-color: #f7f7f7 !important;
+}
+
+.xblock-studio_view .ai-eval-locked-entry .action.setting-clear {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.xblock-studio_view .ai-eval-lock-badge {
+    color: #666;
+    font-weight: 600;
+}

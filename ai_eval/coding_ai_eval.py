@@ -164,6 +164,32 @@ class CodingAIEvalXBlock(AIEvalXBlock):
 
         return self.student_view(context=context)
 
+    def _get_code_execution_backend_config(self):
+        """Return code execution backend config from Django settings, or None if absent."""
+        return getattr(settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', None)
+
+    def _is_judge0_backend_selected(self) -> bool:
+        """Return true when the configured backend is judge0 (default)."""
+        backend_config = self._get_code_execution_backend_config() or {}
+        backend_name = backend_config.get('backend', 'judge0')
+        return backend_name == 'judge0'
+
+    def _is_judge0_api_key_configured(self) -> bool:
+        """Return true when Judge0 API key is present in Django settings config."""
+        backend_config = self._get_code_execution_backend_config() or {}
+        judge0_config = backend_config.get('judge0_config', {})
+        return bool(judge0_config.get('api_key'))
+
+    def should_lock_judge0_api_key_field(self) -> bool:
+        """Lock Judge0 field when runtime settings provide a Judge0 API key."""
+        return self._is_judge0_backend_selected() and self._is_judge0_api_key_configured()
+
+    def _get_studio_lock_payload(self) -> dict:
+        """Extend base lock payload with coding-specific Judge0 lock flag."""
+        payload = super()._get_studio_lock_payload()
+        payload["lock_judge0_api_key"] = self.should_lock_judge0_api_key_field()
+        return payload
+
     def validate_field_data(self, validation, data):
         """
         Validate fields
@@ -178,17 +204,30 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 )
             )
 
+        has_backend_config = self._get_code_execution_backend_config() is not None
+        missing_judge0_key = (
+            (has_backend_config and not self._is_judge0_api_key_configured())
+            or (not has_backend_config and not data.judge0_api_key)
+        )
+
         # Only enforce Judge0 API key when Judge0 backend is selected (or default)
-        backend_config = getattr(settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', {})
-        backend_name = backend_config.get('backend', 'judge0')
         if (
             data.language != LanguageLabels.HTML_CSS
-            and backend_name != 'custom'
-            and not data.judge0_api_key
+            and self._is_judge0_backend_selected()
+            and missing_judge0_key
         ):
+            error_message = (
+                _(
+                    "Judge0 API key is mandatory in Django settings when "
+                    "AI_EVAL_CODE_EXECUTION_BACKEND is configured."
+                )
+                if has_backend_config
+                else _("Judge0 API key is mandatory")
+            )
             validation.add(
                 ValidationMessage(
-                    ValidationMessage.ERROR, _("Judge0 API key is mandatory")
+                    ValidationMessage.ERROR,
+                    error_message,
                 )
             )
 
