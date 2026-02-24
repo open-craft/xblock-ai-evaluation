@@ -2,7 +2,7 @@
 from typing import Self
 
 import logging
-import pkg_resources
+from importlib.resources import files
 from django.core.cache import cache
 
 from django.utils.translation import gettext_noop as _
@@ -122,8 +122,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
-        data = pkg_resources.resource_string(__name__, path)
-        return data.decode("utf8")
+        return files("ai_eval").joinpath(path).read_text(encoding="utf8")
 
     def _get_model_config_value(self, config_parameter: str, obj: Self = None) -> str | None:
         """

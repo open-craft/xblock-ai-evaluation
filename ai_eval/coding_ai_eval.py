@@ -1,7 +1,7 @@
 """Coding Xblock with AI evaluation."""
 
 import logging
-import pkg_resources
+from importlib.resources import files
 
 from django.conf import settings
 from django.utils.translation import gettext_noop as _
@@ -109,8 +109,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
 
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
-        data = pkg_resources.resource_string(__name__, path)
-        return data.decode("utf8")
+        return files("ai_eval").joinpath(path).read_text(encoding="utf8")
 
     def student_view(self, context=None):
         """
