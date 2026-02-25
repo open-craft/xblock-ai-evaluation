@@ -150,7 +150,10 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
         if config_parameter == "api_key":
             # When configured globally/site-wide, ignore XBlock-local model_api_key.
-            if value := self._get_site_or_global_model_config_value(config_parameter, obj):
+            if value := self._get_site_or_global_config_value(
+                config_parameter,
+                obj=obj,
+            ):
                 return value
             if value := getattr(obj, field_name, None):
                 return str(value)
@@ -175,23 +178,22 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
         return f"{model_name}_{config_parameter.upper()}"
 
-    def _get_site_or_global_model_config_value(
-        self, config_parameter: str, obj: Self = None
+    def _get_site_or_global_config_value(
+        self,
+        config_parameter: str,
+        obj: Self = None,
+        model: str | None = None,
     ) -> str | None:
         """
-        Return model config from site or global settings only (ignores XBlock-local fields).
-        """
-        obj = obj or self
-        return self._get_site_or_global_model_config_value_for_model(
-            getattr(obj, "model", None), config_parameter
-        )
+        Return model config from site/global settings.
 
-    def _get_site_or_global_model_config_value_for_model(
-        self, model: str | None, config_parameter: str
-    ) -> str | None:
+        If `model` is provided, it is used directly. Otherwise, model is read
+        from `obj.model` (or `self.model` when obj is omitted).
         """
-        Return model config from site/global settings for an explicit model name.
-        """
+        if model is None:
+            obj = obj or self
+            model = getattr(obj, "model", None)
+
         if not model:
             return None
 
@@ -224,11 +226,12 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         Lock model API key field when custom LLM service is enabled or key is globally provided.
         """
-        obj = obj or self
-        model = getattr(obj, "model", None)
         return bool(
             self._is_custom_llm_service_enabled()
-            or self._get_site_or_global_model_config_value_for_model(model, "api_key")
+            or self._get_site_or_global_config_value(
+                "api_key",
+                obj=obj,
+            )
         )
 
     def _get_model_key_presence_map(self) -> dict[str, bool]:
@@ -240,7 +243,12 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             models.append(self.model)
 
         return {
-            model: bool(self._get_site_or_global_model_config_value_for_model(model, "api_key"))
+            model: bool(
+                self._get_site_or_global_config_value(
+                    "api_key",
+                    model=model,
+                )
+            )
             for model in models
         }
 

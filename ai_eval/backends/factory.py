@@ -17,6 +17,9 @@ class BackendFactory:
         Returns:
             CodeExecutionBackend: Configured backend instance
         """
+        # Keep `None` as the default so we can distinguish "setting absent"
+        # from "setting present but incomplete". We only fall back to the
+        # per-block `api_key` when the backend setting is truly absent.
         raw_backend_config = getattr(
             django_conf.settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', None
         )

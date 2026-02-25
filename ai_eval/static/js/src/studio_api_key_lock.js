@@ -76,7 +76,7 @@ function AIEvalStudioEditor(runtime, element, data) {
         if (useCustomService) {
             return true;
         }
-        if (Object.prototype.hasOwnProperty.call(modelKeyPresence, model)) {
+        if (modelKeyPresence.hasOwnProperty(model)) {
             return Boolean(modelKeyPresence[model]);
         }
         return Boolean(data && data.lock_model_api_key_initial);
