@@ -77,6 +77,12 @@ API URLs are only required and used with the LLAMA model (`ollama/llama2`). Othe
 For better security, we recommend using site configuration or Django settings instead of configuring API keys at the 
 XBlock level. This prevents API keys from being exposed in course exports.
 
+Studio behavior:
+- `Chosen model API Key` is disabled in Studio when either:
+  - a model API key is already available via Site Configuration or Django `XBLOCK_SETTINGS`, or
+  - `USE_CUSTOM_LLM_SERVICE` is enabled.
+  This lock is model-specific: changing the selected model can enable/disable the field based on that model's configured key.
+
 ### Custom LLM Service (advanced)
 
 The XBlocks can optionally route all LLM interactions through a custom LLM service instead of the default provider.
@@ -149,14 +155,21 @@ Notes
 - Asynchronous model: `submit_endpoint` should return an identifier (e.g., `submission_id` or `id`) that is later used to poll `results_endpoint`.
 - `results_endpoint` must include `{submission_id}` and return execution status and outputs when ready.
 - `languages_endpoint` is called during initialization to verify supported languages.
-- To use Judge0, remove the custom backend settings or set `backend='judge0'`. Provide the Judge0 API key in the XBlock configuration. Optionally set `judge0_config.base_url`; otherwise the default RapidAPI endpoint is used.
+- To use self-hosted Judge0, set `backend='judge0'`.
+  - If `AI_EVAL_CODE_EXECUTION_BACKEND` is defined, provide `judge0_config.api_key` in Django settings.
+  - If `AI_EVAL_CODE_EXECUTION_BACKEND` is not defined, the per-XBlock `Judge0 API Key` field is used.
+  - Optionally set `judge0_config.base_url`; otherwise the default RapidAPI endpoint is used.
+- Studio disables the per-XBlock `Judge0 API Key` field when
+  `AI_EVAL_CODE_EXECUTION_BACKEND.backend='judge0'` and
+  `judge0_config.api_key` is provided in runtime settings.
 
 Example Judge0 configuration
 ```python
-# Optional override for Judge0 base URL; API key is set per XBlock instance
+# Self-hosted Judge0 API key and base URL come from Django settings
 AI_EVAL_CODE_EXECUTION_BACKEND = {
     'backend': 'judge0',
     'judge0_config': {
+        'api_key': 'your-judge0-api-key',
         'base_url': 'https://judge0-ce.p.rapidapi.com',
     },
 }

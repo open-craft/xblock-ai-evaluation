@@ -5,6 +5,7 @@ Testing module.
 
 import urllib.request
 import io
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -267,6 +268,39 @@ def test_backend_factory_selection(backend_config, expected_backend_class):
         assert isinstance(backend, expected_backend_class)
 
 
+def test_backend_factory_uses_judge0_config_api_key():
+    """Judge0 backend should source API key from Django backend config."""
+    with patch('django.conf.settings') as mock_settings:
+        mock_settings.AI_EVAL_CODE_EXECUTION_BACKEND = {
+            'backend': 'judge0',
+            'judge0_config': {
+                'api_key': 'config-key',
+                'base_url': 'http://localhost:2358',
+            },
+        }
+        backend = BackendFactory.get_backend()
+        assert isinstance(backend, Judge0Backend)
+        assert backend.api_key == "config-key"
+        assert backend.base_url == "http://localhost:2358"
+
+
+def test_backend_factory_uses_xblock_judge0_key_when_backend_config_absent():
+    """Judge0 backend should use XBlock key when backend setting is not configured."""
+    with patch('django.conf.settings', new=SimpleNamespace()):
+        backend = BackendFactory.get_backend(api_key="xblock-key")
+        assert isinstance(backend, Judge0Backend)
+        assert backend.api_key == "xblock-key"
+
+
+def test_backend_factory_does_not_fallback_when_backend_config_present_but_empty():
+    """Judge0 backend should ignore XBlock key when backend setting exists, even if empty."""
+    with patch('django.conf.settings') as mock_settings:
+        mock_settings.AI_EVAL_CODE_EXECUTION_BACKEND = {}
+        backend = BackendFactory.get_backend(api_key="xblock-key")
+        assert isinstance(backend, Judge0Backend)
+        assert backend.api_key == ""
+
+
 def test_judge0_backend_initialization():
     """Test Judge0Backend initializes with correct API key."""
     backend = Judge0Backend(api_key="test-key")
@@ -433,8 +467,10 @@ def test_custom_get_result(mock_get):
 @pytest.mark.parametrize(
     "xblock_key, site_config_key, settings_dict, expected_result",
     [
-        # XBlock field is prioritized
-        ("xblock-key", "site-config-key", {"GPT4O_API_KEY": "settings-key"}, "xblock-key"),
+        # Site configuration takes precedence over XBlock field for API keys
+        ("xblock-key", "site-config-key", {"GPT4O_API_KEY": "settings-key"}, "site-config-key"),
+        # Global settings take precedence over XBlock field for API keys
+        ("xblock-key", None, {"GPT4O_API_KEY": "settings-key"}, "settings-key"),
         # Fall back to site configuration
         ("", "site-config-key", {"GPT4O_API_KEY": "settings-key"}, "site-config-key"),
         # Fall back to settings
@@ -448,22 +484,12 @@ def test_get_model_config_value_fallback_chain(
 ):
     """
     Test API key fallback chain with different scenarios.
-
-    This tests the core fallback logic which is also used for API URLs.
     """
     ai_eval_block.model_api_key = xblock_key
     ai_eval_block._get_settings = Mock(return_value=settings_dict)
 
-    with patch("ai_eval.base.get_site_configuration_value", return_value=site_config_key) as mock_site_config:
+    with patch("ai_eval.base.get_site_configuration_value", return_value=site_config_key):
         api_key = ai_eval_block.get_model_api_key()
-
-        if not xblock_key:
-            mock_site_config.assert_called_once_with(ai_eval_block.block_settings_key, "GPT4O_API_KEY")
-
-    if not site_config_key and not xblock_key:
-        ai_eval_block._get_settings.assert_called_once()
-    else:
-        ai_eval_block._get_settings.assert_not_called()
 
     assert api_key == expected_result
 
@@ -493,6 +519,7 @@ def test_coding_block_submit_code_uses_backend(mock_get_backend, coding_block_da
     result = block.submit_code_handler.__wrapped__(block, data={"user_code": "print('hello')"})
 
     assert result == {"submission_id": "test-submission-id"}
+    mock_get_backend.assert_called_once_with(block.judge0_api_key)
     mock_backend.submit_code.assert_called_once_with("print('hello')", "Python (3.8.1)")
 
 
@@ -507,4 +534,122 @@ def test_coding_block_get_submission_result_uses_backend(mock_get_backend, codin
     result = block.get_submission_result_handler.__wrapped__(block, data={"submission_id": "test-id"})
 
     assert result == {"status": "Accepted"}
+    mock_get_backend.assert_called_once_with(block.judge0_api_key)
     mock_backend.get_result.assert_called_once_with("test-id")
+
+
+def test_should_lock_model_api_key_field_when_site_key_exists(ai_eval_block):
+    """Model API key field should lock when site/global key is available."""
+    ai_eval_block._get_settings = Mock(return_value={})
+    with patch("ai_eval.base.get_site_configuration_value", return_value="site-key"):
+        assert ai_eval_block.should_lock_model_api_key_field()
+
+
+def test_should_lock_model_api_key_field_when_custom_service_enabled(ai_eval_block):
+    """Model API key field should lock when custom LLM service is enabled."""
+    ai_eval_block._get_settings = Mock(return_value={})
+    with patch("ai_eval.base.get_site_configuration_value", return_value=True):
+        assert ai_eval_block.should_lock_model_api_key_field()
+
+
+def test_should_not_lock_model_api_key_field_without_site_key_or_custom_service(ai_eval_block):
+    """Model API key field should remain editable without global/site key and custom LLM."""
+    ai_eval_block._get_settings = Mock(return_value={})
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        assert not ai_eval_block.should_lock_model_api_key_field()
+
+
+def test_studio_lock_payload_locks_model_api_key_when_locked(ai_eval_block):
+    """Studio payload should lock model API key when globally configured."""
+    ai_eval_block._get_settings = Mock(return_value={})
+    with patch("ai_eval.base.get_site_configuration_value", return_value="site-key"):
+        payload = ai_eval_block._get_studio_lock_payload()
+        assert payload["lock_model_api_key_initial"] is True
+
+
+def test_studio_lock_payload_keeps_model_api_key_unlocked_without_config(ai_eval_block):
+    """Studio payload should keep model API key editable without global/site config."""
+    ai_eval_block._get_settings = Mock(return_value={})
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        payload = ai_eval_block._get_studio_lock_payload()
+        assert payload["lock_model_api_key_initial"] is False
+        assert payload["model_key_presence"][SupportedModels.GPT4O.value] is False
+
+
+def test_should_lock_judge0_api_key_field_when_backend_has_judge0_key(coding_block_data):
+    """Judge0 field should lock when runtime settings provide judge0 backend key."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    with patch(
+        'ai_eval.coding_ai_eval.settings',
+        new=SimpleNamespace(
+            AI_EVAL_CODE_EXECUTION_BACKEND={
+                "backend": "judge0",
+                "judge0_config": {"api_key": "config-key"},
+            }
+        ),
+    ):
+        assert block.should_lock_judge0_api_key_field()
+
+
+def test_should_not_lock_judge0_api_key_field_when_backend_setting_absent(coding_block_data):
+    """Judge0 field should be editable when backend setting is absent."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    with patch('ai_eval.coding_ai_eval.settings', new=SimpleNamespace()):
+        assert not block.should_lock_judge0_api_key_field()
+
+
+def test_should_not_lock_judge0_api_key_field_without_runtime_judge0_key(coding_block_data):
+    """Judge0 field should remain editable when runtime judge0 key is missing."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    with patch(
+        'ai_eval.coding_ai_eval.settings',
+        new=SimpleNamespace(
+            AI_EVAL_CODE_EXECUTION_BACKEND={
+                "backend": "judge0",
+                "judge0_config": {},
+            }
+        ),
+    ):
+        assert not block.should_lock_judge0_api_key_field()
+
+
+def test_should_not_lock_judge0_api_key_field_for_custom_backend(coding_block_data):
+    """Judge0 field should remain editable when runtime backend is custom."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    with patch(
+        'ai_eval.coding_ai_eval.settings',
+        new=SimpleNamespace(
+            AI_EVAL_CODE_EXECUTION_BACKEND={
+                "backend": "custom",
+                "custom_config": {"api_key": "custom-key"},
+            }
+        ),
+    ):
+        assert not block.should_lock_judge0_api_key_field()
+
+
+def test_coding_studio_lock_payload_sets_judge0_lock_flag(coding_block_data):
+    """Coding Studio payload should include judge0 lock flag when runtime key is configured."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    block._get_settings = Mock(return_value={})
+    with patch(
+        'ai_eval.coding_ai_eval.settings',
+        new=SimpleNamespace(
+            AI_EVAL_CODE_EXECUTION_BACKEND={
+                "backend": "judge0",
+                "judge0_config": {"api_key": "config-key"},
+            }
+        ),
+    ), patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        payload = block._get_studio_lock_payload()
+        assert payload["lock_judge0_api_key"] is True
+
+
+def test_coding_studio_lock_payload_unsets_judge0_lock_flag_without_runtime_key(coding_block_data):
+    """Coding Studio payload should not lock judge0 field without runtime judge0 key."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    block._get_settings = Mock(return_value={})
+    with patch('ai_eval.coding_ai_eval.settings', new=SimpleNamespace()), \
+            patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        payload = block._get_studio_lock_payload()
+        assert payload["lock_judge0_api_key"] is False

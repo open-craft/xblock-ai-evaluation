@@ -2,7 +2,7 @@
 from typing import Self
 
 import logging
-import pkg_resources
+from importlib.resources import files
 from django.core.cache import cache
 
 from django.utils.translation import gettext_noop as _
@@ -122,17 +122,21 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
-        data = pkg_resources.resource_string(__name__, path)
-        return data.decode("utf8")
+        return files("ai_eval").joinpath(path).read_text(encoding="utf8")
 
     def _get_model_config_value(self, config_parameter: str, obj: Self = None) -> str | None:
         """
         Get configuration value for the model provider with a fallback chain.
 
-        Checks for the value in the following order:
-        1. XBlock field (model_api_key or model_api_url)
+        For `api_key`, checks:
+        1. Site configuration
+        2. XBlock settings (defined in Django settings)
+        3. XBlock field (model_api_key)
+
+        For other parameters (e.g. `api_url`), checks:
+        1. XBlock field
         2. Site configuration
-        3. XBlock settings (defined in Django settings)
+        3. XBlock settings
 
         Args:
             config_parameter: Parameter to retrieve (e.g., "API_KEY" or "API_URL").
@@ -144,24 +148,131 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         obj = obj or self
         field_name = f"model_{config_parameter}"
 
-        # For custom models, use the model name directly; for supported models, use the enum name
-        try:
-            model_name = SupportedModels(obj.model).name
-        except ValueError:
-            model_name = obj.model.replace("/", "_").replace("-", "_").upper()
+        if config_parameter == "api_key":
+            # When configured globally/site-wide, ignore XBlock-local model_api_key.
+            if value := self._get_site_or_global_config_value(
+                config_parameter,
+                obj=obj,
+            ):
+                return value
+            if value := getattr(obj, field_name, None):
+                return str(value)
+            return None
 
-        config_key = f"{model_name}_{config_parameter.upper()}"
+        config_key = self._get_model_config_key(obj.model, config_parameter)
 
-        # XBlock field
         if value := getattr(obj, field_name, None):
             return str(value)
-
-        # Site configuration
         if value := get_site_configuration_value(self.block_settings_key, config_key):
             return value
-
-        # XBlock settings
         return self._get_settings().get(config_key)
+
+    @staticmethod
+    def _get_model_config_key(model: str, config_parameter: str) -> str:
+        """Build model configuration key name for site/global settings lookups."""
+        # For custom models, use the model name directly; for supported models, use the enum name
+        try:
+            model_name = SupportedModels(model).name
+        except ValueError:
+            model_name = model.replace("/", "_").replace("-", "_").upper()
+
+        return f"{model_name}_{config_parameter.upper()}"
+
+    def _get_site_or_global_config_value(
+        self,
+        config_parameter: str,
+        obj: Self = None,
+        model: str | None = None,
+    ) -> str | None:
+        """
+        Return model config from site/global settings.
+
+        If `model` is provided, it is used directly. Otherwise, model is read
+        from `obj.model` (or `self.model` when obj is omitted).
+        """
+        if model is None:
+            obj = obj or self
+            model = getattr(obj, "model", None)
+
+        if not model:
+            return None
+
+        config_key = self._get_model_config_key(model, config_parameter)
+        if value := get_site_configuration_value(self.block_settings_key, config_key):
+            return value
+        return self._get_settings().get(config_key)
+
+    @staticmethod
+    def _is_truthy(value) -> bool:
+        """
+        Normalize booleans that may be provided as strings.
+        """
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(value)
+
+    def _is_custom_llm_service_enabled(self) -> bool:
+        """
+        Check if custom LLM service is enabled via site/global config.
+        """
+        site_value = get_site_configuration_value(self.block_settings_key, "USE_CUSTOM_LLM_SERVICE")
+        if site_value is not None:
+            return self._is_truthy(site_value)
+        return self._is_truthy(self._get_settings().get("USE_CUSTOM_LLM_SERVICE"))
+
+    def should_lock_model_api_key_field(self, obj: Self = None) -> bool:
+        """
+        Lock model API key field when custom LLM service is enabled or key is globally provided.
+        """
+        return bool(
+            self._is_custom_llm_service_enabled()
+            or self._get_site_or_global_config_value(
+                "api_key",
+                obj=obj,
+            )
+        )
+
+    def _get_model_key_presence_map(self) -> dict[str, bool]:
+        """
+        Return a map of model name -> whether an API key is configured site/global.
+        """
+        models = list(SupportedModels.list())
+        if self.model and self.model not in models:
+            models.append(self.model)
+
+        return {
+            model: bool(
+                self._get_site_or_global_config_value(
+                    "api_key",
+                    model=model,
+                )
+            )
+            for model in models
+        }
+
+    def _get_studio_lock_payload(self) -> dict:
+        """
+        Return Studio-side lock metadata for API key fields.
+        """
+        return {
+            "use_custom_llm_service": self._is_custom_llm_service_enabled(),
+            "initial_model": self.model or "",
+            "model_key_presence": self._get_model_key_presence_map(),
+            "lock_model_api_key_initial": self.should_lock_model_api_key_field(),
+            "lock_judge0_api_key": False,
+        }
+
+    def studio_view(self, context):
+        """
+        Render Studio editor and initialize API-key field lock behavior.
+        """
+        fragment = super().studio_view(context)
+        fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
+        fragment.add_javascript(self.resource_string("static/js/src/studio_api_key_lock.js"))
+        fragment.initialize_js("AIEvalStudioEditor", self._get_studio_lock_payload())
+        return fragment
 
     def get_model_api_key(self, obj: Self = None) -> str | None:
         """Get the API key for the model provider."""

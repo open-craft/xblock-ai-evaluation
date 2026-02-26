@@ -14,18 +14,19 @@ class BackendFactory:
         """
         Get the appropriate backend based on Django settings.
 
-        Args:
-            api_key: Judge0 API key (only used for judge0 backend)
-
         Returns:
             CodeExecutionBackend: Configured backend instance
         """
-        backend_config = getattr(
-            django_conf.settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', {}
+        # Keep `None` as the default so we can distinguish "setting absent"
+        # from "setting present but incomplete". We only fall back to the
+        # per-block `api_key` when the backend setting is truly absent.
+        raw_backend_config = getattr(
+            django_conf.settings, 'AI_EVAL_CODE_EXECUTION_BACKEND', None
         )
+        has_backend_config = raw_backend_config is not None
 
-        if backend_config.get('backend') == 'custom':
-            config = backend_config.get('custom_config', {})
+        if has_backend_config and raw_backend_config.get('backend') == 'custom':
+            config = raw_backend_config.get('custom_config', {})
             return CustomServiceBackend(
                 submit_endpoint=config.get('submit_endpoint', ''),
                 results_endpoint=config.get('results_endpoint', ''),
@@ -37,8 +38,17 @@ class BackendFactory:
             )
 
         # Default to judge0 backend
-        judge0_config = backend_config.get('judge0_config', {})
+        judge0_config = (
+            raw_backend_config.get('judge0_config', {})
+            if has_backend_config
+            else {}
+        )
+        judge0_api_key = (
+            judge0_config.get('api_key', '')
+            if has_backend_config
+            else api_key
+        )
         return Judge0Backend(
-            api_key=api_key,
+            api_key=judge0_api_key,
             base_url=judge0_config.get('base_url')
         )
