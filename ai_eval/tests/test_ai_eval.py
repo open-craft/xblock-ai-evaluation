@@ -15,7 +15,6 @@ from xblock.test.toy_runtime import ToyRuntime
 
 from ai_eval import (
     CodingAIEvalXBlock,
-    MultiAgentAIEvalXBlock,
     ShortAnswerAIEvalXBlock,
 )
 from ai_eval.base import AIEvalXBlock
@@ -168,58 +167,6 @@ def test_shortanswer_attachments_encoding(shortanswer_block_data):
     urllib.request.urlopen = Mock(return_value=io.BytesIO("á".encode('latin-1')))
     contents = block._download_attachment("http://example.com/1.txt")
     assert contents == "á"
-
-
-def test_multiagent_block_finished():
-    """Test the MultiAgentAIEvalXBlock for not allowing input after finished."""
-    data = {
-        "finished": True
-    }
-    block = MultiAgentAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
-    with pytest.raises(JsonHandlerError):
-        block.get_response.__wrapped__(block, data={})
-
-
-def test_multiagent_block_force_finish():
-    """Test force finish for the MultiAgentAIEvalXBlock."""
-    data = {}
-    block = MultiAgentAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
-    block._get_evaluator_response = Mock(return_value="evaluator response")
-    resp = block.get_response.__wrapped__(block, data={"force_finish": True})
-    assert resp["message"] == "evaluator response"
-    assert resp["finished"]
-    assert resp["is_evaluator"]
-
-
-def test_multiagent_block_response():
-    """Test regular response for the MultiAgentAIEvalXBlock."""
-    data = {}
-    block = MultiAgentAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
-    block._get_next_agent = Mock(return_value="Character")
-    block._get_agent_response = Mock(return_value="agent response")
-    block._get_character_data = Mock(return_value={"role": "role"})
-    resp = block.get_response.__wrapped__(block, data={"user_input": "hi"})
-    block._get_next_agent.assert_called_once_with("hi")
-    block._get_agent_response.assert_called_once_with("Character", "hi")
-    assert resp["message"] == "agent response"
-    assert not resp["finished"]
-    assert not resp["is_evaluator"]
-    assert resp["role"] == "Character"
-    assert resp["character_data"]["role"] == "role"
-
-
-def test_multiagent_block_evaluator_response():
-    """Test evaluator response for the MultiAgentAIEvalXBlock."""
-    data = {}
-    block = MultiAgentAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
-    block._get_next_agent = Mock(return_value="FINISH")
-    block._get_evaluator_response = Mock(return_value="evaluator response")
-    resp = block.get_response.__wrapped__(block, data={"user_input": "end"})
-    block._get_next_agent.assert_called_once_with("end")
-    block._get_evaluator_response.assert_called_once_with("end")
-    assert resp["message"] == "evaluator response"
-    assert resp["finished"]
-    assert resp["is_evaluator"]
 
 
 def test_custom_llm_models_dict_response_parsed():

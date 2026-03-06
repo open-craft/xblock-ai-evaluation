@@ -41,7 +41,6 @@ setup(
             "ai_eval_export = ai_eval:DataExportXBlock",
             "shortanswer_ai_eval = ai_eval:ShortAnswerAIEvalXBlock",
             "coding_ai_eval = ai_eval:CodingAIEvalXBlock",
-            "multiagent_ai_eval = ai_eval:MultiAgentAIEvalXBlock",
             "coach_ai_eval = ai_eval:CoachAIEvalXBlock",
         ]
     },

@@ -694,7 +694,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def student_view(self, context=None):
         """
-        The primary view of the MultiAgentAIEvalXBlock, shown to students
+        The primary view of the CoachAIEvalXBlock, shown to students
         when viewing courses.
         """
 

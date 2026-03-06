@@ -5,7 +5,7 @@ from enum import Enum
 class SupportedModels(Enum):
     """
     LLM Models supported by the CodingAIEvalXBlock, ShortAnswerAIEvalXBlock,
-    and MultiAgentAIEvalXBlock.
+    and CoachAIEvalXBlock.
     """
 
     GPT4O = "gpt-4o"
