@@ -22,8 +22,6 @@
       ariaLabel: "Code editor. Press Alt plus F1 for accessibility help."
     });
 
-    monaco.editor.setTabFocusMode(true);
-
     document.addEventListener("keydown", (event) => {
       if (event.key === "F1" && event.altKey) {
         event.preventDefault();

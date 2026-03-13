@@ -470,6 +470,64 @@ def test_coding_block_submit_code_uses_backend(mock_get_backend, coding_block_da
     mock_backend.submit_code.assert_called_once_with("print('hello')", "Python (3.8.1)")
 
 
+@patch.object(CodingAIEvalXBlock, 'get_llm_response', return_value="Looks good")
+def test_coding_block_get_response_persists_current_session(mock_get_llm, coding_block_data):
+    """Coding responses should replace the current session entry for persistence."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+
+    result = block.get_response.__wrapped__(
+        block,
+        data={
+            "code": "print('hello')",
+            "stdout": "hello",
+            "stderr": "",
+        },
+    )
+
+    assert result == {"response": "Looks good"}
+    assert block.sessions == [{
+        "USER_RESPONSE": "print('hello')",
+        "AI_EVALUATION": "Looks good",
+        "CODE_EXEC_RESULT": {
+            "stdout": "hello",
+            "stderr": "",
+        },
+    }]
+    mock_get_llm.assert_called_once()
+
+
+def test_coding_block_reset_appends_blank_session(coding_block_data):
+    """Reset should create a fresh blank session."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    block.sessions = [{
+        "USER_RESPONSE": "print('hello')",
+        "AI_EVALUATION": "Looks good",
+        "CODE_EXEC_RESULT": {
+            "stdout": "hello",
+            "stderr": "",
+        },
+    }]
+
+    result = block.reset_handler.__wrapped__(block, data={})
+
+    assert result == {"message": "reset successful."}
+    assert block.sessions == [
+        {
+            "USER_RESPONSE": "print('hello')",
+            "AI_EVALUATION": "Looks good",
+            "CODE_EXEC_RESULT": {
+                "stdout": "hello",
+                "stderr": "",
+            },
+        },
+        {
+            "USER_RESPONSE": "",
+            "AI_EVALUATION": "",
+            "CODE_EXEC_RESULT": {},
+        },
+    ]
+
+
 @patch('ai_eval.coding_ai_eval.BackendFactory.get_backend')
 def test_coding_block_get_submission_result_uses_backend(mock_get_backend, coding_block_data):
     """Test CodingAIEvalXBlock.get_submission_result_handler uses backend system."""

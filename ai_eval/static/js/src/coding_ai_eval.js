@@ -181,12 +181,6 @@ function CodingAIEvalXBlock(runtime, element, data) {
       );
     }
 
-    // __USAGE_ID_PLACEHOLDER__ is the event data sent from the monaco iframe after loading
-    // we rely on the usage_id to limit the event to the Xblock scope
-    iframe.srcdoc = data.monaco_html.replace(
-      "__USAGE_ID_PLACEHOLDER__",
-      xblockUsageId,
-    );
     runFuncAfterLoading(init);
     function submitCode() {
       const code = iframe.contentWindow.editor.getValue();
@@ -269,7 +263,7 @@ function CodingAIEvalXBlock(runtime, element, data) {
         url: resetHandlerURL,
         method: "POST",
         data: JSON.stringify({}),
-        success: function (data) {
+        success: function () {
           iframe.contentWindow.editor.setValue("");
           aiFeedbackPanel.html("");
           markTabNotification("ai-feedback-tab", false);
@@ -399,6 +393,13 @@ function CodingAIEvalXBlock(runtime, element, data) {
           }
         }
       });
+
+      // __USAGE_ID_PLACEHOLDER__ is the event data sent from the monaco iframe after loading
+      // we rely on the usage_id to limit the event to the Xblock scope
+      iframe.srcdoc = data.monaco_html.replace(
+        "__USAGE_ID_PLACEHOLDER__",
+        xblockUsageId,
+      );
     }
     function addMonacoHTMLRenderEventListener() {
       iframe.contentWindow.editor.onDidChangeModelContent((event) => {
