@@ -166,7 +166,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         frag = Fragment()
         frag.add_content(
             self.loader.render_django_template(
-                "/templates/chatbox.html",
+                "/templates/shortanswer.html",
                 {
                     "self": self,
                     "has_finish_button": False,
@@ -177,7 +177,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript(self.resource_string("static/js/src/utils.js"))
-        frag.add_javascript(self.resource_string("static/js/src/chatbox.js"))
         frag.add_javascript(self.resource_string("static/js/src/shortanswer.js"))
 
         marked_html = self.resource_string("static/html/marked-iframe.html")
