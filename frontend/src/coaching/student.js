@@ -5,10 +5,11 @@ import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown
 
 function normalizePayload(runtime, element, data) {
   return {
+    view: data.view || "student",
     handler_urls: data.handler_urls || {
-      primary_action: runtime.handlerUrl(element, "get_character_response"),
-      secondary_action: runtime.handlerUrl(element, "get_evaluator_response"),
-      reset: runtime.handlerUrl(element, "reset_all"),
+      get_character_response: runtime.handlerUrl(element, "get_character_response"),
+      get_evaluator_response: runtime.handlerUrl(element, "get_evaluator_response"),
+      reset_all: runtime.handlerUrl(element, "reset_all"),
     },
     initial_state: data.initial_state || {
       chat_histories: data.chat_histories,
@@ -25,7 +26,7 @@ function normalizePayload(runtime, element, data) {
   };
 }
 
-function CoachingShell(props) {
+function CoachingStudentShell(props) {
   var payload = props.payload;
   var meta = payload.meta;
   var initialState = payload.initial_state;
@@ -52,6 +53,7 @@ function CoachingShell(props) {
     {
       className: "ai-eval-react-shell ai-eval-react-shell--coaching",
       "data-block-kind": "coaching",
+      "data-view": payload.view,
     },
     [
       React.createElement("div", {
@@ -87,7 +89,7 @@ function CoachingShell(props) {
 }
 
 var initializer = makeXBlockInitializer(
-  CoachingShell,
+  CoachingStudentShell,
   function getProps(runtime, element, data) {
     return { payload: normalizePayload(runtime, element, data) };
   },

@@ -5,21 +5,31 @@ import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown
 
 function normalizePayload(runtime, element, data) {
   return {
+    view: data.view || "student",
     handler_urls: data.handler_urls || {
-      primary_action: runtime.handlerUrl(element, "get_response"),
+      submit_code_handler: runtime.handlerUrl(element, "submit_code_handler"),
+      get_submission_result_handler: runtime.handlerUrl(
+        element,
+        "get_submission_result_handler",
+      ),
+      get_response: runtime.handlerUrl(element, "get_response"),
+      reset_handler: runtime.handlerUrl(element, "reset_handler"),
     },
     initial_state: data.initial_state || {
-      messages: data.messages,
-      max_responses: data.max_responses,
+      code: data.code,
+      ai_evaluation: data.ai_evaluation,
+      code_exec_result: data.code_exec_result,
     },
     meta: data.meta || {
       question: data.question,
+      language: data.language,
+      monaco_html: data.monaco_html,
       marked_html: data.marked_html,
     },
   };
 }
 
-function ShortAnswerShell(props) {
+function CodingStudentShell(props) {
   var payload = props.payload;
   var meta = payload.meta;
   var initialState = payload.initial_state;
@@ -44,8 +54,9 @@ function ShortAnswerShell(props) {
   return React.createElement(
     "section",
     {
-      className: "ai-eval-react-shell ai-eval-react-shell--shortanswer",
-      "data-block-kind": "shortanswer",
+      className: "ai-eval-react-shell ai-eval-react-shell--coding",
+      "data-block-kind": "coding",
+      "data-view": payload.view,
     },
     [
       React.createElement("div", {
@@ -61,13 +72,18 @@ function ShortAnswerShell(props) {
         [
           React.createElement(
             "span",
-            { key: "messages" },
-            String((initialState.messages || []).length) + " messages loaded",
+            { key: "language" },
+            meta.language || "Language not set",
           ),
           React.createElement(
             "span",
-            { key: "limit" },
-            "Max responses: " + String(initialState.max_responses || 0),
+            { key: "code" },
+            "Code chars: " + String((initialState.code || "").length),
+          ),
+          React.createElement(
+            "span",
+            { key: "feedback" },
+            initialState.ai_evaluation ? "Feedback loaded" : "No feedback yet",
           ),
         ],
       ),
@@ -76,13 +92,13 @@ function ShortAnswerShell(props) {
 }
 
 var initializer = makeXBlockInitializer(
-  ShortAnswerShell,
+  CodingStudentShell,
   function getProps(runtime, element, data) {
     return { payload: normalizePayload(runtime, element, data) };
   },
 );
 
 window.AIEvalReactXBlocks = window.AIEvalReactXBlocks || {};
-window.AIEvalReactXBlocks.shortanswer = initializer;
-window.ShortAnswerAIEvalXBlock = initializer;
-window.ReactShortAnswerAIEvalXBlock = initializer;
+window.AIEvalReactXBlocks.coding = initializer;
+window.CodingAIEvalXBlock = initializer;
+window.ReactCodingAIEvalXBlock = initializer;

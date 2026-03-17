@@ -1,5 +1,5 @@
 """Base Xblock with AI evaluation."""
-from typing import Self
+from typing import Any, Self
 
 import logging
 from importlib.resources import files
@@ -262,6 +262,102 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             "model_key_presence": self._get_model_key_presence_map(),
             "lock_model_api_key_initial": self.should_lock_model_api_key_field(),
             "lock_judge0_api_key": False,
+        }
+
+    def _get_react_studio_field_choices(self, field_name: str) -> list[dict[str, Any]]:
+        """
+        Return normalized choice metadata for a Studio-editable field.
+        """
+        field = self.fields[field_name]
+        values_provider = getattr(field, "values_provider", None)
+        values = None
+
+        if callable(values_provider):
+            values = values_provider(self)
+        elif hasattr(field, "values"):
+            values = getattr(field, "values")
+
+        if not values:
+            return []
+
+        normalized = []
+        for value in values:
+            if isinstance(value, dict):
+                normalized.append(value)
+            else:
+                normalized.append({
+                    "display_name": str(value),
+                    "value": value,
+                })
+        return normalized
+
+    def _get_react_studio_field_metadata(self) -> dict[str, dict[str, Any]]:
+        """
+        Return field labels, help text, defaults, and choices for React Studio.
+        """
+        metadata = {}
+
+        for field_name in self.editable_fields:
+            field = self.fields[field_name]
+            metadata[field_name] = {
+                "display_name": str(getattr(field, "display_name", field_name) or field_name),
+                "help": str(getattr(field, "help", "") or ""),
+                "default": getattr(field, "default", None),
+                "choices": self._get_react_studio_field_choices(field_name),
+            }
+
+        return metadata
+
+    def _get_react_studio_initial_state(self) -> dict[str, Any]:
+        """
+        Return current editable values for React Studio boot payloads.
+        """
+        return {
+            field_name: getattr(self, field_name)
+            for field_name in self.editable_fields
+        }
+
+    def _get_react_studio_meta(self) -> dict[str, Any]:
+        """
+        Return additive metadata for future React Studio views.
+        """
+        return {
+            "field_metadata": self._get_react_studio_field_metadata(),
+            "lock_metadata": self._get_studio_lock_payload(),
+        }
+
+    def _get_react_boot_payload(
+        self,
+        view: str,
+        handler_urls: dict[str, str],
+        initial_state: dict[str, Any],
+        meta: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Return the normalized React boot payload shape used by future views.
+        """
+        return {
+            "view": view,
+            "handler_urls": handler_urls,
+            "initial_state": initial_state,
+            "meta": meta,
+        }
+
+    @staticmethod
+    def _build_react_studio_submit_response(
+        success: bool,
+        validation_errors: dict[str, Any] | None = None,
+        validation_warnings: list[str] | None = None,
+        meta: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Return the shared response shape planned for React Studio saves.
+        """
+        return {
+            "success": success,
+            "validation_errors": validation_errors or {},
+            "validation_warnings": validation_warnings or [],
+            "meta": meta or {},
         }
 
     def studio_view(self, context):

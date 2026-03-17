@@ -10,9 +10,12 @@ module.exports = function webpackConfig(_, argv) {
     target: ["web", "es5"],
     devtool: mode === "development" ? "source-map" : false,
     entry: {
-      shortanswer: path.resolve(__dirname, "src/shortanswer/index.js"),
-      coding: path.resolve(__dirname, "src/coding/index.js"),
-      coaching: path.resolve(__dirname, "src/coaching/index.js"),
+      shortanswer: path.resolve(__dirname, "src/shortanswer/student.js"),
+      "shortanswer.studio": path.resolve(__dirname, "src/shortanswer/studio.js"),
+      coding: path.resolve(__dirname, "src/coding/student.js"),
+      "coding.studio": path.resolve(__dirname, "src/coding/studio.js"),
+      coaching: path.resolve(__dirname, "src/coaching/student.js"),
+      "coaching.studio": path.resolve(__dirname, "src/coaching/studio.js"),
       shared: path.resolve(__dirname, "src/shared/index.js"),
     },
     output: {
