@@ -10,13 +10,13 @@ module.exports = function webpackConfig(_, argv) {
     target: ["web", "es5"],
     devtool: mode === "development" ? "source-map" : false,
     entry: {
-      shortanswer: path.resolve(__dirname, "src/shortanswer/student.js"),
-      "shortanswer.studio": path.resolve(__dirname, "src/shortanswer/studio.js"),
-      coding: path.resolve(__dirname, "src/coding/student.js"),
-      "coding.studio": path.resolve(__dirname, "src/coding/studio.js"),
-      coaching: path.resolve(__dirname, "src/coaching/student.js"),
-      "coaching.studio": path.resolve(__dirname, "src/coaching/studio.js"),
-      shared: path.resolve(__dirname, "src/shared/index.js"),
+      shortanswer: path.resolve(__dirname, "src/shortanswer/student.tsx"),
+      "shortanswer.studio": path.resolve(__dirname, "src/shortanswer/studio.tsx"),
+      coding: path.resolve(__dirname, "src/coding/student.tsx"),
+      "coding.studio": path.resolve(__dirname, "src/coding/studio.tsx"),
+      coaching: path.resolve(__dirname, "src/coaching/student.tsx"),
+      "coaching.studio": path.resolve(__dirname, "src/coaching/studio.tsx"),
+      shared: path.resolve(__dirname, "src/shared/index.ts"),
     },
     output: {
       filename: "[name].js",
@@ -38,10 +38,20 @@ module.exports = function webpackConfig(_, argv) {
     module: {
       rules: [
         {
+          test: /\.[jt]sx?$/i,
+          exclude: /node_modules/,
+          use: {
+            loader: "ts-loader",
+          },
+        },
+        {
           test: /\.css$/i,
           use: [MiniCssExtractPlugin.loader, "css-loader"],
         },
       ],
+    },
+    resolve: {
+      extensions: [".tsx", ".ts", ".jsx", ".js"],
     },
     plugins: [
       new MiniCssExtractPlugin({
