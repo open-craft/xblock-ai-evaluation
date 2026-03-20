@@ -1,5 +1,5 @@
 import { makeXBlockInitializer } from "../shared/mountApp";
-import { XBlockRuntime } from "../shared/types";
+import { XBlockElementLike, XBlockRuntime } from "../shared/types";
 import ShortAnswerStudioApp from "./ShortAnswerStudioApp";
 import { ShortAnswerStudioPayload } from "./types";
 
@@ -7,7 +7,7 @@ type StudioPayloadInput = Partial<ShortAnswerStudioPayload>;
 
 function normalizePayload(
   runtime: XBlockRuntime,
-  element: Element,
+  element: XBlockElementLike,
   data: unknown,
 ): ShortAnswerStudioPayload {
   const payloadData = (data || {}) as StudioPayloadInput;

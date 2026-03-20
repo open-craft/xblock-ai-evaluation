@@ -1,8 +1,9 @@
 export type UnknownRecord = Record<string, unknown>;
+export type XBlockElementLike = Element | { 0?: Element; length?: number; jquery?: string };
 
 export interface XBlockRuntime {
   handlerUrl(
-    element: Element,
+    element: XBlockElementLike,
     handlerName: string,
     suffix?: string,
     query?: string,
@@ -23,6 +24,6 @@ export interface SharedPayload<
 
 export type XBlockPropsFactory<Props> = (
   runtime: XBlockRuntime,
-  element: Element,
+  element: XBlockElementLike,
   data: unknown,
 ) => Props;

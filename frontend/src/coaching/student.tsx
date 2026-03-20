@@ -3,7 +3,7 @@ import { FormattedMessage } from "react-intl";
 
 import { makeXBlockInitializer } from "../shared/mountApp";
 import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
-import { SharedPayload, UnknownRecord, XBlockRuntime } from "../shared/types";
+import { SharedPayload, UnknownRecord, XBlockElementLike, XBlockRuntime } from "../shared/types";
 
 interface CoachingHandlerUrls extends UnknownRecord {
   get_character_response?: string;
@@ -44,7 +44,7 @@ type CoachingPayloadInput = Partial<CoachingPayload> & {
 
 function normalizePayload(
   runtime: XBlockRuntime,
-  element: Element,
+  element: XBlockElementLike,
   data: unknown,
 ): CoachingPayload {
   const payloadData = (data || {}) as CoachingPayloadInput;

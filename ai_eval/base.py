@@ -272,6 +272,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         field = self.fields[field_name]
         values_provider = getattr(field, "values_provider", None)
+        if values_provider is None:
+            runtime_options = getattr(field, "runtime_options", None) or {}
+            values_provider = runtime_options.get("values_provider")
         values = None
 
         if callable(values_provider):

@@ -184,14 +184,26 @@ def test_shortanswer_block_studio_view(shortanswer_block_data):
     assert frag.json_init_args["initial_state"]["question"] == shortanswer_block_data["question"]
     assert frag.json_init_args["meta"]["lock_metadata"]["initial_model"] == SupportedModels.GPT4O.value
     assert "question" in frag.json_init_args["meta"]["field_metadata"]
+    assert frag.json_init_args["meta"]["field_metadata"]["model"]["choices"] == [
+        {
+            "display_name": "— Select a model —",
+            "value": "",
+        },
+        {
+            "display_name": SupportedModels.GPT4O.value,
+            "value": SupportedModels.GPT4O.value,
+        },
+    ]
 
 
 def test_shortanswer_studio_submit_success(shortanswer_block_data):
     """React Studio saves should persist fields and return the shared response shape."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     block._get_attachments = Mock(return_value=[])
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
 
-    with patch("ai_eval.base.get_llm_service", return_value=Mock()):
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
         with patch("ai_eval.base.get_site_configuration_value", return_value=None):
             response = block.studio_submit.__wrapped__(
                 block,

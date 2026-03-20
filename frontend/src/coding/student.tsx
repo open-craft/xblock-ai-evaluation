@@ -3,7 +3,7 @@ import { FormattedMessage } from "react-intl";
 
 import { makeXBlockInitializer } from "../shared/mountApp";
 import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
-import { SharedPayload, UnknownRecord, XBlockRuntime } from "../shared/types";
+import { SharedPayload, UnknownRecord, XBlockElementLike, XBlockRuntime } from "../shared/types";
 
 interface CodingHandlerUrls extends UnknownRecord {
   get_response?: string;
@@ -39,7 +39,7 @@ type CodingPayloadInput = Partial<CodingPayload> & {
 
 function normalizePayload(
   runtime: XBlockRuntime,
-  element: Element,
+  element: XBlockElementLike,
   data: unknown,
 ): CodingPayload {
   const payloadData = (data || {}) as CodingPayloadInput;

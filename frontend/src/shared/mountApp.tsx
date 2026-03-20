@@ -2,9 +2,22 @@ import React from "react";
 import ReactDOM from "react-dom";
 
 import { SharedIntlProvider } from "./i18n";
-import { XBlockPropsFactory, XBlockRuntime } from "./types";
+import { XBlockElementLike, XBlockPropsFactory, XBlockRuntime } from "./types";
 
-function resolveMountNode(element: Element, selector?: string) {
+function toDomElement(element: XBlockElementLike) {
+  if (element instanceof Element) {
+    return element;
+  }
+
+  if (element && element[0] instanceof Element) {
+    return element[0];
+  }
+
+  throw new Error("XBlock initializer received an unsupported root element.");
+}
+
+function resolveMountNode(elementLike: XBlockElementLike, selector?: string) {
+  const element = toDomElement(elementLike);
   let mountNode: Element | null = null;
 
   if (selector) {
@@ -26,7 +39,7 @@ function resolveMountNode(element: Element, selector?: string) {
 }
 
 export function mountReactTree(
-  element: Element,
+  element: XBlockElementLike,
   reactElement: React.ReactElement,
   selector?: string,
 ) {
@@ -47,7 +60,7 @@ export function makeXBlockInitializer<Props extends Record<string, unknown>>(
 ) {
   return function initializeXBlock(
     runtime: XBlockRuntime,
-    element: Element,
+    element: XBlockElementLike,
     data?: unknown,
   ) {
     const props = getProps ? getProps(runtime, element, data || {}) : ({} as Props);
