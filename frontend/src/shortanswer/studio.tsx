@@ -1,23 +1,16 @@
-import React from "react";
-import { FormattedMessage } from "react-intl";
-
 import { makeXBlockInitializer } from "../shared/mountApp";
-import StudioPlaceholder from "../shared/StudioPlaceholder";
-import { SharedPayload, UnknownRecord, XBlockRuntime } from "../shared/types";
+import { XBlockRuntime } from "../shared/types";
+import ShortAnswerStudioApp from "./ShortAnswerStudioApp";
+import { ShortAnswerStudioPayload } from "./types";
 
-interface StudioHandlerUrls extends UnknownRecord {
-  studio_submit?: string;
-}
-
-type StudioPayload = SharedPayload<StudioHandlerUrls, UnknownRecord, UnknownRecord>;
-type StudioLegacyData = Partial<StudioPayload>;
+type StudioPayloadInput = Partial<ShortAnswerStudioPayload>;
 
 function normalizePayload(
   runtime: XBlockRuntime,
   element: Element,
   data: unknown,
-): StudioPayload {
-  const payloadData = (data || {}) as StudioLegacyData;
+): ShortAnswerStudioPayload {
+  const payloadData = (data || {}) as StudioPayloadInput;
 
   return {
     view: payloadData.view || "studio",
@@ -30,30 +23,17 @@ function normalizePayload(
 }
 
 const initializer = makeXBlockInitializer(
-  function ShortAnswerStudioPlaceholder({ payload }: { payload: StudioPayload }) {
-    return (
-      <StudioPlaceholder
-        blockKind="shortanswer"
-        payload={payload}
-        title={
-          <FormattedMessage
-            id="shortanswer.studio.title"
-            defaultMessage="Short Answer Studio Shell"
-          />
-        }
-      />
-    );
-  },
+  ShortAnswerStudioApp,
   (runtime, element, data) => {
-    return { payload: normalizePayload(runtime, element, data) };
+    return {
+      payload: normalizePayload(runtime, element, data),
+      runtime,
+    };
   },
 );
 
 const globalWindow = window as Window & {
-  AIEvalReactXBlocks?: Record<string, typeof initializer>;
   ShortAnswerAIEvalXBlockStudio?: typeof initializer;
 };
 
-globalWindow.AIEvalReactXBlocks = globalWindow.AIEvalReactXBlocks || {};
-globalWindow.AIEvalReactXBlocks.shortanswerStudio = initializer;
 globalWindow.ShortAnswerAIEvalXBlockStudio = initializer;

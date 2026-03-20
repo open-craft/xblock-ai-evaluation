@@ -197,9 +197,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         """Lock Judge0 field when runtime settings provide a Judge0 API key."""
         return self._is_judge0_backend_selected() and self._is_judge0_api_key_configured()
 
-    def _get_studio_lock_payload(self) -> dict:
+    def _studio_lock_metadata(self) -> dict:
         """Extend base lock payload with coding-specific Judge0 lock flag."""
-        payload = super()._get_studio_lock_payload()
+        payload = super()._studio_lock_metadata()
         payload["lock_judge0_api_key"] = self.should_lock_judge0_api_key_field()
         return payload
 

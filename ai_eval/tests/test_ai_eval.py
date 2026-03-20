@@ -26,6 +26,12 @@ from ai_eval.backends.custom import CustomServiceBackend
 from ai_eval.utils import SUPPORTED_LANGUAGE_MAP, LanguageLabels
 
 
+def _mock_handler_url(_block, handler_name, suffix='', query='', thirdparty=False):
+    """Return deterministic handler URLs for frontend payload tests."""
+    del suffix, query, thirdparty
+    return f"/handler/{handler_name}"
+
+
 @pytest.fixture
 def coding_block_data():
     """Fixture for coding block test data."""
@@ -52,9 +58,17 @@ def coding_block_data():
 def shortanswer_block_data():
     """Fixture for short answer block test data."""
     return {
+        "display_name": "Short answer with AI Evaluation",
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "test-key",
+        "model_api_url": "",
+        "evaluation_prompt": "Evaluate this answer",
         "question": "ca va?",
         "sessions": [[{"source": "user", "content": "hi"}]],
         "max_responses": 3,
+        "allow_reset": False,
+        "character_image": "",
+        "attachment_urls": [],
         "marked_html": (
             '<!doctype html>\n<html lang="en">\n<head></head>\n<body>\n'
             '    <script type="text/javascript" '
@@ -93,12 +107,27 @@ def test_coding_block_student_view(coding_block_data):
 def test_shortanswer_block_student_view(shortanswer_block_data):
     """Test the basic view loads for ShortAnswerAIEvalXBlock."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
-    frag = block.student_view()
-    expected_args = shortanswer_block_data.copy()
-    del expected_args["sessions"]
-    expected_args["messages"] = shortanswer_block_data["sessions"][-1]
-    assert frag.json_init_args == expected_args
-    assert '<div class="shortanswer_block">' in frag.content
+    with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+        frag = block.student_view()
+    assert frag.js_init_fn == "ShortAnswerAIEvalXBlock"
+    assert frag.json_init_args == {
+        "view": "student",
+        "handler_urls": {
+            "get_response": "/handler/get_response",
+            "reset": "/handler/reset",
+        },
+        "initial_state": {
+            "messages": shortanswer_block_data["sessions"][-1],
+        },
+        "meta": {
+            "question": shortanswer_block_data["question"],
+            "max_responses": shortanswer_block_data["max_responses"],
+            "allow_reset": shortanswer_block_data["allow_reset"],
+            "character_image": shortanswer_block_data["character_image"],
+            "marked_html": block.resource_string("static/html/marked-iframe.html"),
+        },
+    }
+    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 
 
 def test_shortanswer_reset_allowed(shortanswer_block_data):
@@ -130,8 +159,159 @@ def test_character_image(shortanswer_block_data):
         "character_image": "/static/image.jpg",
     }
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
-    frag = block.student_view()
-    assert '<img src="/static/image.jpg" />' in frag.content
+    with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+        frag = block.student_view()
+    assert frag.json_init_args["meta"]["character_image"] == "/static/image.jpg"
+
+
+def test_shortanswer_block_studio_view(shortanswer_block_data):
+    """Short Answer Studio should boot the React editor payload."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+                frag = block.studio_view()
+
+    assert frag.js_init_fn == "ShortAnswerAIEvalXBlockStudio"
+    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+    assert frag.json_init_args["view"] == "studio"
+    assert frag.json_init_args["handler_urls"] == {
+        "studio_submit": "/handler/studio_submit",
+    }
+    assert frag.json_init_args["initial_state"]["question"] == shortanswer_block_data["question"]
+    assert frag.json_init_args["meta"]["lock_metadata"]["initial_model"] == SupportedModels.GPT4O.value
+    assert "question" in frag.json_init_args["meta"]["field_metadata"]
+
+
+def test_shortanswer_studio_submit_success(shortanswer_block_data):
+    """React Studio saves should persist fields and return the shared response shape."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_attachments = Mock(return_value=[])
+
+    with patch("ai_eval.base.get_llm_service", return_value=Mock()):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                    "model_api_key": "updated-key",
+                    "model_api_url": "",
+                    "question": "Updated question",
+                    "evaluation_prompt": "Updated prompt",
+                    "max_responses": "4",
+                    "allow_reset": True,
+                    "character_image": "/static/new-image.jpg",
+                    "attachment_urls": ["http://example.com/1.txt"],
+                },
+            )
+
+    assert response["success"] is True
+    assert response["validation_errors"] == {}
+    assert response["validation_warnings"] == []
+    assert block.display_name == "Updated title"
+    assert block.question == "Updated question"
+    assert block.max_responses == 4
+    assert block.allow_reset is True
+    assert block.character_image == "/static/new-image.jpg"
+    assert block.attachment_urls == ["http://example.com/1.txt"]
+
+
+def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
+    """React Studio save failures should keep values unsaved and return structured field errors."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_attachments = Mock(side_effect=Exception("download failed"))
+
+    with patch("ai_eval.base.get_llm_service", return_value=Mock()):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                    "model_api_key": "updated-key",
+                    "model_api_url": "",
+                    "question": "",
+                    "evaluation_prompt": "Updated prompt",
+                    "max_responses": "0",
+                    "allow_reset": True,
+                    "character_image": "",
+                    "attachment_urls": ["http://example.com/bad.txt"],
+                },
+            )
+
+    assert response["success"] is False
+    assert response["validation_errors"] == {
+        "question": ["Question field is mandatory"],
+        "max_responses": ["max responses must be an integer between 1 and 15"],
+        "attachment_urls": ["Error downloading attachments"],
+    }
+    assert response["validation_warnings"] == []
+    assert block.question == shortanswer_block_data["question"]
+    assert block.max_responses == shortanswer_block_data["max_responses"]
+
+
+def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_data):
+    """React Studio saves should fail loudly when the frontend omits editable fields."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+
+    with patch("ai_eval.base.get_llm_service", return_value=Mock()):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                },
+            )
+
+    assert response["success"] is False
+    assert response["validation_errors"] == {
+        "model_api_key": ["Missing field in Studio payload."],
+        "model_api_url": ["Missing field in Studio payload."],
+        "question": ["Missing field in Studio payload."],
+        "evaluation_prompt": ["Missing field in Studio payload."],
+        "max_responses": ["Missing field in Studio payload."],
+        "allow_reset": ["Missing field in Studio payload."],
+        "character_image": ["Missing field in Studio payload."],
+        "attachment_urls": ["Missing field in Studio payload."],
+    }
+
+
+def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
+    """Warnings should be returned inline without blocking a successful save."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_attachments = Mock(return_value=[])
+
+    with patch.object(
+        ShortAnswerAIEvalXBlock,
+        "_collect_studio_validation_issues",
+        return_value=({}, ["Non-blocking warning"]),
+    ):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                    "model_api_key": "updated-key",
+                    "model_api_url": "",
+                    "question": "Updated question",
+                    "evaluation_prompt": "Updated prompt",
+                    "max_responses": "4",
+                    "allow_reset": True,
+                    "character_image": "/static/new-image.jpg",
+                    "attachment_urls": ["http://example.com/1.txt"],
+                },
+            )
+
+    assert response["success"] is True
+    assert response["validation_errors"] == {}
+    assert response["validation_warnings"] == ["Non-blocking warning"]
+    assert block.display_name == "Updated title"
 
 
 def test_shortanswer_attachments(shortanswer_block_data):
@@ -568,7 +748,7 @@ def test_studio_lock_payload_locks_model_api_key_when_locked(ai_eval_block):
     """Studio payload should lock model API key when globally configured."""
     ai_eval_block._get_settings = Mock(return_value={})
     with patch("ai_eval.base.get_site_configuration_value", return_value="site-key"):
-        payload = ai_eval_block._get_studio_lock_payload()
+        payload = ai_eval_block._studio_lock_metadata()
         assert payload["lock_model_api_key_initial"] is True
 
 
@@ -576,7 +756,7 @@ def test_studio_lock_payload_keeps_model_api_key_unlocked_without_config(ai_eval
     """Studio payload should keep model API key editable without global/site config."""
     ai_eval_block._get_settings = Mock(return_value={})
     with patch("ai_eval.base.get_site_configuration_value", return_value=None):
-        payload = ai_eval_block._get_studio_lock_payload()
+        payload = ai_eval_block._studio_lock_metadata()
         assert payload["lock_model_api_key_initial"] is False
         assert payload["model_key_presence"][SupportedModels.GPT4O.value] is False
 
@@ -646,7 +826,7 @@ def test_coding_studio_lock_payload_sets_judge0_lock_flag(coding_block_data):
             }
         ),
     ), patch("ai_eval.base.get_site_configuration_value", return_value=None):
-        payload = block._get_studio_lock_payload()
+        payload = block._studio_lock_metadata()
         assert payload["lock_judge0_api_key"] is True
 
 
@@ -656,5 +836,5 @@ def test_coding_studio_lock_payload_unsets_judge0_lock_flag_without_runtime_key(
     block._get_settings = Mock(return_value={})
     with patch('ai_eval.coding_ai_eval.settings', new=SimpleNamespace()), \
             patch("ai_eval.base.get_site_configuration_value", return_value=None):
-        payload = block._get_studio_lock_payload()
+        payload = block._studio_lock_metadata()
         assert payload["lock_judge0_api_key"] is False

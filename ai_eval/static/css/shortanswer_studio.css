@@ -1,0 +1,53 @@
+.shortanswer-react-studio .shortanswer-studio-summary {
+    margin-bottom: 1rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-summary__error {
+    color: #a11d1d;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-summary__warnings,
+.shortanswer-react-studio .shortanswer-studio-errors {
+    color: #8a5a00;
+    margin: 0.35rem 0 0;
+    padding-left: 1.25rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-errors {
+    color: #a11d1d;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-row .field-data-control {
+    flex: 1 1 auto;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-add {
+    align-self: flex-start;
+}
+
+.shortanswer-react-studio .shortanswer-studio-checkbox {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-checkbox input[type="checkbox"] {
+    width: auto;
+    min-width: auto;
+    height: auto;
+}

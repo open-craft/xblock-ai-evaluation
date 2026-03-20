@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { FormattedMessage } from "react-intl";
 
 import { makeXBlockInitializer } from "../shared/mountApp";
@@ -31,7 +31,7 @@ type CoachingPayload = SharedPayload<
   CoachingMeta
 >;
 
-type CoachingLegacyData = Partial<CoachingPayload> & {
+type CoachingPayloadInput = Partial<CoachingPayload> & {
   attempts?: unknown;
   chat_histories?: unknown;
   characters?: unknown[];
@@ -47,7 +47,7 @@ function normalizePayload(
   element: Element,
   data: unknown,
 ): CoachingPayload {
-  const payloadData = (data || {}) as CoachingLegacyData;
+  const payloadData = (data || {}) as CoachingPayloadInput;
 
   return {
     view: payloadData.view || "student",
@@ -73,10 +73,10 @@ function normalizePayload(
 
 function CoachingStudentShell({ payload }: { payload: CoachingPayload }) {
   const { meta, initial_state: initialState } = payload;
-  const [introHtml, setIntroHtml] = React.useState(renderMarkdown(meta.intro_text));
+  const [introHtml, setIntroHtml] = useState(renderMarkdown(meta.intro_text));
   const characterCount = Array.isArray(meta.characters) ? meta.characters.length : 0;
 
-  React.useEffect(() => {
+  useEffect(() => {
     let isActive = true;
 
     ensureMarkdownRenderer(meta.marked_html).then(() => {
@@ -138,12 +138,7 @@ const initializer = makeXBlockInitializer(
 );
 
 const globalWindow = window as Window & {
-  AIEvalReactXBlocks?: Record<string, typeof initializer>;
   CoachAIEvalXBlock?: typeof initializer;
-  ReactCoachAIEvalXBlock?: typeof initializer;
 };
 
-globalWindow.AIEvalReactXBlocks = globalWindow.AIEvalReactXBlocks || {};
-globalWindow.AIEvalReactXBlocks.coaching = initializer;
 globalWindow.CoachAIEvalXBlock = initializer;
-globalWindow.ReactCoachAIEvalXBlock = initializer;

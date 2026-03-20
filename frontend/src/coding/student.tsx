@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { FormattedMessage } from "react-intl";
 
 import { makeXBlockInitializer } from "../shared/mountApp";
@@ -27,7 +27,7 @@ interface CodingMeta extends UnknownRecord {
 
 type CodingPayload = SharedPayload<CodingHandlerUrls, CodingInitialState, CodingMeta>;
 
-type CodingLegacyData = Partial<CodingPayload> & {
+type CodingPayloadInput = Partial<CodingPayload> & {
   ai_evaluation?: unknown;
   code?: string;
   code_exec_result?: unknown;
@@ -42,7 +42,7 @@ function normalizePayload(
   element: Element,
   data: unknown,
 ): CodingPayload {
-  const payloadData = (data || {}) as CodingLegacyData;
+  const payloadData = (data || {}) as CodingPayloadInput;
 
   return {
     view: payloadData.view || "student",
@@ -71,9 +71,9 @@ function normalizePayload(
 
 function CodingStudentShell({ payload }: { payload: CodingPayload }) {
   const { meta, initial_state: initialState } = payload;
-  const [questionHtml, setQuestionHtml] = React.useState(renderMarkdown(meta.question));
+  const [questionHtml, setQuestionHtml] = useState(renderMarkdown(meta.question));
 
-  React.useEffect(() => {
+  useEffect(() => {
     let isActive = true;
 
     ensureMarkdownRenderer(meta.marked_html).then(() => {
@@ -136,12 +136,7 @@ const initializer = makeXBlockInitializer(
 );
 
 const globalWindow = window as Window & {
-  AIEvalReactXBlocks?: Record<string, typeof initializer>;
   CodingAIEvalXBlock?: typeof initializer;
-  ReactCodingAIEvalXBlock?: typeof initializer;
 };
 
-globalWindow.AIEvalReactXBlocks = globalWindow.AIEvalReactXBlocks || {};
-globalWindow.AIEvalReactXBlocks.coding = initializer;
 globalWindow.CodingAIEvalXBlock = initializer;
-globalWindow.ReactCodingAIEvalXBlock = initializer;

@@ -252,7 +252,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             for model in models
         }
 
-    def _get_studio_lock_payload(self) -> dict:
+    # Studio metadata helpers
+
+    def _studio_lock_metadata(self) -> dict:
         """
         Return Studio-side lock metadata for API key fields.
         """
@@ -264,7 +266,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             "lock_judge0_api_key": False,
         }
 
-    def _get_react_studio_field_choices(self, field_name: str) -> list[dict[str, Any]]:
+    def _studio_field_choices(self, field_name: str) -> list[dict[str, Any]]:
         """
         Return normalized choice metadata for a Studio-editable field.
         """
@@ -291,9 +293,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                 })
         return normalized
 
-    def _get_react_studio_field_metadata(self) -> dict[str, dict[str, Any]]:
+    def _studio_field_metadata(self) -> dict[str, dict[str, Any]]:
         """
-        Return field labels, help text, defaults, and choices for React Studio.
+        Return field labels, help text, defaults, and choices for Studio.
         """
         metadata = {}
 
@@ -303,30 +305,143 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                 "display_name": str(getattr(field, "display_name", field_name) or field_name),
                 "help": str(getattr(field, "help", "") or ""),
                 "default": getattr(field, "default", None),
-                "choices": self._get_react_studio_field_choices(field_name),
+                "choices": self._studio_field_choices(field_name),
             }
 
         return metadata
 
-    def _get_react_studio_initial_state(self) -> dict[str, Any]:
+    def _studio_initial_state(self) -> dict[str, Any]:
         """
-        Return current editable values for React Studio boot payloads.
+        Return current editable values for Studio payloads.
         """
         return {
             field_name: getattr(self, field_name)
             for field_name in self.editable_fields
         }
 
-    def _get_react_studio_meta(self) -> dict[str, Any]:
+    def _studio_payload_meta(self) -> dict[str, Any]:
         """
-        Return additive metadata for future React Studio views.
+        Return additive metadata for future Studio views.
         """
         return {
-            "field_metadata": self._get_react_studio_field_metadata(),
-            "lock_metadata": self._get_studio_lock_payload(),
+            "field_metadata": self._studio_field_metadata(),
+            "lock_metadata": self._studio_lock_metadata(),
         }
 
-    def _get_react_boot_payload(
+    # Studio validation helpers
+
+    def _add_studio_validation_error(
+        self,
+        validation_errors: dict[str, list[str]],
+        field_name: str,
+        message: str,
+    ) -> None:
+        """
+        Append a structured field error used by the Studio contract.
+        """
+        validation_errors.setdefault(field_name, []).append(str(message))
+
+    def _add_studio_validation_warning(
+        self,
+        validation_warnings: list[str],
+        message: str,
+    ) -> None:
+        """
+        Append a structured warning used by the Studio contract.
+        """
+        validation_warnings.append(str(message))
+
+    def _collect_studio_validation_issues(
+        self,
+        data,
+    ) -> tuple[dict[str, list[str]], list[str]]:
+        """
+        Return structured field errors and warnings for Studio saves.
+        """
+        from .llm_services import DefaultLLMService  # pylint: disable=import-outside-toplevel
+
+        validation_errors: dict[str, list[str]] = {}
+        validation_warnings: list[str] = []
+        llm_service = get_llm_service()
+
+        use_custom_service = get_site_configuration_value("ai_eval", "USE_CUSTOM_LLM_SERVICE")
+        if use_custom_service and llm_service and isinstance(llm_service, DefaultLLMService):
+            self._add_studio_validation_warning(
+                validation_warnings,
+                _(
+                    "Custom LLM service is enabled but using default models due to configuration issues. "
+                    "Check logs for details."
+                ),
+            )
+
+        usage_id = getattr(getattr(self, "scope_ids", None), "usage_id", None)
+        if usage_id:
+            cache_key = f"ai_eval:models_warn:{usage_id}"
+            warning_msg = cache.get(cache_key)
+            if warning_msg:
+                self._add_studio_validation_warning(validation_warnings, warning_msg)
+
+        if not data.model:
+            self._add_studio_validation_error(
+                validation_errors,
+                "model",
+                _("Model field is mandatory - please select one from the dropdown."),
+            )
+
+        if isinstance(llm_service, DefaultLLMService):
+            if not self.get_model_api_key(data):
+                self._add_studio_validation_error(
+                    validation_errors,
+                    "model_api_key",
+                    _("Model API key is mandatory, if not set globally by your administrator."),
+                )
+
+            if data.model == SupportedModels.LLAMA.value and not self.get_model_api_url(data):
+                self._add_studio_validation_error(
+                    validation_errors,
+                    "model_api_url",
+                    _(
+                        "API URL field is mandatory when using ollama/llama2, "
+                        "if not set globally by your administrator."
+                    ),
+                )
+
+            if data.model != SupportedModels.LLAMA.value and data.model_api_url:
+                self._add_studio_validation_error(
+                    validation_errors,
+                    "model_api_url",
+                    _("API URL field can be set only when using ollama/llama2."),
+                )
+
+        return validation_errors, validation_warnings
+
+    def _clear_cached_studio_warnings(self) -> None:
+        """
+        Clear any short-lived validation warning cached during Studio metadata loading.
+        """
+        usage_id = getattr(getattr(self, "scope_ids", None), "usage_id", None)
+        if usage_id:
+            cache.delete(f"ai_eval:models_warn:{usage_id}")
+
+    @staticmethod
+    def _apply_studio_issues(
+        validation,
+        validation_errors: dict[str, list[str]],
+        validation_warnings: list[str],
+    ) -> None:
+        """
+        Convert structured Studio issues back into ValidationMessage objects.
+        """
+        for field_errors in validation_errors.values():
+            for message in field_errors:
+                validation.add(ValidationMessage(ValidationMessage.ERROR, message))
+
+        for warning in validation_warnings:
+            validation.add(ValidationMessage(ValidationMessage.WARNING, warning))
+
+    # Frontend payload helpers
+
+    def _build_view_payload(
         self,
         view: str,
         handler_urls: dict[str, str],
@@ -334,7 +449,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         meta: dict[str, Any],
     ) -> dict[str, Any]:
         """
-        Return the normalized React boot payload shape used by future views.
+        Return the normalized view payload shape used by future views.
         """
         return {
             "view": view,
@@ -343,15 +458,21 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             "meta": meta,
         }
 
+    def _handler_url(self, handler_name: str) -> str:
+        """
+        Build a handler URL for view payloads.
+        """
+        return self.runtime.handler_url(self, handler_name)
+
     @staticmethod
-    def _build_react_studio_submit_response(
+    def _studio_submit_response(
         success: bool,
         validation_errors: dict[str, Any] | None = None,
         validation_warnings: list[str] | None = None,
         meta: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
-        Return the shared response shape planned for React Studio saves.
+        Return the shared response shape planned for Studio saves.
         """
         return {
             "success": success,
@@ -367,7 +488,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         fragment = super().studio_view(context)
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_javascript(self.resource_string("static/js/src/studio_api_key_lock.js"))
-        fragment.initialize_js("AIEvalStudioEditor", self._get_studio_lock_payload())
+        fragment.initialize_js("AIEvalStudioEditor", self._studio_lock_metadata())
         return fragment
 
     def get_model_api_key(self, obj: Self = None) -> str | None:
@@ -385,66 +506,15 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         Validate fields and populate model choices dynamically.
         """
-        from .llm_services import DefaultLLMService  # pylint: disable=import-outside-toplevel
-        llm_service = get_llm_service()
-        # Add warning if custom service is configured but using defaults
-        use_custom_service = get_site_configuration_value("ai_eval", "USE_CUSTOM_LLM_SERVICE")
-        if use_custom_service and llm_service and isinstance(llm_service, DefaultLLMService):
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.WARNING,
-                    _(
-                        "Custom LLM service is enabled but using default models due to configuration issues. "
-                        "Check logs for details."
-                    )
-                )
-            )
+        validation_errors, validation_warnings = self._collect_studio_validation_issues(data)
 
-        # Surface any warning captured during model choices population without re-calling the service.
-        usage_id = getattr(getattr(self, "scope_ids", None), "usage_id", None)
-        if usage_id:
-            cache_key = f"ai_eval:models_warn:{usage_id}"
-            warning_msg = cache.get(cache_key)
-            if warning_msg:
-                validation.add(ValidationMessage(ValidationMessage.WARNING, warning_msg))
-                cache.delete(cache_key)
+        self._apply_studio_issues(
+            validation,
+            validation_errors,
+            validation_warnings,
+        )
 
-        if not data.model:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    _("Model field is mandatory - please select one from the dropdown.")
-                )
-            )
-
-        # Only run these checks for the default service
-        if isinstance(llm_service, DefaultLLMService):
-            if not self.get_model_api_key(data):
-                validation.add(
-                    ValidationMessage(
-                        ValidationMessage.ERROR,
-                        _("Model API key is mandatory, if not set globally by your administrator.")
-                    )
-                )
-
-            if data.model == SupportedModels.LLAMA.value and not self.get_model_api_url(data):
-                validation.add(
-                    ValidationMessage(
-                        ValidationMessage.ERROR,
-                        _(
-                            "API URL field is mandatory when using ollama/llama2, "
-                            "if not set globally by your administrator."
-                        ),
-                    )
-                )
-
-            if data.model != SupportedModels.LLAMA.value and data.model_api_url:
-                validation.add(
-                    ValidationMessage(
-                        ValidationMessage.ERROR,
-                        _("API URL field can be set only when using ollama/llama2."),
-                    )
-                )
+        self._clear_cached_studio_warnings()
 
     def get_llm_response(self, messages, tag: str | None = None):
         """

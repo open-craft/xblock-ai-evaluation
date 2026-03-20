@@ -10,14 +10,14 @@ interface StudioHandlerUrls extends UnknownRecord {
 }
 
 type StudioPayload = SharedPayload<StudioHandlerUrls, UnknownRecord, UnknownRecord>;
-type StudioLegacyData = Partial<StudioPayload>;
+type StudioPayloadInput = Partial<StudioPayload>;
 
 function normalizePayload(
   runtime: XBlockRuntime,
   element: Element,
   data: unknown,
 ): StudioPayload {
-  const payloadData = (data || {}) as StudioLegacyData;
+  const payloadData = (data || {}) as StudioPayloadInput;
 
   return {
     view: payloadData.view || "studio",
@@ -45,10 +45,7 @@ const initializer = makeXBlockInitializer(
 );
 
 const globalWindow = window as Window & {
-  AIEvalReactXBlocks?: Record<string, typeof initializer>;
   CodingAIEvalXBlockStudio?: typeof initializer;
 };
 
-globalWindow.AIEvalReactXBlocks = globalWindow.AIEvalReactXBlocks || {};
-globalWindow.AIEvalReactXBlocks.codingStudio = initializer;
 globalWindow.CodingAIEvalXBlockStudio = initializer;

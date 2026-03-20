@@ -7,6 +7,7 @@ export interface XBlockRuntime {
     suffix?: string,
     query?: string,
   ): string;
+  notify?(name: string, payload?: UnknownRecord): void;
 }
 
 export interface SharedPayload<

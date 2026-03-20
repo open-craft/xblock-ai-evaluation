@@ -1,32 +1,11 @@
-import React from "react";
-import { FormattedMessage } from "react-intl";
-
 import { makeXBlockInitializer } from "../shared/mountApp";
-import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
-import { SharedPayload, UnknownRecord, XBlockRuntime } from "../shared/types";
+import { XBlockRuntime } from "../shared/types";
+import ShortAnswerStudentApp from "./ShortAnswerStudentApp";
+import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
 
-interface ShortAnswerHandlerUrls extends UnknownRecord {
-  get_response?: string;
-  reset?: string;
-}
-
-interface ShortAnswerInitialState extends UnknownRecord {
-  max_responses?: number;
-  messages?: unknown[];
-}
-
-interface ShortAnswerMeta extends UnknownRecord {
-  marked_html?: string;
-  question?: string;
-}
-
-type ShortAnswerPayload = SharedPayload<
-  ShortAnswerHandlerUrls,
-  ShortAnswerInitialState,
-  ShortAnswerMeta
->;
-
-type ShortAnswerLegacyData = Partial<ShortAnswerPayload> & {
+type ShortAnswerPayloadInput = Partial<ShortAnswerStudentPayload> & {
+  allow_reset?: boolean;
+  character_image?: string;
   marked_html?: string;
   max_responses?: number;
   messages?: unknown[];
@@ -37,8 +16,8 @@ function normalizePayload(
   runtime: XBlockRuntime,
   element: Element,
   data: unknown,
-): ShortAnswerPayload {
-  const payloadData = (data || {}) as ShortAnswerLegacyData;
+): ShortAnswerStudentPayload {
+  const payloadData = (data || {}) as ShortAnswerPayloadInput;
 
   return {
     view: payloadData.view || "student",
@@ -47,76 +26,27 @@ function normalizePayload(
       reset: runtime.handlerUrl(element, "reset"),
     },
     initial_state: payloadData.initial_state || {
-      messages: payloadData.messages,
-      max_responses: payloadData.max_responses,
+      messages: payloadData.messages as ShortAnswerMessage[] | undefined,
     },
     meta: payloadData.meta || {
+      allow_reset: payloadData.allow_reset,
+      character_image: payloadData.character_image,
       question: payloadData.question,
+      max_responses: payloadData.max_responses,
       marked_html: payloadData.marked_html,
     },
   };
 }
 
-function ShortAnswerStudentShell({ payload }: { payload: ShortAnswerPayload }) {
-  const { meta, initial_state: initialState } = payload;
-  const [questionHtml, setQuestionHtml] = React.useState(renderMarkdown(meta.question));
-  const messageCount = Array.isArray(initialState.messages) ? initialState.messages.length : 0;
-
-  React.useEffect(() => {
-    let isActive = true;
-
-    ensureMarkdownRenderer(meta.marked_html).then(() => {
-      if (isActive) {
-        setQuestionHtml(renderMarkdown(meta.question));
-      }
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [meta.marked_html, meta.question]);
-
-  return (
-    <section
-      className="ai-eval-react-shell ai-eval-react-shell--shortanswer"
-      data-block-kind="shortanswer"
-      data-view={payload.view}
-    >
-      <div dangerouslySetInnerHTML={{ __html: questionHtml }} />
-      <div className="ai-eval-react-shell__meta">
-        <span>
-          <FormattedMessage
-            id="shortanswer.student.messagesLoaded"
-            defaultMessage="{count} messages loaded"
-            values={{ count: messageCount }}
-          />
-        </span>
-        <span>
-          <FormattedMessage
-            id="shortanswer.student.maxResponses"
-            defaultMessage="Max responses: {count}"
-            values={{ count: initialState.max_responses || 0 }}
-          />
-        </span>
-      </div>
-    </section>
-  );
-}
-
 const initializer = makeXBlockInitializer(
-  ShortAnswerStudentShell,
+  ShortAnswerStudentApp,
   (runtime, element, data) => {
     return { payload: normalizePayload(runtime, element, data) };
   },
 );
 
 const globalWindow = window as Window & {
-  AIEvalReactXBlocks?: Record<string, typeof initializer>;
-  ReactShortAnswerAIEvalXBlock?: typeof initializer;
   ShortAnswerAIEvalXBlock?: typeof initializer;
 };
 
-globalWindow.AIEvalReactXBlocks = globalWindow.AIEvalReactXBlocks || {};
-globalWindow.AIEvalReactXBlocks.shortanswer = initializer;
 globalWindow.ShortAnswerAIEvalXBlock = initializer;
-globalWindow.ReactShortAnswerAIEvalXBlock = initializer;
