@@ -203,40 +203,45 @@ function AttachmentUrlsEditor({
 }) {
   const intl = useIntl();
   const attachmentUrls = value.length > 0 ? value : [""];
+  const removeAttachmentLabel = intl.formatMessage({
+    id: "shortanswer.studio.removeAttachment",
+    defaultMessage: "Remove attachment",
+  });
 
   return (
     <li className="field comp-setting-entry metadata_entry" data-field-name="attachment_urls">
       <div className="wrapper-comp-setting">
-        <label className="label setting-label">
+        <label className="label setting-label shortanswer-studio-section-label">
           {metadata?.display_name || "Attachment URLs"}
         </label>
         <div className="shortanswer-studio-attachment-list">
           {attachmentUrls.map((attachmentUrl, index) => {
             return (
               <div className="shortanswer-studio-attachment-row" key={String(index)}>
-                <input
-                  type="text"
-                  className="field-data-control"
-                  value={attachmentUrl}
-                  onChange={(event) => {
-                    const nextUrls = attachmentUrls.slice();
-                    nextUrls[index] = event.target.value;
-                    onChange(nextUrls);
-                  }}
-                />
+                <div className="shortanswer-studio-attachment-input-shell">
+                  <input
+                    type="text"
+                    className="field-data-control"
+                    value={attachmentUrl}
+                    onChange={(event) => {
+                      const nextUrls = attachmentUrls.slice();
+                      nextUrls[index] = event.target.value;
+                      onChange(nextUrls);
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
-                  className="button"
+                  className="button shortanswer-studio-attachment-remove"
+                  aria-label={removeAttachmentLabel}
+                  title={removeAttachmentLabel}
                   onClick={() => {
                     const nextUrls = attachmentUrls.filter((_, urlIndex) => urlIndex !== index);
                     onChange(nextUrls);
                   }}
                   disabled={attachmentUrls.length === 1 && !attachmentUrl}
                 >
-                  {intl.formatMessage({
-                    id: "shortanswer.studio.removeAttachment",
-                    defaultMessage: "Remove",
-                  })}
+                  <span aria-hidden="true">&times;</span>
                 </button>
               </div>
             );
@@ -403,22 +408,27 @@ function SelectField({
         <label className="label setting-label" htmlFor={"xb-field-edit-" + fieldName}>
           {metadata?.display_name || fieldName}
         </label>
-        <select
-          id={"xb-field-edit-" + fieldName}
-          className="field-data-control"
-          value={value}
-          onChange={(event) => {
-            onChange(event.target.value);
-          }}
-        >
-          {choices.map((choice, index) => {
-            return (
-              <option key={String(index)} value={choice.value || ""}>
-                {choice.display_name || choice.value || ""}
-              </option>
-            );
-          })}
-        </select>
+        <div className="shortanswer-studio-select-shell">
+          <select
+            id={"xb-field-edit-" + fieldName}
+            className="field-data-control shortanswer-studio-select"
+            value={value}
+            onChange={(event) => {
+              onChange(event.target.value);
+            }}
+          >
+            {choices.map((choice, index) => {
+              return (
+                <option key={String(index)} value={choice.value || ""}>
+                  {choice.display_name || choice.value || ""}
+                </option>
+              );
+            })}
+          </select>
+          <span className="shortanswer-studio-select-icon" aria-hidden="true">
+            ▾
+          </span>
+        </div>
       </div>
       <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
@@ -441,18 +451,20 @@ function BooleanField({
 }) {
   return (
     <li className="field comp-setting-entry metadata_entry" data-field-name={fieldName}>
-      <div className="wrapper-comp-setting shortanswer-studio-checkbox">
+      <div className="wrapper-comp-setting">
         <label className="label setting-label" htmlFor={"xb-field-edit-" + fieldName}>
           {metadata?.display_name || fieldName}
         </label>
-        <input
-          id={"xb-field-edit-" + fieldName}
-          type="checkbox"
-          checked={value}
-          onChange={(event) => {
-            onChange(event.target.checked);
-          }}
-        />
+        <div className="shortanswer-studio-checkbox-control">
+          <input
+            id={"xb-field-edit-" + fieldName}
+            type="checkbox"
+            checked={value}
+            onChange={(event) => {
+              onChange(event.target.checked);
+            }}
+          />
+        </div>
       </div>
       <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
@@ -703,34 +715,38 @@ export default function ShortAnswerStudioApp({
           <li className="action-item">
             <a
               href="#"
-              className="button action-primary save-button"
+              className="button action-primary action-save shortanswer-studio-save-button"
               aria-disabled={isSaving}
               onClick={handleSave}
             >
-              {isSaving
-                ? intl.formatMessage({
-                    id: "shortanswer.studio.savingButton",
-                    defaultMessage: "Saving...",
-                  })
-                : intl.formatMessage({
-                    id: "shortanswer.studio.save",
-                    defaultMessage: "Save",
-                  })}
+              <span className="action-button-text">
+                {isSaving
+                  ? intl.formatMessage({
+                      id: "shortanswer.studio.savingButton",
+                      defaultMessage: "Saving...",
+                    })
+                  : intl.formatMessage({
+                      id: "shortanswer.studio.save",
+                      defaultMessage: "Save",
+                    })}
+              </span>
             </a>
           </li>
           <li className="action-item">
             <a
               href="#"
-              className="button cancel-button"
+              className="button action-cancel shortanswer-studio-cancel-button"
               onClick={(event) => {
                 event.preventDefault();
                 notifyRuntime(runtime, "cancel", {});
               }}
             >
-              {intl.formatMessage({
-                id: "shortanswer.studio.cancel",
-                defaultMessage: "Cancel",
-              })}
+              <span className="action-button-text">
+                {intl.formatMessage({
+                  id: "shortanswer.studio.cancel",
+                  defaultMessage: "Cancel",
+                })}
+              </span>
             </a>
           </li>
         </ul>

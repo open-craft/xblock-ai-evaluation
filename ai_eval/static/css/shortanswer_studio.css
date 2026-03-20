@@ -1,53 +1,242 @@
+.shortanswer-react-studio {
+    color: #2d3b45;
+}
+
+.shortanswer-react-studio .wrapper-comp-settings {
+    padding: 0;
+}
+
+.shortanswer-react-studio .settings-list {
+    margin: 0;
+    padding: 0;
+}
+
+.shortanswer-react-studio .metadata_entry {
+    border-bottom: 1px solid #e5e5e5;
+    margin: 0;
+    padding: 1rem 0;
+}
+
+.shortanswer-react-studio .metadata_entry:first-child {
+    padding-top: 0;
+}
+
+.shortanswer-react-studio .metadata_entry:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.shortanswer-react-studio .wrapper-comp-setting {
+    align-items: start;
+    column-gap: 2rem;
+    display: grid;
+    grid-template-columns: 440px minmax(440px, 620px);
+}
+
+.shortanswer-react-studio .setting-label {
+    color: #3c3c3c;
+    font-size: 0.95rem;
+    font-weight: 600;
+    grid-column: 1;
+    line-height: 1.35;
+    margin: 0;
+    padding-top: 0.65rem;
+    white-space: normal;
+}
+
+.shortanswer-react-studio .field-data-control,
+.shortanswer-react-studio .shortanswer-studio-select-shell,
+.shortanswer-react-studio .shortanswer-studio-attachment-list,
+.shortanswer-react-studio .shortanswer-studio-checkbox-control {
+    grid-column: 2;
+    width: 100%;
+}
+
+.shortanswer-react-studio .field-data-control {
+    background: #ffffff;
+    border: 1px solid #c8c8c8;
+    border-radius: 3px;
+    box-sizing: border-box;
+    color: #3c3c3c;
+    min-height: 2.5rem;
+    padding: 0.625rem 0.75rem;
+    width: 100% !important;
+}
+
+.shortanswer-react-studio .field-data-control:focus {
+    border-color: #0a3055;
+    box-shadow: 0 0 0 1px #0a3055;
+    outline: none;
+}
+
+.shortanswer-react-studio textarea.field-data-control {
+    min-height: 8rem;
+    resize: vertical;
+}
+
+.shortanswer-react-studio .tip.setting-help,
+.shortanswer-react-studio .shortanswer-studio-errors {
+    color: #6b6b6b;
+    display: block;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    margin-top: 0.45rem;
+    max-width: 300px;
+}
+
 .shortanswer-react-studio .shortanswer-studio-summary {
+    background: #fff8e5;
+    border: 1px solid #ead9a4;
+    border-radius: 3px;
     margin-bottom: 1rem;
+    padding: 0.75rem 0.875rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-summary__error,
+.shortanswer-react-studio .shortanswer-studio-errors {
+    color: #a11d1d;
 }
 
 .shortanswer-react-studio .shortanswer-studio-summary__error {
-    color: #a11d1d;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.35rem;
 }
 
-.shortanswer-react-studio .shortanswer-studio-summary__warnings,
-.shortanswer-react-studio .shortanswer-studio-errors {
+.shortanswer-react-studio .shortanswer-studio-summary__warnings {
     color: #8a5a00;
     margin: 0.35rem 0 0;
     padding-left: 1.25rem;
 }
 
 .shortanswer-react-studio .shortanswer-studio-errors {
-    color: #a11d1d;
+    margin: 0.35rem 0 0;
+    padding-left: 1.25rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-select-shell {
+    max-width: 620px;
+    position: relative;
+}
+
+.shortanswer-react-studio .shortanswer-studio-select {
+    appearance: none;
+    cursor: pointer;
+    padding-right: 2.5rem;
+    width: 100% !important;
+}
+
+.shortanswer-react-studio .shortanswer-studio-select-icon {
+    color: #6b6b6b;
+    pointer-events: none;
+    position: absolute;
+    right: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.shortanswer-react-studio .shortanswer-studio-checkbox-control {
+    align-self: start;
+    min-height: auto;
+    padding-top: 0.68rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-checkbox-control input[type="checkbox"] {
+    height: 18px;
+    margin: 0;
+    min-width: 18px;
+    transform: translateX(-301px);
+    width: 18px;
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    width: 100%;
+    max-width: 620px;
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-row {
-    display: flex;
-    gap: 0.5rem;
     align-items: center;
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr) 20px;
 }
 
-.shortanswer-react-studio .shortanswer-studio-attachment-row .field-data-control {
-    flex: 1 1 auto;
+.shortanswer-react-studio .shortanswer-studio-attachment-input-shell {
+    min-width: 0;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-input-shell .field-data-control {
+    border: 1px solid #c8d2dd;
+    border-radius: 6px;
+    box-shadow: none;
+    padding: 0.55rem 0.7rem;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-remove {
+    align-items: center;
+    background: #d94a4a !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+    color: #fff !important;
+    display: inline-flex !important;
+    font-size: 12px !important;
+    height: 20px !important;
+    justify-content: center;
+    line-height: 20px !important;
+    min-height: 20px !important;
+    min-width: 20px !important;
+    padding: 0 !important;
+    width: 20px !important;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-remove:hover {
+    background: #c53b3b !important;
+    color: #fff !important;
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-add {
-    align-self: flex-start;
+    margin-top: 0.35rem;
+    max-width: 200px;
 }
 
-.shortanswer-react-studio .shortanswer-studio-checkbox {
+.shortanswer-react-studio .xblock-actions {
+    box-sizing: border-box;
+    margin-top: 1rem;
+    padding-left: 12px;
+}
+
+.shortanswer-react-studio .xblock-actions ul {
     align-items: center;
-    display: flex;
-    gap: 0.75rem;
+    display: inline-flex;
+    float: left;
+    gap: 0.85rem;
+    justify-content: flex-start;
+    list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
-.shortanswer-react-studio .shortanswer-studio-checkbox input[type="checkbox"] {
-    width: auto;
-    min-width: auto;
-    height: auto;
+.shortanswer-react-studio .shortanswer-studio-save-button,
+.shortanswer-react-studio .shortanswer-studio-cancel-button {
+    display: inline-block;
+    min-width: 5.75rem;
+    text-align: center;
+}
+
+@media (max-width: 1180px) {
+    .shortanswer-react-studio .wrapper-comp-setting {
+        grid-template-columns: 1fr;
+    }
+
+    .shortanswer-react-studio .setting-label,
+    .shortanswer-react-studio .field-data-control,
+    .shortanswer-react-studio .shortanswer-studio-select-shell,
+    .shortanswer-react-studio .shortanswer-studio-attachment-list,
+    .shortanswer-react-studio .shortanswer-studio-checkbox-control {
+        grid-column: 1;
+        width: 100%;
+    }
+
+    .shortanswer-react-studio .shortanswer-studio-checkbox-control input[type="checkbox"] {
+        transform: none;
+    }
 }

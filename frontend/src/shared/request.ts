@@ -50,16 +50,41 @@ function getErrorMessage(response: Response, payload: ResponsePayload) {
   return "Request failed.";
 }
 
+function getCookie(name: string) {
+  if (typeof document === "undefined" || !document.cookie) {
+    return null;
+  }
+
+  const prefix = encodeURIComponent(name) + "=";
+  const cookies = document.cookie.split(";");
+
+  for (let index = 0; index < cookies.length; index += 1) {
+    const cookie = cookies[index].trim();
+    if (cookie.startsWith(prefix)) {
+      return decodeURIComponent(cookie.slice(prefix.length));
+    }
+  }
+
+  return null;
+}
+
 export function postJson<TResponse extends UnknownRecord = UnknownRecord>(
   url: string,
   payload?: unknown,
 ): Promise<TResponse> {
+  const csrfToken = getCookie("csrftoken");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (csrfToken) {
+    headers["X-CSRFToken"] = csrfToken;
+  }
+
   return fetch(url, {
     method: "POST",
     credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(payload || {}),
   }).then((response) => {
     return parseResponseBody(response).then((body) => {

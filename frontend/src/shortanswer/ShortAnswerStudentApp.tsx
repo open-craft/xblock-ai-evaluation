@@ -189,7 +189,7 @@ function MessageComposer({
           <button
             type="button"
             className={
-              "chat-button chat-reset-button" + (canReset ? "" : " disabled")
+              "btn chat-button chat-reset-button" + (canReset ? "" : " disabled")
             }
             disabled={!canReset}
             aria-disabled={!canReset}
@@ -228,7 +228,6 @@ function MessageComposer({
           onClick={onSubmit}
         >
           {submitLabel}
-          <i className="fa fa-paper-plane" />
         </button>
       </div>
     </React.Fragment>
