@@ -1,33 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { FormattedMessage } from "react-intl";
-
 import { makeXBlockInitializer } from "../shared/mountApp";
-import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
-import { SharedPayload, UnknownRecord, XBlockElementLike, XBlockRuntime } from "../shared/types";
+import { XBlockElementLike, XBlockRuntime } from "../shared/types";
+import CodingStudentApp from "./CodingStudentApp";
+import { CodingExecutionResult, CodingStudentPayload } from "./types";
 
-interface CodingHandlerUrls extends UnknownRecord {
-  get_response?: string;
-  get_submission_result_handler?: string;
-  reset_handler?: string;
-  submit_code_handler?: string;
-}
-
-interface CodingInitialState extends UnknownRecord {
-  ai_evaluation?: unknown;
-  code?: string;
-  code_exec_result?: unknown;
-}
-
-interface CodingMeta extends UnknownRecord {
-  language?: string;
-  marked_html?: string;
-  monaco_html?: string;
-  question?: string;
-}
-
-type CodingPayload = SharedPayload<CodingHandlerUrls, CodingInitialState, CodingMeta>;
-
-type CodingPayloadInput = Partial<CodingPayload> & {
+type CodingPayloadInput = Partial<CodingStudentPayload> & {
   ai_evaluation?: unknown;
   code?: string;
   code_exec_result?: unknown;
@@ -41,8 +17,13 @@ function normalizePayload(
   runtime: XBlockRuntime,
   element: XBlockElementLike,
   data: unknown,
-): CodingPayload {
+): CodingStudentPayload {
   const payloadData = (data || {}) as CodingPayloadInput;
+  const fallbackInitialState: CodingStudentPayload["initial_state"] = {
+    code: payloadData.code,
+    ai_evaluation: payloadData.ai_evaluation,
+    code_exec_result: payloadData.code_exec_result as CodingExecutionResult | undefined,
+  };
 
   return {
     view: payloadData.view || "student",
@@ -55,11 +36,7 @@ function normalizePayload(
       get_response: runtime.handlerUrl(element, "get_response"),
       reset_handler: runtime.handlerUrl(element, "reset_handler"),
     },
-    initial_state: payloadData.initial_state || {
-      code: payloadData.code,
-      ai_evaluation: payloadData.ai_evaluation,
-      code_exec_result: payloadData.code_exec_result,
-    },
+    initial_state: payloadData.initial_state || fallbackInitialState,
     meta: payloadData.meta || {
       question: payloadData.question,
       language: payloadData.language,
@@ -69,69 +46,34 @@ function normalizePayload(
   };
 }
 
-function CodingStudentShell({ payload }: { payload: CodingPayload }) {
-  const { meta, initial_state: initialState } = payload;
-  const [questionHtml, setQuestionHtml] = useState(renderMarkdown(meta.question));
+function resolveUsageId(element: XBlockElementLike) {
+  if (element instanceof Element) {
+    return element.getAttribute("data-usage") || element.getAttribute("data-usage-id") || "";
+  }
 
-  useEffect(() => {
-    let isActive = true;
+  const rootElement = element?.[0];
+  if (rootElement instanceof Element) {
+    return (
+      rootElement.getAttribute("data-usage") || rootElement.getAttribute("data-usage-id") || ""
+    );
+  }
 
-    ensureMarkdownRenderer(meta.marked_html).then(() => {
-      if (isActive) {
-        setQuestionHtml(renderMarkdown(meta.question));
-      }
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [meta.marked_html, meta.question]);
-
-  return (
-    <section
-      className="ai-eval-react-shell ai-eval-react-shell--coding"
-      data-block-kind="coding"
-      data-view={payload.view}
-    >
-      <div dangerouslySetInnerHTML={{ __html: questionHtml }} />
-      <div className="ai-eval-react-shell__meta">
-        <span>
-          {meta.language || (
-            <FormattedMessage
-              id="coding.student.languageNotSet"
-              defaultMessage="Language not set"
-            />
-          )}
-        </span>
-        <span>
-          <FormattedMessage
-            id="coding.student.codeChars"
-            defaultMessage="Code chars: {count}"
-            values={{ count: (initialState.code || "").length }}
-          />
-        </span>
-        <span>
-          {initialState.ai_evaluation ? (
-            <FormattedMessage
-              id="coding.student.feedbackLoaded"
-              defaultMessage="Feedback loaded"
-            />
-          ) : (
-            <FormattedMessage
-              id="coding.student.noFeedback"
-              defaultMessage="No feedback yet"
-            />
-          )}
-        </span>
-      </div>
-    </section>
-  );
+  return "";
 }
 
 const initializer = makeXBlockInitializer(
-  CodingStudentShell,
+  CodingStudentApp,
   (runtime, element, data) => {
-    return { payload: normalizePayload(runtime, element, data) };
+    const usageId = resolveUsageId(element);
+
+    if (!usageId) {
+      throw new Error("XBlock is missing a usage ID attribute on its root HTML node.");
+    }
+
+    return {
+      payload: normalizePayload(runtime, element, data),
+      usageId,
+    };
   },
 );
 

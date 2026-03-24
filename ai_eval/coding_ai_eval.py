@@ -9,7 +9,7 @@ from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Dict, List, Scope, String
-from xblock.validation import ValidationMessage
+from xblock.utils.studio_editable import FutureFields
 
 from .base import AIEvalXBlock
 from .llm_services import TIMEOUT_ERROR_MESSAGE
@@ -130,18 +130,14 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         The primary view of the CodingAIEvalXBlock, shown to students
         when viewing courses.
         """
-        html = self.loader.render_django_template(
-            "/templates/coding_ai_eval.html",
-            {
-                "self": self,
-            },
+        frag = Fragment(
+            self.loader.render_django_template(
+                "/templates/coding_ai_eval.html",
+                {},
+            )
         )
-
-        frag = Fragment(html)
         frag.add_css(self.resource_string("static/css/coding_ai_eval.css"))
-        frag.add_javascript(self.resource_string("static/js/src/utils.js"))
-
-        frag.add_javascript(self.resource_string("static/js/src/coding_ai_eval.js"))
+        frag.add_javascript(self.resource_string("static/bundles/coding.js"))
 
         monaco_html = self.loader.render_django_template(
             "/templates/monaco.html",
@@ -150,17 +146,54 @@ class CodingAIEvalXBlock(AIEvalXBlock):
             },
         )
         marked_html = self.resource_string("static/html/marked-iframe.html")
-        js_data = {
-            "monaco_html": monaco_html,
-            "question": self.question,
-            "code": self.sessions[-1][USER_RESPONSE],
-            "ai_evaluation": self.sessions[-1][AI_EVALUATION],
-            "code_exec_result": self.sessions[-1][CODE_EXEC_RESULT],
-            "marked_html": marked_html,
-            "language": self.language,
-        }
-        frag.initialize_js("CodingAIEvalXBlock", js_data)
+        current_session = self.sessions[-1]
+        frag.initialize_js(
+            "CodingAIEvalXBlock",
+            self._build_view_payload(
+                view="student",
+                handler_urls={
+                    "submit_code_handler": self._handler_url("submit_code_handler"),
+                    "get_submission_result_handler": self._handler_url(
+                        "get_submission_result_handler"
+                    ),
+                    "get_response": self._handler_url("get_response"),
+                    "reset_handler": self._handler_url("reset_handler"),
+                },
+                initial_state={
+                    "code": current_session[USER_RESPONSE],
+                    "ai_evaluation": current_session[AI_EVALUATION],
+                    "code_exec_result": current_session[CODE_EXEC_RESULT],
+                },
+                meta={
+                    "question": self.question,
+                    "language": self.language,
+                    "monaco_html": monaco_html,
+                    "marked_html": marked_html,
+                },
+            ),
+        )
         return frag
+
+    def studio_view(self, context=None):
+        """
+        Render the React Studio editor for Coding.
+        """
+        fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
+        fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
+        fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
+        fragment.add_javascript(self.resource_string("static/bundles/coding.studio.js"))
+        fragment.initialize_js(
+            "CodingAIEvalXBlockStudio",
+            self._build_view_payload(
+                view="studio",
+                handler_urls={
+                    "studio_submit": self._handler_url("studio_submit"),
+                },
+                initial_state=self._studio_initial_state(),
+                meta=self._studio_payload_meta(),
+            ),
+        )
+        return fragment
 
     def author_view(self, context=None):
         """
@@ -203,18 +236,20 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         payload["lock_judge0_api_key"] = self.should_lock_judge0_api_key_field()
         return payload
 
-    def validate_field_data(self, validation, data):
+    def _collect_studio_validation_issues(
+        self,
+        data,
+    ) -> tuple[dict[str, list[str]], list[str]]:
         """
-        Validate fields
+        Extend base Studio validation issues with Coding field rules.
         """
-
-        super().validate_field_data(validation, data)
+        validation_errors, validation_warnings = super()._collect_studio_validation_issues(data)
 
         if not data.question:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR, _("Question field is mandatory")
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "question",
+                _("Question field is mandatory"),
             )
 
         has_backend_config = self._get_code_execution_backend_config() is not None
@@ -237,12 +272,77 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 if has_backend_config
                 else _("Judge0 API key is mandatory")
             )
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    error_message,
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "judge0_api_key",
+                error_message,
             )
+
+        return validation_errors, validation_warnings
+
+    def validate_field_data(self, validation, data):
+        """
+        Validate fields.
+        """
+        validation_errors, validation_warnings = self._collect_studio_validation_issues(data)
+
+        self._apply_studio_issues(
+            validation,
+            validation_errors,
+            validation_warnings,
+        )
+
+        self._clear_cached_studio_warnings()
+
+    @XBlock.json_handler
+    def studio_submit(self, data, suffix=""):  # pylint: disable=unused-argument
+        """
+        Save the Studio editor payload using the existing field validation rules.
+        """
+        values = {}
+        missing_fields = []
+        for field_name in self.editable_fields:
+            if field_name not in data:
+                missing_fields.append(field_name)
+                continue
+            field = self.fields[field_name]
+            values[field_name] = field.from_json(data[field_name])
+
+        if missing_fields:
+            validation_errors = {
+                field_name: [_("Missing field in Studio payload.")]
+                for field_name in missing_fields
+            }
+            return self._studio_submit_response(
+                success=False,
+                validation_errors=validation_errors,
+                validation_warnings=[],
+                meta=self._studio_payload_meta(),
+            )
+
+        self.clean_studio_edits(values)
+
+        preview_data = FutureFields(
+            new_fields_dict=values,
+            newly_removed_fields=[],
+            fallback_obj=self,
+        )
+        validation_errors, validation_warnings = self._collect_studio_validation_issues(
+            preview_data,
+        )
+        self._clear_cached_studio_warnings()
+        has_validation_errors = bool(validation_errors)
+
+        if not has_validation_errors:
+            for field_name, value in values.items():
+                setattr(self, field_name, value)
+
+        return self._studio_submit_response(
+            success=not has_validation_errors,
+            validation_errors=validation_errors,
+            validation_warnings=validation_warnings,
+            meta=self._studio_payload_meta(),
+        )
 
     @XBlock.json_handler
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument

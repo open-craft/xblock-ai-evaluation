@@ -35,22 +35,23 @@ def _mock_handler_url(_block, handler_name, suffix='', query='', thirdparty=Fals
 @pytest.fixture
 def coding_block_data():
     """Fixture for coding block test data."""
-    monaco_html = AIEvalXBlock.loader.render_django_template(
-        "/templates/monaco.html",
-        {
-            "monaco_language": SUPPORTED_LANGUAGE_MAP[LanguageLabels.Python].monaco_id,
-        },
-    )
     return {
+        "display_name": "Coding with AI Evaluation",
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "test-key",
+        "model_api_url": "",
+        "evaluation_prompt": "Evaluate this code",
+        "judge0_api_key": "judge0-key",
         "language": "Python (3.8.1)",
         "question": "ca va?",
-        "code": "",
-        "ai_evaluation": "",
-        "code_exec_result": {},
-        "marked_html": '<!doctype html>\n<html lang="en">\n<head></head>\n<body>\n    <script '
-        'type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/marked/13.0.2/marked'
-        '.min.js"></script>\n</body>\n</html>',
-        "monaco_html": monaco_html,
+        "sessions": [{
+            "USER_RESPONSE": "print('hello')",
+            "AI_EVALUATION": "Looks good",
+            "CODE_EXEC_RESULT": {
+                "stdout": "hello",
+                "stderr": "",
+            },
+        }],
     }
 
 
@@ -99,9 +100,74 @@ def ai_eval_block():
 def test_coding_block_student_view(coding_block_data):
     """Test the basic view loads for CodingAIEvalXBlock."""
     block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
-    frag = block.student_view()
-    assert coding_block_data == frag.json_init_args
-    assert '<div class="eval-ai-container">' in frag.content
+    with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+        frag = block.student_view()
+
+    monaco_html = AIEvalXBlock.loader.render_django_template(
+        "/templates/monaco.html",
+        {
+            "monaco_language": SUPPORTED_LANGUAGE_MAP[LanguageLabels.Python].monaco_id,
+        },
+    )
+
+    assert frag.js_init_fn == "CodingAIEvalXBlock"
+    assert frag.json_init_args == {
+        "view": "student",
+        "handler_urls": {
+            "submit_code_handler": "/handler/submit_code_handler",
+            "get_submission_result_handler": "/handler/get_submission_result_handler",
+            "get_response": "/handler/get_response",
+            "reset_handler": "/handler/reset_handler",
+        },
+        "initial_state": {
+            "code": "print('hello')",
+            "ai_evaluation": "Looks good",
+            "code_exec_result": {
+                "stdout": "hello",
+                "stderr": "",
+            },
+        },
+        "meta": {
+            "question": coding_block_data["question"],
+            "language": coding_block_data["language"],
+            "monaco_html": monaco_html,
+            "marked_html": block.resource_string("static/html/marked-iframe.html"),
+        },
+    }
+    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+
+
+def test_coding_block_studio_view(coding_block_data):
+    """Coding Studio should boot the React editor payload."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+                frag = block.studio_view()
+
+    assert frag.js_init_fn == "CodingAIEvalXBlockStudio"
+    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+    assert frag.json_init_args["view"] == "studio"
+    assert frag.json_init_args["handler_urls"] == {
+        "studio_submit": "/handler/studio_submit",
+    }
+    assert frag.json_init_args["initial_state"]["question"] == coding_block_data["question"]
+    assert frag.json_init_args["initial_state"]["judge0_api_key"] == coding_block_data["judge0_api_key"]
+    assert frag.json_init_args["meta"]["lock_metadata"]["initial_model"] == SupportedModels.GPT4O.value
+    assert "language" in frag.json_init_args["meta"]["field_metadata"]
+    assert frag.json_init_args["meta"]["field_metadata"]["model"]["choices"] == [
+        {
+            "display_name": "— Select a model —",
+            "value": "",
+        },
+        {
+            "display_name": SupportedModels.GPT4O.value,
+            "value": SupportedModels.GPT4O.value,
+        },
+    ]
 
 
 def test_shortanswer_block_student_view(shortanswer_block_data):
@@ -236,8 +302,10 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
     """React Studio save failures should keep values unsaved and return structured field errors."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     block._get_attachments = Mock(side_effect=Exception("download failed"))
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
 
-    with patch("ai_eval.base.get_llm_service", return_value=Mock()):
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
         with patch("ai_eval.base.get_site_configuration_value", return_value=None):
             response = block.studio_submit.__wrapped__(
                 block,
@@ -269,8 +337,10 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
 def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_data):
     """React Studio saves should fail loudly when the frontend omits editable fields."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
 
-    with patch("ai_eval.base.get_llm_service", return_value=Mock()):
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
         with patch("ai_eval.base.get_site_configuration_value", return_value=None):
             response = block.studio_submit.__wrapped__(
                 block,
@@ -317,6 +387,127 @@ def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "/static/new-image.jpg",
                     "attachment_urls": ["http://example.com/1.txt"],
+                },
+            )
+
+    assert response["success"] is True
+    assert response["validation_errors"] == {}
+    assert response["validation_warnings"] == ["Non-blocking warning"]
+    assert block.display_name == "Updated title"
+
+
+def test_coding_studio_submit_success(coding_block_data):
+    """Coding React Studio saves should persist fields and return the shared response shape."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                    "model_api_key": "updated-key",
+                    "model_api_url": "",
+                    "question": "Updated question",
+                    "evaluation_prompt": "Updated prompt",
+                    "judge0_api_key": "updated-judge0-key",
+                    "language": LanguageLabels.Python,
+                },
+            )
+
+    assert response["success"] is True
+    assert response["validation_errors"] == {}
+    assert response["validation_warnings"] == []
+    assert block.display_name == "Updated title"
+    assert block.question == "Updated question"
+    assert block.evaluation_prompt == "Updated prompt"
+    assert block.judge0_api_key == "updated-judge0-key"
+    assert block.language == LanguageLabels.Python
+
+
+def test_coding_studio_submit_validation_errors(coding_block_data):
+    """Coding React Studio should keep invalid values unsaved and return field errors."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                    "model_api_key": "updated-key",
+                    "model_api_url": "",
+                    "question": "",
+                    "evaluation_prompt": "Updated prompt",
+                    "judge0_api_key": "",
+                    "language": LanguageLabels.Python,
+                },
+            )
+
+    assert response["success"] is False
+    assert response["validation_errors"] == {
+        "question": ["Question field is mandatory"],
+        "judge0_api_key": ["Judge0 API key is mandatory"],
+    }
+    assert response["validation_warnings"] == []
+    assert block.question == coding_block_data["question"]
+    assert block.judge0_api_key == coding_block_data["judge0_api_key"]
+
+
+def test_coding_studio_submit_rejects_incomplete_payload(coding_block_data):
+    """Coding Studio saves should fail loudly when the frontend omits editable fields."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                },
+            )
+
+    assert response["success"] is False
+    assert response["validation_errors"] == {
+        "model_api_key": ["Missing field in Studio payload."],
+        "model_api_url": ["Missing field in Studio payload."],
+        "question": ["Missing field in Studio payload."],
+        "evaluation_prompt": ["Missing field in Studio payload."],
+        "judge0_api_key": ["Missing field in Studio payload."],
+        "language": ["Missing field in Studio payload."],
+    }
+
+
+def test_coding_studio_submit_allows_warnings(coding_block_data):
+    """Coding Studio warnings should not block a successful save."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+
+    with patch.object(
+        CodingAIEvalXBlock,
+        "_collect_studio_validation_issues",
+        return_value=({}, ["Non-blocking warning"]),
+    ):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                    "model_api_key": "updated-key",
+                    "model_api_url": "",
+                    "question": "Updated question",
+                    "evaluation_prompt": "Updated prompt",
+                    "judge0_api_key": "updated-judge0-key",
+                    "language": LanguageLabels.Python,
                 },
             )
 

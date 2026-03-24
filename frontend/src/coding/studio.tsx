@@ -1,22 +1,15 @@
-import React from "react";
-import { FormattedMessage } from "react-intl";
-
 import { makeXBlockInitializer } from "../shared/mountApp";
-import StudioPlaceholder from "../shared/StudioPlaceholder";
-import { SharedPayload, UnknownRecord, XBlockElementLike, XBlockRuntime } from "../shared/types";
+import { XBlockElementLike, XBlockRuntime } from "../shared/types";
+import CodingStudioApp from "./CodingStudioApp";
+import { CodingStudioPayload } from "./types";
 
-interface StudioHandlerUrls extends UnknownRecord {
-  studio_submit?: string;
-}
-
-type StudioPayload = SharedPayload<StudioHandlerUrls, UnknownRecord, UnknownRecord>;
-type StudioPayloadInput = Partial<StudioPayload>;
+type StudioPayloadInput = Partial<CodingStudioPayload>;
 
 function normalizePayload(
   runtime: XBlockRuntime,
   element: XBlockElementLike,
   data: unknown,
-): StudioPayload {
+): CodingStudioPayload {
   const payloadData = (data || {}) as StudioPayloadInput;
 
   return {
@@ -30,17 +23,12 @@ function normalizePayload(
 }
 
 const initializer = makeXBlockInitializer(
-  function CodingStudioPlaceholder({ payload }: { payload: StudioPayload }) {
-    return (
-      <StudioPlaceholder
-        blockKind="coding"
-        payload={payload}
-        title={<FormattedMessage id="coding.studio.title" defaultMessage="Coding Studio Shell" />}
-      />
-    );
-  },
+  CodingStudioApp,
   (runtime, element, data) => {
-    return { payload: normalizePayload(runtime, element, data) };
+    return {
+      payload: normalizePayload(runtime, element, data),
+      runtime,
+    };
   },
 );
 
