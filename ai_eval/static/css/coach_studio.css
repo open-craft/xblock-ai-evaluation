@@ -1,53 +1,63 @@
-/* Coach XBlock - Studio edit layout enhancements (scoped to editor body) */
+/* Coaching Studio overrides for the shared React Studio form layout. */
 
-/* Stack each field vertically: label -> help -> input */
-.xblock-editor .wrapper-comp-setting,
-.xblock-editor .list-input.settings-list .setting {
-  display: block;
-  clear: both;
-  margin-bottom: 1.25rem;
+.coaching-react-studio .wrapper-comp-setting {
+    align-items: start;
+    column-gap: 1.5rem;
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) minmax(520px, 50vw);
 }
 
-.xblock-editor .wrapper-comp-setting .setting-label,
-.xblock-editor .wrapper-comp-setting .setting-input {
-  float: none !important;
-  width: 100% !important;
+.coaching-react-studio .field-data-control,
+.coaching-react-studio .shortanswer-studio-select-shell {
+    grid-column: 2;
+    max-width: min(50vw, 760px);
+    width: 100%;
 }
 
-.xblock-editor .wrapper-comp-setting .setting-label label,
-.xblock-editor .wrapper-comp-setting .setting-label .label {
-  display: block;
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: #111827;
-  margin: 0 0 0.25rem 0;
+.coaching-react-studio textarea.field-data-control {
+    max-width: min(54vw, 820px);
 }
 
-/* Help/description text under the label */
-.xblock-editor .wrapper-comp-setting .setting-label .tip,
-.xblock-editor .wrapper-comp-setting .setting-label .help,
-.xblock-editor .wrapper-comp-setting .setting-label .setting-help {
-  display: block;
-  margin: 0 0 0.5rem 0;
-  color: #6b7280; /* slate-500 */
-  font-size: 0.95rem;
-  line-height: 1.35;
+.coaching-react-studio .tip.setting-help,
+.coaching-react-studio .shortanswer-studio-errors {
+    max-width: min(50vw, 760px);
 }
 
-/* Inputs span full width */
-.xblock-editor .wrapper-comp-setting .setting-input input[type="text"],
-.xblock-editor .wrapper-comp-setting .setting-input input[type="number"],
-.xblock-editor .wrapper-comp-setting .setting-input select,
-.xblock-editor .wrapper-comp-setting .setting-input textarea {
-  width: 100% !important;
-  max-width: none;
-  border: 1px solid #d1d5db; /* gray-300 */
-  border-radius: 6px;
-  padding: 0.65rem 0.75rem;
-  box-shadow: none;
+.coaching-react-studio [data-field-name="allow_reset"] .wrapper-comp-setting {
+    align-items: center;
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) auto;
 }
 
-/* Space multi-line editors consistently */
-.xblock-editor .wrapper-comp-setting .setting-input textarea {
-  min-height: 120px;
+.coaching-react-studio .shortanswer-studio-checkbox-control {
+    align-items: center;
+    display: inline-flex;
+    grid-column: 2;
+    justify-self: start;
+    min-height: 2.5rem;
+    padding-top: 0;
+    width: auto;
+}
+
+.coaching-react-studio .shortanswer-studio-checkbox-control input[type="checkbox"] {
+    position: static;
+    transform: none;
+}
+
+@media (max-width: 1180px) {
+    .coaching-react-studio .wrapper-comp-setting,
+    .coaching-react-studio [data-field-name="allow_reset"] .wrapper-comp-setting {
+        grid-template-columns: 1fr;
+    }
+
+    .coaching-react-studio .field-data-control,
+    .coaching-react-studio .shortanswer-studio-select-shell,
+    .coaching-react-studio textarea.field-data-control,
+    .coaching-react-studio .shortanswer-studio-checkbox-control,
+    .coaching-react-studio .tip.setting-help,
+    .coaching-react-studio .shortanswer-studio-errors {
+        grid-column: 1;
+        max-width: none;
+        width: 100%;
+    }
 }
