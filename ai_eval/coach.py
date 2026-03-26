@@ -303,11 +303,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         default=0,
     )
 
-    input_open = Boolean(
-        scope=Scope.user_state,
-        default=True,
-    )
-
     final_submission = String(
         scope=Scope.user_state,
         default="",
@@ -316,6 +311,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     final_evaluation_markdown = String(
         scope=Scope.user_state,
         default="",
+    )
+
+    sessions = List(
+        scope=Scope.user_state,
+        default=[],
     )
 
     max_attempts = Integer(
@@ -467,25 +467,137 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         ]
         return characters[character_index]
 
+    @staticmethod
+    def _empty_session():
+        """Return a blank Coaching session payload."""
+        return {
+            "workspace_history": [],
+            "coach_history": [],
+            "evaluation_fragments": [],
+            "attempts_used": 0,
+            "finished": False,
+            "final_submission": "",
+            "final_evaluation_markdown": "",
+        }
+
+    def _normalize_session(self, session):
+        """Normalize persisted learner session data into the expected shape."""
+        session = dict(session or {})
+        normalized = self._empty_session()
+
+        for field_name in ("workspace_history", "coach_history", "evaluation_fragments"):
+            value = session.get(field_name)
+            normalized[field_name] = list(value) if isinstance(value, list) else []
+
+        attempts_used = session.get("attempts_used", 0)
+        try:
+            attempts_used = int(attempts_used or 0)
+        except (TypeError, ValueError):
+            attempts_used = 0
+        normalized["attempts_used"] = max(attempts_used, 0)
+        normalized["finished"] = bool(session.get("finished", False))
+        normalized["final_submission"] = str(session.get("final_submission") or "")
+        normalized["final_evaluation_markdown"] = str(
+            session.get("final_evaluation_markdown") or ""
+        )
+        return normalized
+
+    def _build_session_from_older_state(self):
+        """Build a session snapshot from older learner-state fields."""
+        return self._normalize_session({
+            "workspace_history": self.workspace_history,
+            "coach_history": self.coach_history,
+            "evaluation_fragments": self.evaluation_fragments,
+            "attempts_used": self.attempts_used,
+            "finished": self.finished,
+            "final_submission": self.final_submission,
+            "final_evaluation_markdown": self.final_evaluation_markdown,
+        })
+
+    def _clear_older_state_runtime_fields(self):
+        """Reset older learner-state fields after migration."""
+        self.workspace_history = []
+        self.coach_history = []
+        self.evaluation_fragments = []
+        self.attempts_used = 0
+        self.finished = False
+        self.final_submission = ""
+        self.final_evaluation_markdown = ""
+
+    def _ensure_sessions_initialized(self):
+        """Ensure Coaching learner state has a normalized active session."""
+        current_sessions = self.sessions if isinstance(self.sessions, list) else []
+        normalized_sessions = []
+        sessions_changed = not isinstance(self.sessions, list)
+
+        for session in current_sessions:
+            normalized_session = self._normalize_session(session)
+            normalized_sessions.append(normalized_session)
+            if normalized_session != session:
+                sessions_changed = True
+
+        migrate_from_older_state = not normalized_sessions
+        if migrate_from_older_state:
+            normalized_sessions = [self._build_session_from_older_state()]
+            sessions_changed = True
+
+        if sessions_changed:
+            self.sessions = normalized_sessions
+
+        if migrate_from_older_state:
+            self._clear_older_state_runtime_fields()
+            self.save()
+
+    def _get_active_session(self):
+        """Return the normalized active learner session."""
+        self._ensure_sessions_initialized()
+        sessions = list(self.sessions or [])
+        active_session = self._normalize_session(sessions[-1])
+        if active_session != sessions[-1]:
+            self._set_active_session(active_session)
+        return active_session
+
+    def _set_active_session(self, session):
+        """Replace the active learner session for reliable persistence."""
+        normalized_session = self._normalize_session(session)
+        sessions = list(self.sessions or [])
+        if sessions:
+            sessions[-1] = normalized_session
+        else:
+            sessions = [normalized_session]
+        self.sessions = sessions
+        return normalized_session
+
+    def _start_new_session(self):
+        """Append and return a fresh active learner session."""
+        sessions = list(self.sessions or [])
+        sessions.append(self._empty_session())
+        self.sessions = sessions
+        return sessions[-1]
+
+    def _session_has_meaningful_data(self, session):
+        """Return whether a session contains learner progress worth preserving."""
+        session = self._normalize_session(session)
+        return any([
+            bool(session["workspace_history"]),
+            bool(session["coach_history"]),
+            bool(session["evaluation_fragments"]),
+            bool(session["final_submission"]),
+            bool(session["final_evaluation_markdown"]),
+            session["attempts_used"] > 0,
+        ])
+
     def _ensure_histories(self):
         """
         Initialize chat histories.
         """
-        if getattr(self, "_histories_ready", False):
-            return
-        if not isinstance(self.workspace_history, list):
-            self.workspace_history = []
-        if not isinstance(self.coach_history, list):
-            self.coach_history = []
-        if not isinstance(self.evaluation_fragments, list):
-            self.evaluation_fragments = []
-        self._histories_ready = True  # pylint: disable=attribute-defined-outside-init
+        return self._get_active_session()
 
-    def _record_fragment(self, character_index, user_message, character_message, **extra):
+    def _record_fragment(self, character_index, user_message, character_message, session=None, **extra):
         """
         Persist a conversation fragment into the appropriate history list.
         """
-        self._ensure_histories()
+        session = self._normalize_session(session or self._ensure_histories())
         fragment = {
             "character_index": character_index,
             "user_message": user_message,
@@ -493,18 +605,19 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         }
         fragment.update(extra)
         if fragment.get("is_evaluation"):
-            evaluations = list(self.evaluation_fragments or [])
+            evaluations = list(session["evaluation_fragments"])
             evaluations.append(fragment)
-            self.evaluation_fragments = evaluations
-            return
+            session["evaluation_fragments"] = evaluations
+            return self._set_active_session(session)
         if character_index == 1:
-            coach = list(self.coach_history or [])
+            coach = list(session["coach_history"])
             coach.append(fragment)
-            self.coach_history = coach
+            session["coach_history"] = coach
         else:
-            workspace = list(self.workspace_history or [])
+            workspace = list(session["workspace_history"])
             workspace.append(fragment)
-            self.workspace_history = workspace
+            session["workspace_history"] = workspace
+        return self._set_active_session(session)
 
     def _is_evaluation_fragment(self, fragment):  # pylint: disable=missing-function-docstring
         if fragment.get("is_evaluation"):
@@ -513,7 +626,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             return False
         if fragment.get("user_message"):
             return False
-        evaluation = self.final_evaluation_markdown or ""
+        evaluation = self._get_active_session()["final_evaluation_markdown"]
         if not evaluation:
             return False
         return fragment.get("character_message") == evaluation
@@ -549,11 +662,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Get chat histories separated by character.
         """
-        self._ensure_histories()
+        session = self._ensure_histories()
         chat_histories = [[], []]
-        for fragment in self.workspace_history or []:
+        for fragment in session["workspace_history"]:
             chat_histories[0].extend(self._get_chat_fragment_messages(fragment))
-        for fragment in self.coach_history or []:
+        for fragment in session["coach_history"]:
             chat_histories[1].extend(self._get_chat_fragment_messages(fragment))
         return chat_histories
 
@@ -568,10 +681,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         )
 
     def _build_final_report_payload(self):  # pylint: disable=missing-function-docstring
-        if not self.finished:
+        session = self._get_active_session()
+        if not session["finished"]:
             return None
-        final_submission = self.final_submission or ""
-        evaluation_markdown = self.final_evaluation_markdown or ""
+        final_submission = session["final_submission"]
+        evaluation_markdown = session["final_evaluation_markdown"]
         if not final_submission or not evaluation_markdown:
             return None
         report_html = self._render_final_report(final_submission)
@@ -581,17 +695,17 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "report_html": report_html,
             "show_report_card": True,
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": session["finished"],
         }
 
     def _messages_for_character(self, character_index, user_input=None):
         """
         Build LLM message payload for the requested character.
         """
-        self._ensure_histories()
+        session = self._ensure_histories()
         history_fragments = (
-            self.workspace_history if character_index == 0 else self.coach_history
-        ) or []
+            session["workspace_history"] if character_index == 0 else session["coach_history"]
+        )
         chat_history = []
         if character_index == 0 and self.initial_message:
             chat_history.append({
@@ -636,23 +750,20 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Return attempt usage details for the frontend.
         """
+        session = self._get_active_session()
         max_attempts = self.max_attempts or 0
-        attempts_used = self.attempts_used or 0
+        attempts_used = session["attempts_used"]
         max_attempts = max(max_attempts, 0)
         attempts_used = max(attempts_used, 0)
         attempts_remaining = max_attempts - attempts_used if max_attempts else None
         if attempts_remaining is not None:
             attempts_remaining = max(attempts_remaining, 0)
         can_retry = True if not max_attempts else (attempts_used < max_attempts)
-        input_open = self.input_open
-        if input_open is None:
-            input_open = True
         return {
             "max_attempts": max_attempts,
             "attempts_used": attempts_used,
             "attempts_remaining": attempts_remaining,
             "can_retry": can_retry,
-            "input_open": bool(input_open),
         }
 
     def _get_thread_tag(self, context="workspace"):
@@ -697,6 +808,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         The primary view of the CoachAIEvalXBlock, shown to students
         when viewing courses.
         """
+        active_session = self._get_active_session()
 
         characters = list(map(self._get_character_data, range(2)))
 
@@ -725,7 +837,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "content": getattr(self, 'coach_initial_message', ""),
             },
             "characters": characters,
-            "finished": self.finished,
+            "finished": active_session["finished"],
             "attempts": self._get_attempt_state(),
             "max_attempts": self.max_attempts,
             "titles": {
@@ -746,7 +858,8 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Generate the next message in the interaction.
         """
-        if self.finished:
+        session = self._get_active_session()
+        if session["finished"]:
             raise JsonHandlerError(403, "The session has ended.")
 
         if not isinstance(data, dict):
@@ -774,13 +887,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             max_attempts = self.max_attempts or 0
             if not trimmed_input:
                 raise JsonHandlerError(400, "Input cannot be empty.")
-            if max_attempts and self.attempts_used >= max_attempts:
+            if max_attempts and session["attempts_used"] >= max_attempts:
                 raise JsonHandlerError(403, "No attempts remaining.")
-            self.attempts_used = (self.attempts_used or 0) + 1
-            if max_attempts and self.attempts_used >= max_attempts:
-                self.input_open = False
+            session["attempts_used"] += 1
 
-        self._ensure_histories()
         thread_context = f"character{character_index}"
         message = self.get_llm_response(
             self._messages_for_character(character_index, user_input),
@@ -797,7 +907,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             if m:
                 message = m.group(1)
 
-        self._record_fragment(character_index, user_input, message)
+        session = self._record_fragment(
+            character_index,
+            user_input,
+            message,
+            session=session,
+        )
         character = self._get_character_data(character_index)
         return {
             "message": {
@@ -806,7 +921,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "pane": character["pane"],
             },
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": session["finished"],
         }
 
     @XBlock.json_handler
@@ -814,23 +929,18 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Reset both workspace and coach conversations and attempt state.
 
-        This is a full learner reset: clears histories, evaluation artifacts,
-        attempts, and cached provider thread IDs.
+        Preserve prior meaningful sessions and start a fresh active session.
         """
-        self._ensure_histories()
-        self.workspace_history = []
-        self.coach_history = []
-        self.evaluation_fragments = []
-        self.finished = False
-        self.input_open = True
-        self.attempts_used = 0
-        self.final_submission = ""
-        self.final_evaluation_markdown = ""
-        self.thread_map = {}
+        session = self._get_active_session()
+        if self._session_has_meaningful_data(session):
+            self._start_new_session()
+        else:
+            self._set_active_session(self._empty_session())
+        self._clear_thread_contexts(["character0", "character1", "evaluator"])
         return {
             "chat_histories": self._get_chat_histories(),
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": self._get_active_session()["finished"],
         }
 
     @XBlock.json_handler
@@ -841,12 +951,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         activity.
 
         """
-        if self.finished:
+        session = self._get_active_session()
+        if session["finished"]:
             raise JsonHandlerError(403, "The session has ended.")
 
-        self._ensure_histories()
         latest_fragment = None
-        for fragment in reversed(self.workspace_history or []):
+        for fragment in reversed(session["workspace_history"]):
             if (fragment.get("user_message") or "").strip():
                 latest_fragment = fragment
                 break
@@ -879,23 +989,23 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             _evaluator_messages(),
             tag=self._get_thread_tag("evaluator"),
         )
-        self._record_fragment(0, "", message, is_evaluation=True)
-        self.finished = True
-        self.input_open = False
-        self.final_submission = latest_fragment["user_message"]
-        self.final_evaluation_markdown = message
+        session = self._record_fragment(0, "", message, session=session, is_evaluation=True)
+        session["finished"] = True
+        session["final_submission"] = latest_fragment["user_message"]
+        session["final_evaluation_markdown"] = message
+        self._set_active_session(session)
         character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
-        report_html = self._render_final_report(self.final_submission)
+        report_html = self._render_final_report(session["final_submission"])
         return {
             "message": {
                 "character": character,
                 "content": message,
                 "pane": character["pane"],
             },
-            "final_submission": self.final_submission,
+            "final_submission": session["final_submission"],
             "report_html": report_html,
             "evaluation_markdown": message,
             "show_report_card": True,
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": session["finished"],
         }

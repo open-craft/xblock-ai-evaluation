@@ -15,6 +15,7 @@ from xblock.test.toy_runtime import ToyRuntime
 
 from ai_eval import (
     CodingAIEvalXBlock,
+    CoachAIEvalXBlock,
     ShortAnswerAIEvalXBlock,
 )
 from ai_eval.base import AIEvalXBlock
@@ -77,6 +78,41 @@ def shortanswer_block_data():
             '/ajax/libs/marked/13.0.2/marked.min.js"></script>\n'
             "</body>\n</html>"
         ),
+    }
+
+
+def _empty_coach_session():
+    """Return the expected default Coaching session shape."""
+    return {
+        "workspace_history": [],
+        "coach_history": [],
+        "evaluation_fragments": [],
+        "attempts_used": 0,
+        "finished": False,
+        "final_submission": "",
+        "final_evaluation_markdown": "",
+    }
+
+
+@pytest.fixture
+def coach_block_data():
+    """Fixture for Coaching block test data."""
+    return {
+        "display_name": "Coached AI Evaluation",
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "test-key",
+        "model_api_url": "",
+        "character_1_name": "Patient",
+        "character_1_role": "Patient",
+        "character_2_name": "Coach",
+        "character_2_role": "Coach",
+        "scenario_data": {
+            "case_details": "Case details",
+            "learning_objectives": ["Objective"],
+            "evaluation_criteria": [{"name": "Criterion"}],
+        },
+        "max_attempts": 3,
+        "allow_reset": True,
     }
 
 
@@ -260,6 +296,217 @@ def test_shortanswer_block_studio_view(shortanswer_block_data):
             "value": SupportedModels.GPT4O.value,
         },
     ]
+
+
+def test_coach_block_migrates_older_state_to_sessions(coach_block_data):
+    """Older Coaching learner state should migrate into sessions."""
+    existing_workspace = [{
+        "character_index": 0,
+        "user_message": "student answer",
+        "character_message": "patient reply",
+    }]
+    existing_coach = [{
+        "character_index": 1,
+        "user_message": "help",
+        "character_message": "coach reply",
+    }]
+    existing_evaluation = [{
+        "character_index": 0,
+        "user_message": "",
+        "character_message": "# Evaluation Report",
+        "is_evaluation": True,
+    }]
+    data = {
+        **coach_block_data,
+        "workspace_history": existing_workspace,
+        "coach_history": existing_coach,
+        "evaluation_fragments": existing_evaluation,
+        "attempts_used": 1,
+        "finished": True,
+        "final_submission": "student answer",
+        "final_evaluation_markdown": "# Evaluation Report",
+    }
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+
+    expected_session = {
+        "workspace_history": existing_workspace,
+        "coach_history": existing_coach,
+        "evaluation_fragments": existing_evaluation,
+        "attempts_used": 1,
+        "finished": True,
+        "final_submission": "student answer",
+        "final_evaluation_markdown": "# Evaluation Report",
+    }
+
+    assert block._get_active_session() == expected_session
+    assert block.sessions == [expected_session]
+    assert block.workspace_history == []
+    assert block.coach_history == []
+    assert block.evaluation_fragments == []
+    assert block.attempts_used == 0
+    assert block.finished is False
+    assert block.final_submission == ""
+    assert block.final_evaluation_markdown == ""
+
+
+@patch("ai_eval.coach.get_llm_service", return_value=Mock())
+@patch.object(CoachAIEvalXBlock, "get_llm_response", return_value="patient follow-up")
+def test_coach_get_character_response_uses_session_runtime_state(
+    mock_get_llm,
+    _mock_get_llm_service,
+    coach_block_data,
+):
+    """Coaching runtime should write new activity only into the active session."""
+    existing_fragment = {
+        "character_index": 0,
+        "user_message": "first answer",
+        "character_message": "first reply",
+    }
+    data = {
+        **coach_block_data,
+        "workspace_history": [existing_fragment],
+        "attempts_used": 1,
+    }
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+
+    result = block.get_character_response.__wrapped__(
+        block,
+        data={"character_index": 0, "user_input": "second answer"},
+    )
+
+    assert result["message"]["content"] == "patient follow-up"
+    assert result["attempts"]["attempts_used"] == 2
+    assert result["finished"] is False
+    assert block.sessions == [{
+        "workspace_history": [
+            existing_fragment,
+            {
+                "character_index": 0,
+                "user_message": "second answer",
+                "character_message": "patient follow-up",
+            },
+        ],
+        "coach_history": [],
+        "evaluation_fragments": [],
+        "attempts_used": 2,
+        "finished": False,
+        "final_submission": "",
+        "final_evaluation_markdown": "",
+    }]
+    assert block.workspace_history == []
+    mock_get_llm.assert_called_once()
+
+
+@patch("ai_eval.coach.get_llm_service", return_value=Mock())
+@patch.object(CoachAIEvalXBlock, "_render_final_report", return_value="<article>report</article>")
+@patch.object(CoachAIEvalXBlock, "get_llm_response", return_value="# Evaluation Report")
+def test_coach_get_evaluator_response_persists_active_session(
+    mock_get_llm,
+    mock_render_report,
+    _mock_get_llm_service,
+    coach_block_data,
+):
+    """Evaluator output should finalize the active Coaching session."""
+    session = _empty_coach_session()
+    session["workspace_history"] = [{
+        "character_index": 0,
+        "user_message": "final learner answer",
+        "character_message": "patient reply",
+    }]
+    session["attempts_used"] = 1
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**coach_block_data, "sessions": [session]}),
+        None,
+    )
+
+    result = block.get_evaluator_response.__wrapped__(block, data={})
+
+    assert result["evaluation_markdown"] == "# Evaluation Report"
+    assert result["final_submission"] == "final learner answer"
+    assert result["report_html"] == "<article>report</article>"
+    assert result["finished"] is True
+    assert block.sessions == [{
+        "workspace_history": session["workspace_history"],
+        "coach_history": [],
+        "evaluation_fragments": [{
+            "character_index": 0,
+            "user_message": "",
+            "character_message": "# Evaluation Report",
+            "is_evaluation": True,
+        }],
+        "attempts_used": 1,
+        "finished": True,
+        "final_submission": "final learner answer",
+        "final_evaluation_markdown": "# Evaluation Report",
+    }]
+    mock_get_llm.assert_called_once()
+    mock_render_report.assert_called_once_with("final learner answer")
+
+
+def test_coach_reset_all_appends_new_empty_session_for_meaningful_state(coach_block_data):
+    """Reset should preserve prior Coaching history and start a new active session."""
+    prior_session = {
+        "workspace_history": [{
+            "character_index": 0,
+            "user_message": "answer",
+            "character_message": "reply",
+        }],
+        "coach_history": [],
+        "evaluation_fragments": [],
+        "attempts_used": 1,
+        "finished": False,
+        "final_submission": "",
+        "final_evaluation_markdown": "",
+    }
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**coach_block_data, "sessions": [prior_session]}),
+        None,
+    )
+    block.thread_map = {
+        "provider:model:hash:character0": "thread-1",
+        "provider:model:hash:character1": "thread-2",
+        "provider:model:hash:evaluator": "thread-3",
+    }
+
+    result = block.reset_all.__wrapped__(block, data={})
+
+    assert result == {
+        "chat_histories": [[], []],
+        "attempts": {
+            "max_attempts": 3,
+            "attempts_used": 0,
+            "attempts_remaining": 3,
+            "can_retry": True,
+        },
+        "finished": False,
+    }
+    assert block.sessions == [prior_session, _empty_coach_session()]
+    assert block.thread_map == {}
+
+
+def test_coach_reset_all_avoids_duplicate_empty_sessions(coach_block_data):
+    """Reset should reuse the existing empty active session."""
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**coach_block_data, "sessions": [_empty_coach_session()]}),
+        None,
+    )
+    block.thread_map = {"provider:model:hash:character0": "thread-1"}
+
+    result = block.reset_all.__wrapped__(block, data={})
+
+    assert result["chat_histories"] == [[], []]
+    assert result["attempts"] == {
+        "max_attempts": 3,
+        "attempts_used": 0,
+        "attempts_remaining": 3,
+        "can_retry": True,
+    }
+    assert result["finished"] is False
+    assert block.sessions == [_empty_coach_session()]
+    assert block.thread_map == {}
 
 
 def test_shortanswer_studio_submit_success(shortanswer_block_data):
