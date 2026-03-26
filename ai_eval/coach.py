@@ -1,6 +1,7 @@
 """Multi-agent AI XBlock."""
 
 import hashlib
+import json
 import re
 import textwrap
 import typing
@@ -13,6 +14,7 @@ from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
 from xblock.validation import ValidationMessage
+from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
@@ -355,13 +357,24 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "allow_reset",
     )
 
-    def studio_view(self, context):
-        """Render Studio edit view with styling only (no extra wrapper)."""
-        fragment = super().studio_view(context)
-        try:
-            fragment.add_css(self.resource_string("static/css/coach_studio.css"))
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
+    def studio_view(self, context=None):
+        """Render the React Studio editor for Coaching."""
+        fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
+        fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
+        fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
+        fragment.add_css(self.resource_string("static/css/coach_studio.css"))
+        fragment.add_javascript(self.resource_string("static/bundles/coaching.studio.js"))
+        fragment.initialize_js(
+            "CoachAIEvalXBlockStudio",
+            self._build_view_payload(
+                view="studio",
+                handler_urls={
+                    "studio_submit": self._handler_url("studio_submit"),
+                },
+                initial_state=self._studio_initial_state(),
+                meta=self._studio_payload_meta(),
+            ),
+        )
         return fragment
 
     def _render_template(self, template, **context):
@@ -370,36 +383,36 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def _get_field_display_name(self, field_name):
         return self.fields[field_name].display_name
 
-    def validate_field_data(self, validation, data):
-        """Validate field data."""
-        super().validate_field_data(validation, data)
-
+    def _collect_studio_validation_issues(
+        self,
+        data,
+    ) -> tuple[dict[str, list[str]], list[str]]:
+        """
+        Extend base Studio validation issues with Coaching-specific rules.
+        """
+        validation_errors, validation_warnings = super()._collect_studio_validation_issues(data)
         scenario_data = data.scenario_data
         if not isinstance(scenario_data, dict):
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    (
-                        f"{self._get_field_display_name('scenario_data')}: "
-                        "must be a JSON object (dictionary)."
-                    ),
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "scenario_data",
+                _(
+                    "Scenario data must be a JSON object (dictionary)."
+                ),
             )
             scenario_data = {}
 
         try:
             CoachScenarioData(**scenario_data)
         except pydantic.ValidationError as e:  # pylint: disable=unused-variable
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    (
-                        f"{self._get_field_display_name('scenario_data')}: "
-                        "structure is invalid. Expected keys: "
-                        "case_details (str), learning_objectives (list[str]), "
-                        "evaluation_criteria (list[{name: str}])."
-                    ),
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "scenario_data",
+                _(
+                    "Scenario data structure is invalid. Expected keys: "
+                    "case_details (str), learning_objectives (list[str]), "
+                    "evaluation_criteria (list[{name: str}])."
+                ),
             )
 
         # Validate templates early (StrictUndefined): catches missing keys/typos.
@@ -409,11 +422,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 messages=[{"character": {"name": "", "role": ""}, "content": ""}],
             )
         except jinja2.TemplateError as e:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    f"{self._get_field_display_name('conversation_format')}: {e}",
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "conversation_format",
+                str(e),
             )
 
         for prompt_field, pane in [
@@ -432,22 +444,34 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                     scenario_data=scenario_data,
                 )
             except jinja2.TemplateError as e:
-                validation.add(
-                    ValidationMessage(
-                        ValidationMessage.ERROR,
-                        f"{self._get_field_display_name(prompt_field)}: {e}",
-                    )
+                self._add_studio_validation_error(
+                    validation_errors,
+                    prompt_field,
+                    str(e),
                 )
 
         try:
             self._render_template(data.evaluator_prompt, scenario_data=scenario_data)
         except jinja2.TemplateError as e:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    f"{self._get_field_display_name('evaluator_prompt')}: {e}",
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "evaluator_prompt",
+                str(e),
             )
+
+        return validation_errors, validation_warnings
+
+    def validate_field_data(self, validation, data):
+        """Validate field data."""
+        validation_errors, validation_warnings = self._collect_studio_validation_issues(data)
+
+        self._apply_studio_issues(
+            validation,
+            validation_errors,
+            validation_warnings,
+        )
+
+        self._clear_cached_studio_warnings()
 
     def _get_character_data(self, character_index):  # pylint: disable=missing-function-docstring
         # Hardcoded at 2 characters but extensible.
@@ -809,49 +833,132 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         when viewing courses.
         """
         active_session = self._get_active_session()
-
         characters = list(map(self._get_character_data, range(2)))
-
-        frag = Fragment()
-        frag.add_content(
-            self.loader.render_django_template(
-                "/templates/coach_layout.html",
-                {
-                    "self": self,
-                    "intro_text": self.intro_text,
-                    "characters": characters,
-                },
-            )
-        )
+        frag = Fragment('<div data-ai-eval-react-root="true"></div>')
         frag.add_css(self.resource_string("static/css/chatbox.css"))
-        frag.add_javascript(self.resource_string("static/js/src/utils.js"))
+        frag.add_javascript(self.resource_string("static/bundles/coaching.js"))
         marked_html = self.resource_string("static/html/marked-iframe.html")
-        js_data = {
-            "chat_histories": self._get_chat_histories(),
-            "initial_message": {
-                "character": self._get_character_data(0),
-                "content": self.initial_message,
+        js_data = self._build_view_payload(
+            view="student",
+            handler_urls={
+                "get_character_response": self._handler_url("get_character_response"),
+                "get_evaluator_response": self._handler_url("get_evaluator_response"),
+                "reset_all": self._handler_url("reset_all"),
             },
-            "coach_initial_message": {
-                "character": self._get_character_data(1),
-                "content": getattr(self, 'coach_initial_message', ""),
+            initial_state={
+                "chat_histories": self._get_chat_histories(),
+                "finished": active_session["finished"],
+                "attempts": self._get_attempt_state(),
             },
-            "characters": characters,
-            "finished": active_session["finished"],
-            "attempts": self._get_attempt_state(),
-            "max_attempts": self.max_attempts,
-            "titles": {
-                "workspace": self.workspace_title,
-                "coach": self.coach_title,
+            meta={
+                "characters": characters,
+                "initial_message": {
+                    "character": self._get_character_data(0),
+                    "content": self.initial_message,
+                },
+                "coach_initial_message": {
+                    "character": self._get_character_data(1),
+                    "content": self.coach_initial_message,
+                },
+                "titles": {
+                    "workspace": self.workspace_title,
+                    "coach": self.coach_title,
+                },
+                "marked_html": marked_html,
+                "allow_reset": self.allow_reset,
+                "intro_text": self.intro_text,
             },
-            "marked_html": marked_html,
-        }
+        )
         final_report = self._build_final_report_payload()
         if final_report:
-            js_data["final_report"] = final_report
-        frag.add_javascript(self.resource_string("static/js/src/coach.js"))
+            js_data["initial_state"]["final_report"] = final_report
         frag.initialize_js("CoachAIEvalXBlock", js_data)
         return frag
+
+    def _studio_parse_json_field(self, field_name, raw_value):
+        """Parse Studio JSON textarea values for Coaching-specific fields."""
+        if field_name not in {"scenario_data", "blacklist"}:
+            return raw_value, None
+
+        if not isinstance(raw_value, str):
+            return raw_value, None
+
+        try:
+            parsed_value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            label = self._get_field_display_name(field_name)
+            return None, _(f"{label} must be valid JSON.")
+
+        if field_name == "scenario_data" and not isinstance(parsed_value, dict):
+            return None, _("Scenario data must be a JSON object (dictionary).")
+
+        if field_name == "blacklist" and not isinstance(parsed_value, list):
+            return None, _("Output blacklist must be a JSON array.")
+
+        return parsed_value, None
+
+    @XBlock.json_handler
+    def studio_submit(self, data, suffix=""):  # pylint: disable=unused-argument
+        """
+        Save the Studio editor payload using the existing field validation rules.
+        """
+        values = {}
+        missing_fields = []
+        validation_errors = {}
+
+        for field_name in self.editable_fields:
+            if field_name not in data:
+                missing_fields.append(field_name)
+                continue
+
+            parsed_value, parse_error = self._studio_parse_json_field(
+                field_name,
+                data[field_name],
+            )
+            if parse_error:
+                validation_errors[field_name] = [parse_error]
+                continue
+
+            field = self.fields[field_name]
+            values[field_name] = field.from_json(parsed_value)
+
+        if missing_fields:
+            validation_errors.update({
+                field_name: [_("Missing field in Studio payload.")]
+                for field_name in missing_fields
+            })
+
+        if validation_errors:
+            return self._studio_submit_response(
+                success=False,
+                validation_errors=validation_errors,
+                validation_warnings=[],
+                meta=self._studio_payload_meta(),
+            )
+
+        self.clean_studio_edits(values)
+
+        preview_data = FutureFields(
+            new_fields_dict=values,
+            newly_removed_fields=[],
+            fallback_obj=self,
+        )
+        validation_errors, validation_warnings = self._collect_studio_validation_issues(
+            preview_data,
+        )
+        self._clear_cached_studio_warnings()
+        has_validation_errors = bool(validation_errors)
+
+        if not has_validation_errors:
+            for field_name, value in values.items():
+                setattr(self, field_name, value)
+
+        return self._studio_submit_response(
+            success=not has_validation_errors,
+            validation_errors=validation_errors,
+            validation_warnings=validation_warnings,
+            meta=self._studio_payload_meta(),
+        )
 
     @XBlock.json_handler
     def get_character_response(self, data, suffix=""):

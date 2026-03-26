@@ -1,16 +1,10 @@
-import React from "react";
-import { FormattedMessage } from "react-intl";
-
 import { makeXBlockInitializer } from "../shared/mountApp";
-import StudioPlaceholder from "../shared/StudioPlaceholder";
-import { SharedPayload, UnknownRecord, XBlockElementLike, XBlockRuntime } from "../shared/types";
+import { XBlockElementLike, XBlockRuntime } from "../shared/types";
+import CoachingStudioApp from "./CoachingStudioApp";
+import { CoachingStudioPayload } from "./types";
 
-interface StudioHandlerUrls extends UnknownRecord {
-  studio_submit?: string;
-}
-
-type StudioPayload = SharedPayload<StudioHandlerUrls, UnknownRecord, UnknownRecord>;
-type StudioPayloadInput = Partial<StudioPayload>;
+type StudioPayload = CoachingStudioPayload;
+type StudioPayloadInput = Partial<CoachingStudioPayload>;
 
 function normalizePayload(
   runtime: XBlockRuntime,
@@ -30,22 +24,12 @@ function normalizePayload(
 }
 
 const initializer = makeXBlockInitializer(
-  function CoachingStudioPlaceholder({ payload }: { payload: StudioPayload }) {
-    return (
-      <StudioPlaceholder
-        blockKind="coaching"
-        payload={payload}
-        title={
-          <FormattedMessage
-            id="coaching.studio.title"
-            defaultMessage="Coaching Studio Shell"
-          />
-        }
-      />
-    );
-  },
+  CoachingStudioApp,
   (runtime, element, data) => {
-    return { payload: normalizePayload(runtime, element, data) };
+    return {
+      payload: normalizePayload(runtime, element, data),
+      runtime,
+    };
   },
 );
 
