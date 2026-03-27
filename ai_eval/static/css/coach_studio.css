@@ -1,63 +1,462 @@
-/* Coaching Studio overrides for the shared React Studio form layout. */
+/* Coaching Studio sectioned authoring layout. */
 
-.coaching-react-studio .wrapper-comp-setting {
-    align-items: start;
-    column-gap: 1.5rem;
-    display: grid;
-    grid-template-columns: minmax(240px, 320px) minmax(520px, 50vw);
+.coaching-react-studio {
+    --coaching-border: #cbcbcb;
+    --coaching-border-strong: #b4b4b4;
+    --coaching-border-soft: #e5e5e5;
+    --coaching-panel-bg: #ffffff;
+    --coaching-page-bg: #f4f4f4;
+    --coaching-nav-active: #e5e5e5;
+    --coaching-text: #3c3c3c;
+    --coaching-text-muted: #717171;
+    --coaching-title: #515151;
+    --coaching-accent: #0078b1;
+    --coaching-accent-soft: #dceef6;
+    --coaching-danger: #a11d1d;
+    --coaching-warning-bg: #fff8e5;
+    --coaching-warning-border: #ead9a4;
 }
 
-.coaching-react-studio .field-data-control,
-.coaching-react-studio .shortanswer-studio-select-shell {
-    grid-column: 2;
-    max-width: min(50vw, 760px);
+.modal-window.modal-type-coach_ai_eval .modal-actions {
+    display: block;
+}
+
+.coaching-react-studio .wrapper-comp-settings {
+    padding: 0;
+}
+
+.coaching-react-studio .coaching-studio-shell {
+    background: var(--coaching-page-bg);
+    border-radius: 4px;
+    color: var(--coaching-text);
+    padding: 20px 24px 24px;
+}
+
+.coaching-react-studio .coaching-studio-action {
+    min-width: 88px;
+    text-align: center;
+}
+
+.coaching-react-studio .coaching-studio-action--primary {
+    background: var(--coaching-accent);
+    border-color: var(--coaching-accent);
+    color: #fff;
+}
+
+.coaching-react-studio .coaching-studio-action--primary[disabled] {
+    opacity: 0.75;
+}
+
+.coaching-react-studio .coaching-studio-summary {
+    background: var(--coaching-warning-bg);
+    border: 1px solid var(--coaching-warning-border);
+    border-radius: 3px;
+    margin-bottom: 16px;
+    padding: 12px 14px;
+}
+
+.coaching-react-studio .coaching-studio-summary__error,
+.coaching-react-studio .coaching-studio-field-errors,
+.coaching-react-studio .coaching-studio-section-errors .coaching-studio-field-errors {
+    color: var(--coaching-danger);
+}
+
+.coaching-react-studio .coaching-studio-summary__error {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.coaching-react-studio .coaching-studio-summary__warnings {
+    color: #8a5a00;
+    margin: 6px 0 0;
+    padding-left: 20px;
+}
+
+.coaching-react-studio .coaching-studio-body {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: 200px minmax(0, 1fr);
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-nav {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 24px 0 0;
+}
+
+.coaching-react-studio .coaching-studio-nav-item + .coaching-studio-nav-item {
+    margin-top: 2px;
+}
+
+.coaching-react-studio .coaching-studio-nav-button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 2px;
+    color: var(--coaching-text);
+    cursor: pointer;
+    display: flex;
+    font-size: 16px;
+    font-weight: 500;
+    justify-content: space-between;
+    line-height: 34px;
+    padding: 0 12px;
+    position: relative;
+    text-align: left;
     width: 100%;
 }
 
-.coaching-react-studio textarea.field-data-control {
-    max-width: min(54vw, 820px);
+.coaching-react-studio .coaching-studio-nav-button:hover {
+    background: rgba(0, 0, 0, 0.03);
 }
 
-.coaching-react-studio .tip.setting-help,
-.coaching-react-studio .shortanswer-studio-errors {
-    max-width: min(50vw, 760px);
+.coaching-react-studio .coaching-studio-nav-button.is-active {
+    background: var(--coaching-nav-active);
 }
 
-.coaching-react-studio [data-field-name="allow_reset"] .wrapper-comp-setting {
+.coaching-react-studio .coaching-studio-nav-button.is-active::after {
+    background: var(--coaching-accent);
+    border-radius: 100px;
+    content: "";
+    height: 24px;
+    left: 0;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+}
+
+.coaching-react-studio .coaching-studio-nav-text {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-nav-badge {
+    background: #f8d5d5;
+    border-radius: 999px;
+    color: var(--coaching-danger);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    min-width: 20px;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.coaching-react-studio .coaching-studio-panel {
+    background: var(--coaching-panel-bg);
+    border: 1px solid var(--coaching-border);
+    border-radius: 2px;
+    min-width: 0;
+    padding: 22px 28px 28px;
+}
+
+.coaching-react-studio .coaching-studio-panel-header {
+    margin-bottom: 4px;
+    padding: 0 20px 0;
+}
+
+.coaching-react-studio .coaching-studio-panel-title {
+    color: var(--coaching-text);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-panel-description {
+    color: var(--coaching-text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 8px 0 0;
+    max-width: 72ch;
+}
+
+.coaching-react-studio .coaching-studio-section-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.coaching-react-studio .coaching-studio-card {
+    border-radius: 3px;
+    padding: 20px;
+}
+
+.coaching-react-studio .coaching-studio-card-header {
+    margin-bottom: 18px;
+}
+
+.coaching-react-studio .coaching-studio-card-title {
+    color: var(--coaching-title);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-card-description {
+    color: var(--coaching-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    margin: 4px 0 0;
+}
+
+.coaching-react-studio .coaching-studio-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.coaching-react-studio .coaching-studio-field {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-header {
+    margin-bottom: 8px;
+}
+
+.coaching-react-studio .coaching-studio-field-title-row {
+    align-items: baseline;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.coaching-react-studio .coaching-studio-field-label {
+    color: var(--coaching-title);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-counter {
+    color: var(--coaching-text-muted);
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.coaching-react-studio .coaching-studio-field-description,
+.coaching-react-studio .coaching-studio-field-help {
+    color: var(--coaching-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-control {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-list-field {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.coaching-react-studio .coaching-studio-list-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.coaching-react-studio .coaching-studio-list-row-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.coaching-react-studio .coaching-studio-list-row {
+    align-items: flex-start;
+    display: flex;
+    gap: 10px;
+}
+
+.coaching-react-studio .coaching-studio-list-row .coaching-studio-input {
+    flex: 1 1 auto;
+}
+
+.coaching-react-studio .coaching-studio-input {
+    background: #fff;
+    border: 1px solid var(--coaching-border-strong);
+    border-radius: 2px;
+    box-sizing: border-box;
+    color: var(--coaching-text);
+    font-size: 14px;
+    line-height: 23px;
+    max-width: none;
+    width: 100% !important;
+}
+
+.coaching-react-studio .coaching-studio-input[aria-invalid="true"] {
+    border-color: #d08b8b;
+}
+
+.coaching-react-studio .coaching-studio-input:focus {
+    border-color: var(--coaching-accent);
+    box-shadow: 0 0 0 1px var(--coaching-accent);
+    outline: none;
+}
+
+.coaching-react-studio .coaching-studio-input--compact {
+    max-width: 120px;
+}
+
+.coaching-react-studio .coaching-studio-textarea {
+    min-height: 74px;
+    resize: vertical;
+}
+
+.coaching-react-studio .coaching-studio-select-shell {
+    max-width: none;
+}
+
+.coaching-react-studio .coaching-studio-select-icon {
+    color: var(--coaching-text-muted);
+}
+
+.coaching-react-studio .coaching-studio-list-add,
+.coaching-react-studio .coaching-studio-list-remove {
+    align-self: flex-start;
+    background: #fff;
+    border: 1px solid var(--coaching-border-strong);
+    border-radius: 2px;
+    color: var(--coaching-text);
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 36px;
+    padding: 0 12px;
+}
+
+.coaching-react-studio .coaching-studio-list-remove {
     align-items: center;
-    display: grid;
-    grid-template-columns: minmax(240px, 320px) auto;
-}
-
-.coaching-react-studio .shortanswer-studio-checkbox-control {
-    align-items: center;
+    background: #fff5f5;
+    border-color: #e5b7b7;
+    border-radius: 999px;
+    color: var(--coaching-danger);
     display: inline-flex;
-    grid-column: 2;
-    justify-self: start;
-    min-height: 2.5rem;
-    padding-top: 0;
-    width: auto;
+    font-size: 18px;
+    height: 28px;
+    justify-content: center;
+    line-height: 1;
+    min-height: 28px;
+    min-width: 28px;
+    padding: 0;
+    width: 28px;
 }
 
-.coaching-react-studio .shortanswer-studio-checkbox-control input[type="checkbox"] {
-    position: static;
-    transform: none;
+.coaching-react-studio .coaching-studio-list-add:hover {
+    border-color: var(--coaching-accent);
+    color: var(--coaching-accent);
+}
+
+.coaching-react-studio .coaching-studio-list-remove:hover {
+    background: #ffe7e7;
+    border-color: #d08b8b;
+    color: #8d1313;
+}
+
+.coaching-react-studio .coaching-studio-radio-group {
+    display: flex;
+    gap: 24px;
+    padding: 4px 0 2px;
+}
+
+.coaching-react-studio .coaching-studio-radio-option {
+    align-items: center;
+    color: #454545;
+    display: inline-flex;
+    font-size: 18px;
+    gap: 8px;
+    line-height: 28px;
+}
+
+.coaching-react-studio .coaching-studio-radio-option input[type="radio"] {
+    accent-color: var(--coaching-accent);
+    height: 18px;
+    margin: 0;
+    width: 18px;
+}
+
+.coaching-react-studio .coaching-studio-field-errors {
+    margin: 8px 0 0;
+    padding-left: 20px;
+}
+
+.coaching-react-studio .coaching-studio-section-errors {
+    background: #fff6f6;
+    border: 1px solid #f0c7c7;
+    border-radius: 3px;
+    padding: 12px 14px;
+}
+
+.coaching-react-studio .coaching-studio-section-errors__title {
+    color: var(--coaching-danger);
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0 0 4px;
 }
 
 @media (max-width: 1180px) {
-    .coaching-react-studio .wrapper-comp-setting,
-    .coaching-react-studio [data-field-name="allow_reset"] .wrapper-comp-setting {
+    .coaching-react-studio .coaching-studio-shell {
+        padding: 16px;
+    }
+
+    .coaching-react-studio .coaching-studio-body {
+        gap: 16px;
         grid-template-columns: 1fr;
     }
 
-    .coaching-react-studio .field-data-control,
-    .coaching-react-studio .shortanswer-studio-select-shell,
-    .coaching-react-studio textarea.field-data-control,
-    .coaching-react-studio .shortanswer-studio-checkbox-control,
-    .coaching-react-studio .tip.setting-help,
-    .coaching-react-studio .shortanswer-studio-errors {
-        grid-column: 1;
-        max-width: none;
-        width: 100%;
+    .coaching-react-studio .coaching-studio-nav-list {
+        display: grid;
+        gap: 6px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        padding-top: 0;
+    }
+
+    .coaching-react-studio .coaching-studio-nav-button.is-active::after {
+        display: none;
+    }
+
+    .coaching-react-studio .coaching-studio-panel {
+        padding: 18px;
+    }
+}
+
+@media (max-width: 720px) {
+    .coaching-react-studio .coaching-studio-card {
+        padding: 16px;
+    }
+
+    .coaching-react-studio .coaching-studio-field-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .coaching-react-studio .coaching-studio-radio-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .coaching-react-studio .coaching-studio-list-row {
+        grid-template-columns: 1fr;
     }
 }

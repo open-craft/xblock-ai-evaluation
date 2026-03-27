@@ -383,6 +383,91 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def _get_field_display_name(self, field_name):
         return self.fields[field_name].display_name
 
+    def _map_scenario_data_validation_error_field(
+        self,
+        location: tuple[typing.Any, ...],
+    ) -> str:
+        """Translate `scenario_data` schema errors into Studio field keys."""
+        if not location:
+            return "scenario_data"
+
+        field_name = location[0]
+        if field_name == "case_details":
+            return "scenario_case_details"
+        if field_name == "learning_objectives":
+            return "scenario_learning_objectives"
+        if field_name == "evaluation_criteria":
+            return "scenario_evaluation_criteria"
+        return "scenario_data"
+
+    def _format_scenario_data_validation_error(
+        self,
+        error: dict[str, typing.Any],
+    ) -> tuple[str, str]:
+        """Return a Studio field key and author-facing validation message."""
+        location = tuple(error.get("loc", ()))
+        mapped_field = self._map_scenario_data_validation_error_field(location)
+
+        if mapped_field == "scenario_case_details":
+            return mapped_field, _("Scenario must be a valid string.")
+
+        if mapped_field == "scenario_learning_objectives":
+            if len(location) > 1 and isinstance(location[1], int):
+                return mapped_field, _(
+                    "Learning objective {index} must be text."
+                ).format(index=location[1] + 1)
+            return mapped_field, _("Learning objectives must be a list of text items.")
+
+        if mapped_field == "scenario_evaluation_criteria":
+            if len(location) > 2 and location[2] == "name" and isinstance(location[1], int):
+                return mapped_field, _(
+                    "Evaluation criterion {index} must include a name."
+                ).format(index=location[1] + 1)
+            if len(location) > 1 and isinstance(location[1], int):
+                return mapped_field, _(
+                    "Evaluation criterion {index} must be a valid criterion."
+                ).format(index=location[1] + 1)
+            return mapped_field, _(
+                "Evaluation criteria must be a list of criteria with names."
+            )
+
+        return mapped_field, _(
+            "Scenario data structure is invalid. Expected keys: "
+            "case_details (str), learning_objectives (list[str]), "
+            "evaluation_criteria (list[{name: str}])."
+        )
+
+    def _get_template_validation_scenario_data(
+        self,
+        scenario_data: dict[str, typing.Any],
+        has_schema_errors: bool,
+    ) -> dict[str, typing.Any]:
+        """Provide stable scenario data for template validation."""
+        if not has_schema_errors:
+            return scenario_data
+
+        existing_scenario_data = getattr(self, "scenario_data", None)
+        if isinstance(existing_scenario_data, dict):
+            return existing_scenario_data
+
+        return {
+            "case_details": "",
+            "learning_objectives": [],
+            "evaluation_criteria": [],
+        }
+
+    @staticmethod
+    def _sanitize_blacklist_values(values):
+        """Drop empty blacklist entries while preserving meaningful terms."""
+        if not isinstance(values, list):
+            return values
+
+        return [
+            value
+            for value in values
+            if not (isinstance(value, str) and value.strip() == "")
+        ]
+
     def _collect_studio_validation_issues(
         self,
         data,
@@ -392,7 +477,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         validation_errors, validation_warnings = super()._collect_studio_validation_issues(data)
         scenario_data = data.scenario_data
+        has_scenario_schema_errors = False
         if not isinstance(scenario_data, dict):
+            has_scenario_schema_errors = True
             self._add_studio_validation_error(
                 validation_errors,
                 "scenario_data",
@@ -404,16 +491,19 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
         try:
             CoachScenarioData(**scenario_data)
-        except pydantic.ValidationError as e:  # pylint: disable=unused-variable
-            self._add_studio_validation_error(
-                validation_errors,
-                "scenario_data",
-                _(
-                    "Scenario data structure is invalid. Expected keys: "
-                    "case_details (str), learning_objectives (list[str]), "
-                    "evaluation_criteria (list[{name: str}])."
-                ),
-            )
+        except pydantic.ValidationError as e:
+            has_scenario_schema_errors = True
+            for error in e.errors():
+                field_name, message = self._format_scenario_data_validation_error(error)
+                self._add_studio_validation_error(
+                    validation_errors,
+                    field_name,
+                    message,
+                )
+        template_scenario_data = self._get_template_validation_scenario_data(
+            scenario_data,
+            has_scenario_schema_errors,
+        )
 
         # Validate templates early (StrictUndefined): catches missing keys/typos.
         try:
@@ -441,7 +531,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                         "avatar": "",
                         "pane": pane,
                     },
-                    scenario_data=scenario_data,
+                    scenario_data=template_scenario_data,
                 )
             except jinja2.TemplateError as e:
                 self._add_studio_validation_error(
@@ -451,7 +541,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 )
 
         try:
-            self._render_template(data.evaluator_prompt, scenario_data=scenario_data)
+            self._render_template(data.evaluator_prompt, scenario_data=template_scenario_data)
         except jinja2.TemplateError as e:
             self._add_studio_validation_error(
                 validation_errors,
@@ -895,6 +985,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if field_name == "blacklist" and not isinstance(parsed_value, list):
             return None, _("Output blacklist must be a JSON array.")
 
+        if field_name == "blacklist":
+            parsed_value = self._sanitize_blacklist_values(parsed_value)
+
         return parsed_value, None
 
     @XBlock.json_handler
@@ -1003,8 +1096,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self._messages_for_character(character_index, user_input),
             tag=self._get_thread_tag(thread_context),
         )
-        if self.blacklist:
-            if re.search(fr"\b({'|'.join(map(re.escape, self.blacklist))})\b",
+        blacklist_terms = self._sanitize_blacklist_values(self.blacklist)
+        if blacklist_terms:
+            if re.search(fr"\b({'|'.join(map(re.escape, blacklist_terms))})\b",
                          message, re.I):
                 raise JsonHandlerError(500, "Internal error.")
         if self.message_content_tag:

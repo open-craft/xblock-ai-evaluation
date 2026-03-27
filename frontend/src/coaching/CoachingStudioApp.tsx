@@ -9,14 +9,31 @@ import {
 } from "../shared/studio";
 import { UnknownRecord, XBlockRuntime } from "../shared/types";
 import {
+  CoachingListItem,
+  getBlacklistItems,
+  getScenarioEditorModel,
+  getScenarioListItems,
+  sanitizeBlacklistValue,
+  updateBlacklistItems,
+  updateScenarioDataValue,
+  updateScenarioListItems,
+} from "./coachingStudioAdapters";
+import {
+  COACHING_STUDIO_SECTIONS,
+  CoachingStudioSectionId,
+} from "./coachingStudioSections";
+import {
+  CoachingStudioValidationErrors,
+  getFirstSectionWithErrors,
+  getSectionErrorCount,
+} from "./coachingStudioValidation";
+import {
   CoachingStudioLockMetadata,
   CoachingStudioMeta,
   CoachingStudioPayload,
   CoachingStudioState,
   StudioFieldMetadata,
 } from "./types";
-
-type ValidationErrors = Record<string, string[]>;
 
 function stringifyJsonValue(value: unknown) {
   if (typeof value === "string") {
@@ -86,26 +103,29 @@ function normalizeValidationWarnings(rawWarnings: unknown): string[] {
     .map((warning) => String(warning));
 }
 
-function normalizeValidationErrors(rawErrors: unknown): ValidationErrors {
+function normalizeValidationErrors(rawErrors: unknown): CoachingStudioValidationErrors {
   if (!rawErrors || typeof rawErrors !== "object") {
     return {};
   }
 
   const validationErrors = rawErrors as Record<string, unknown>;
 
-  return Object.keys(validationErrors).reduce<ValidationErrors>((errors, fieldName) => {
-    const fieldErrors = validationErrors[fieldName];
+  return Object.keys(validationErrors).reduce<CoachingStudioValidationErrors>(
+    (errors, fieldName) => {
+      const fieldErrors = validationErrors[fieldName];
 
-    if (Array.isArray(fieldErrors)) {
-      errors[fieldName] = fieldErrors
-        .filter((entry) => typeof entry === "string")
-        .map((entry) => String(entry));
-    } else if (typeof fieldErrors === "string" && fieldErrors) {
-      errors[fieldName] = [fieldErrors];
-    }
+      if (Array.isArray(fieldErrors)) {
+        errors[fieldName] = fieldErrors
+          .filter((entry) => typeof entry === "string")
+          .map((entry) => String(entry));
+      } else if (typeof fieldErrors === "string" && fieldErrors) {
+        errors[fieldName] = [fieldErrors];
+      }
 
-    return errors;
-  }, {});
+      return errors;
+    },
+    {},
+  );
 }
 
 function getSaveErrorMessage(error: unknown, fallbackMessage: string) {
@@ -137,10 +157,59 @@ function notifyRuntime(runtime: XBlockRuntime | undefined, name: string, payload
   }
 }
 
+function updateListItemAtIndex(items: CoachingListItem[], index: number, nextValue: string) {
+  return items.map((item, itemIndex) => {
+    return itemIndex === index ? { value: nextValue } : item;
+  });
+}
+
+function appendListItem(items: CoachingListItem[]) {
+  return [...items, { value: "" }];
+}
+
+function removeListItemAtIndex(items: CoachingListItem[], index: number) {
+  return items.filter((_, itemIndex) => {
+    return itemIndex !== index;
+  });
+}
+
+function hasInvalidRows(items: CoachingListItem[]) {
+  return items.some((item) => {
+    return Boolean(item.error);
+  });
+}
+
+function buildFrontendValidationErrors(values: CoachingStudioState): CoachingStudioValidationErrors {
+  const validationErrors: CoachingStudioValidationErrors = {};
+  const learningObjectives = getScenarioListItems(values.scenario_data, "learning_objectives");
+  const evaluationCriteria = getScenarioListItems(values.scenario_data, "evaluation_criteria");
+  const blacklistItems = getBlacklistItems(values.blacklist);
+
+  if (hasInvalidRows(learningObjectives)) {
+    validationErrors.scenario_learning_objectives = [
+      "Resolve the invalid learning objective rows below.",
+    ];
+  }
+
+  if (hasInvalidRows(evaluationCriteria)) {
+    validationErrors.scenario_evaluation_criteria = [
+      "Resolve the invalid evaluation criteria rows below.",
+    ];
+  }
+
+  if (hasInvalidRows(blacklistItems)) {
+    validationErrors.blacklist = [
+      "Resolve the invalid blocked phrase rows below.",
+    ];
+  }
+
+  return validationErrors;
+}
+
 function buildSubmitPayload(values: CoachingStudioState) {
   return {
     allow_reset: Boolean(values.allow_reset),
-    blacklist: values.blacklist || "[]",
+    blacklist: sanitizeBlacklistValue(values.blacklist),
     character_1_avatar: values.character_1_avatar || "",
     character_1_name: values.character_1_name || "",
     character_1_prompt: values.character_1_prompt || "",
@@ -180,12 +249,8 @@ function isModelApiKeyLocked(values: CoachingStudioState, lockMetadata?: Coachin
   return Boolean(lockMetadata?.lock_model_api_key_initial);
 }
 
-function FieldHelp({ metadata }: { metadata?: StudioFieldMetadata }) {
-  if (!metadata?.help) {
-    return null;
-  }
-
-  return <span className="tip setting-help">{metadata.help}</span>;
+function getFieldLabel(metadata: StudioFieldMetadata | undefined, fallbackLabel: string) {
+  return metadata?.display_name || fallbackLabel;
 }
 
 function FieldErrors({ errors }: { errors?: string[] }) {
@@ -194,11 +259,406 @@ function FieldErrors({ errors }: { errors?: string[] }) {
   }
 
   return (
-    <ul className="shortanswer-studio-errors">
+    <ul className="coaching-studio-field-errors">
       {errors.map((error, index) => {
         return <li key={String(index)}>{error}</li>;
       })}
     </ul>
+  );
+}
+
+function FieldHelp({ description, helpText }: { description?: string; helpText?: string }) {
+  if (!description && !helpText) {
+    return null;
+  }
+
+  return (
+    <div className="coaching-studio-field-copy">
+      {description ? <p className="coaching-studio-field-description">{description}</p> : null}
+      {!description && helpText ? (
+        <p className="coaching-studio-field-help">{helpText}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function FieldShell({
+  children,
+  counter,
+  description,
+  errors,
+  helpText,
+  label,
+  locked,
+  showLabel = true,
+}: {
+  children: React.ReactNode;
+  counter?: string;
+  description?: string;
+  errors?: string[];
+  helpText?: string;
+  label: string;
+  locked?: boolean;
+  showLabel?: boolean;
+}) {
+  return (
+    <div className="coaching-studio-field">
+      <div className="coaching-studio-field-header">
+        {showLabel || counter ? (
+          <div className="coaching-studio-field-title-row">
+            {showLabel ? (
+              <p className="coaching-studio-field-label">
+                {label}
+                {locked ? <span className="ai-eval-lock-badge"> Locked by admin</span> : null}
+              </p>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            {counter ? <p className="coaching-studio-field-counter">{counter}</p> : null}
+          </div>
+        ) : null}
+        <FieldHelp description={description} helpText={helpText} />
+      </div>
+      <div className="coaching-studio-field-control">{children}</div>
+      <FieldErrors errors={errors} />
+    </div>
+  );
+}
+
+function TextInputField({
+  counter,
+  description,
+  errors,
+  fieldName,
+  locked,
+  metadata,
+  onChange,
+  placeholder,
+  value,
+}: {
+  counter?: string;
+  description?: string;
+  errors?: string[];
+  fieldName: string;
+  locked?: boolean;
+  metadata?: StudioFieldMetadata;
+  onChange: (nextValue: string) => void;
+  placeholder?: string;
+  value: string;
+}) {
+  return (
+    <FieldShell
+      label={getFieldLabel(metadata, fieldName)}
+      description={description}
+      helpText={metadata?.help}
+      errors={errors}
+      counter={counter}
+      locked={locked}
+    >
+      <input
+        id={"xb-field-edit-" + fieldName}
+        type="text"
+        className="field-data-control coaching-studio-input"
+        disabled={Boolean(locked)}
+        aria-disabled={Boolean(locked)}
+        aria-invalid={Boolean(errors?.length)}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </FieldShell>
+  );
+}
+
+function NumberField({
+  description,
+  errors,
+  fieldName,
+  metadata,
+  onChange,
+  value,
+}: {
+  description?: string;
+  errors?: string[];
+  fieldName: string;
+  metadata?: StudioFieldMetadata;
+  onChange: (nextValue: string) => void;
+  value: number | string | null | undefined;
+}) {
+  return (
+    <FieldShell
+      label={getFieldLabel(metadata, fieldName)}
+      description={description}
+      helpText={metadata?.help}
+      errors={errors}
+    >
+      <input
+        id={"xb-field-edit-" + fieldName}
+        type="number"
+        min={0}
+        step={1}
+        className="field-data-control coaching-studio-input coaching-studio-input--compact"
+        aria-invalid={Boolean(errors?.length)}
+        value={value === null || typeof value === "undefined" ? "" : value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </FieldShell>
+  );
+}
+
+function TextAreaField({
+  counter,
+  description,
+  errors,
+  fieldName,
+  metadata,
+  onChange,
+  rows,
+  showLabel = true,
+  value,
+}: {
+  counter?: string;
+  description?: string;
+  errors?: string[];
+  fieldName: string;
+  metadata?: StudioFieldMetadata;
+  onChange: (nextValue: string) => void;
+  rows?: number;
+  showLabel?: boolean;
+  value: string;
+}) {
+  return (
+    <FieldShell
+      label={getFieldLabel(metadata, fieldName)}
+      description={description}
+      helpText={metadata?.help}
+      errors={errors}
+      counter={counter}
+      showLabel={showLabel}
+    >
+      <textarea
+        id={"xb-field-edit-" + fieldName}
+        className="field-data-control coaching-studio-input coaching-studio-textarea"
+        rows={rows || 8}
+        aria-invalid={Boolean(errors?.length)}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </FieldShell>
+  );
+}
+
+function SelectField({
+  description,
+  errors,
+  fieldName,
+  metadata,
+  onChange,
+  value,
+}: {
+  description?: string;
+  errors?: string[];
+  fieldName: string;
+  metadata?: StudioFieldMetadata;
+  onChange: (nextValue: string) => void;
+  value: string;
+}) {
+  const choices = Array.isArray(metadata?.choices) ? metadata?.choices : [];
+
+  return (
+    <FieldShell
+      label={getFieldLabel(metadata, fieldName)}
+      description={description}
+      helpText={metadata?.help}
+      errors={errors}
+    >
+      <div className="shortanswer-studio-select-shell coaching-studio-select-shell">
+        <select
+          id={"xb-field-edit-" + fieldName}
+          className="field-data-control shortanswer-studio-select coaching-studio-input"
+          aria-invalid={Boolean(errors?.length)}
+          value={value}
+          onChange={(event) => {
+            onChange(event.target.value);
+          }}
+        >
+          {choices.map((choice, index) => {
+            return (
+              <option key={String(index)} value={choice.value || ""}>
+                {choice.display_name || choice.value || ""}
+              </option>
+            );
+          })}
+        </select>
+        <span className="shortanswer-studio-select-icon coaching-studio-select-icon" aria-hidden="true">
+          ▾
+        </span>
+      </div>
+    </FieldShell>
+  );
+}
+
+function BooleanChoiceField({
+  description,
+  errors,
+  fieldName,
+  metadata,
+  onChange,
+  value,
+}: {
+  description?: string;
+  errors?: string[];
+  fieldName: string;
+  metadata?: StudioFieldMetadata;
+  onChange: (nextValue: boolean) => void;
+  value: boolean;
+}) {
+  return (
+    <FieldShell
+      label={getFieldLabel(metadata, fieldName)}
+      description={description}
+      helpText={metadata?.help}
+      errors={errors}
+    >
+      <div className="coaching-studio-radio-group" role="radiogroup" aria-label={fieldName}>
+        <label className="coaching-studio-radio-option">
+          <input
+            type="radio"
+            name={fieldName}
+            checked={value}
+            onChange={() => {
+              onChange(true);
+            }}
+          />
+          <span>Yes</span>
+        </label>
+        <label className="coaching-studio-radio-option">
+          <input
+            type="radio"
+            name={fieldName}
+            checked={!value}
+            onChange={() => {
+              onChange(false);
+            }}
+          />
+          <span>No</span>
+        </label>
+      </div>
+    </FieldShell>
+  );
+}
+
+function ListField({
+  addLabel,
+  description,
+  errors,
+  fieldName,
+  helpText,
+  items,
+  label,
+  onAdd,
+  onChangeItem,
+  onRemoveItem,
+  placeholder,
+  showLabel = true,
+}: {
+  addLabel: string;
+  description?: string;
+  errors?: string[];
+  fieldName: string;
+  helpText?: string;
+  items: CoachingListItem[];
+  label: string;
+  onAdd: () => void;
+  onChangeItem: (index: number, nextValue: string) => void;
+  onRemoveItem: (index: number) => void;
+  placeholder?: string;
+  showLabel?: boolean;
+}) {
+  const displayItems = items.length > 0 ? items : [{ value: "" }];
+
+  return (
+    <FieldShell
+      label={label}
+      description={description}
+      helpText={helpText}
+      errors={errors}
+      showLabel={showLabel}
+    >
+      <div className="coaching-studio-list-field">
+        <div className="coaching-studio-list-rows">
+          {displayItems.map((item, index) => {
+            const canRemove = items.length > 0;
+
+            return (
+              <div className="coaching-studio-list-row-group" key={fieldName + "-" + String(index)}>
+                <div className="coaching-studio-list-row">
+                  <input
+                    id={"xb-field-edit-" + fieldName + "-" + String(index)}
+                    type="text"
+                    className="field-data-control coaching-studio-input"
+                    aria-invalid={Boolean(errors?.length || item.error)}
+                    value={item.value}
+                    placeholder={placeholder}
+                    onChange={(event) => {
+                      onChangeItem(index, event.target.value);
+                    }}
+                  />
+                  {canRemove ? (
+                    <button
+                      type="button"
+                      className="button coaching-studio-list-remove"
+                      aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
+                      onClick={() => {
+                        onRemoveItem(index);
+                      }}
+                    >
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  ) : null}
+                </div>
+                <FieldErrors errors={item.error ? [item.error] : undefined} />
+              </div>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className="button coaching-studio-list-add"
+          onClick={onAdd}
+        >
+          {addLabel}
+        </button>
+      </div>
+    </FieldShell>
+  );
+}
+
+function SectionCard({
+  children,
+  description,
+  title,
+}: {
+  children: React.ReactNode;
+  description?: string;
+  title?: string;
+}) {
+  return (
+    <section className="coaching-studio-card">
+      {title ? (
+        <div className="coaching-studio-card-header">
+          <h3 className="coaching-studio-card-title">{title}</h3>
+          {description ? <p className="coaching-studio-card-description">{description}</p> : null}
+        </div>
+      ) : null}
+      <div className="coaching-studio-card-body">{children}</div>
+    </section>
   );
 }
 
@@ -214,10 +674,10 @@ function StudioValidationSummary({
   }
 
   return (
-    <div className="shortanswer-studio-summary">
-      {requestError ? <div className="shortanswer-studio-summary__error">{requestError}</div> : null}
+    <div className="coaching-studio-summary">
+      {requestError ? <div className="coaching-studio-summary__error">{requestError}</div> : null}
       {validationWarnings.length > 0 ? (
-        <ul className="shortanswer-studio-summary__warnings">
+        <ul className="coaching-studio-summary__warnings">
           {validationWarnings.map((warning, index) => {
             return <li key={String(index)}>{warning}</li>;
           })}
@@ -227,214 +687,62 @@ function StudioValidationSummary({
   );
 }
 
-function TextField({
-  errors,
-  fieldName,
-  locked,
-  metadata,
-  onChange,
-  type,
-  value,
-}: {
-  errors?: string[];
-  fieldName: string;
-  locked?: boolean;
-  metadata?: StudioFieldMetadata;
-  onChange: (nextValue: string) => void;
-  type: string;
-  value: string;
-}) {
+function SectionFieldErrors({ errors }: { errors?: string[] }) {
+  if (!errors || errors.length === 0) {
+    return null;
+  }
+
   return (
-    <li
-      className={
-        "field comp-setting-entry metadata_entry" + (locked ? " ai-eval-locked-entry" : "")
-      }
-      data-field-name={fieldName}
-    >
-      <div className="wrapper-comp-setting">
-        <label className="label setting-label" htmlFor={"xb-field-edit-" + fieldName}>
-          {metadata?.display_name || fieldName}
-          {locked ? <span className="ai-eval-lock-badge"> (Locked by admin)</span> : null}
-        </label>
-        <input
-          id={"xb-field-edit-" + fieldName}
-          type={type}
-          className="field-data-control"
-          disabled={Boolean(locked)}
-          aria-disabled={Boolean(locked)}
-          value={value}
-          onChange={(event) => {
-            onChange(event.target.value);
-          }}
-        />
-      </div>
+    <div className="coaching-studio-section-errors">
+      <p className="coaching-studio-section-errors__title">This section has validation issues.</p>
       <FieldErrors errors={errors} />
-      <FieldHelp metadata={metadata} />
-    </li>
+    </div>
   );
 }
 
-function TextAreaField({
-  errors,
-  fieldName,
-  metadata,
-  onChange,
-  rows,
-  value,
+function SectionNav({
+  activeSection,
+  onSectionChange,
+  validationErrors,
 }: {
-  errors?: string[];
-  fieldName: string;
-  metadata?: StudioFieldMetadata;
-  onChange: (nextValue: string) => void;
-  rows?: number;
-  value: string;
+  activeSection: CoachingStudioSectionId;
+  onSectionChange: (sectionId: CoachingStudioSectionId) => void;
+  validationErrors: CoachingStudioValidationErrors;
 }) {
   return (
-    <li className="field comp-setting-entry metadata_entry" data-field-name={fieldName}>
-      <div className="wrapper-comp-setting">
-        <label className="label setting-label" htmlFor={"xb-field-edit-" + fieldName}>
-          {metadata?.display_name || fieldName}
-        </label>
-        <textarea
-          id={"xb-field-edit-" + fieldName}
-          className="field-data-control"
-          rows={rows || 10}
-          cols={70}
-          value={value}
-          onChange={(event) => {
-            onChange(event.target.value);
-          }}
-        />
-      </div>
-      <FieldErrors errors={errors} />
-      <FieldHelp metadata={metadata} />
-    </li>
+    <nav className="coaching-studio-nav" aria-label="Coaching Studio sections">
+      <ul className="coaching-studio-nav-list">
+        {COACHING_STUDIO_SECTIONS.map((section) => {
+          const errorCount = getSectionErrorCount(section.id, validationErrors);
+          const isActive = section.id === activeSection;
+
+          return (
+            <li key={section.id} className="coaching-studio-nav-item">
+              <button
+                type="button"
+                className={
+                  "coaching-studio-nav-button" +
+                  (isActive ? " is-active" : "") +
+                  (errorCount > 0 ? " has-errors" : "")
+                }
+                onClick={() => {
+                  onSectionChange(section.id);
+                }}
+              >
+                <span className="coaching-studio-nav-text">{section.title}</span>
+                {errorCount > 0 ? (
+                  <span className="coaching-studio-nav-badge">{errorCount}</span>
+                ) : null}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
-function NumberField({
-  errors,
-  fieldName,
-  metadata,
-  onChange,
-  value,
-}: {
-  errors?: string[];
-  fieldName: string;
-  metadata?: StudioFieldMetadata;
-  onChange: (nextValue: string) => void;
-  value: number | string | null | undefined;
-}) {
-  return (
-    <li className="field comp-setting-entry metadata_entry" data-field-name={fieldName}>
-      <div className="wrapper-comp-setting">
-        <label className="label setting-label" htmlFor={"xb-field-edit-" + fieldName}>
-          {metadata?.display_name || fieldName}
-        </label>
-        <input
-          id={"xb-field-edit-" + fieldName}
-          type="number"
-          className="field-data-control"
-          min={0}
-          step={1}
-          value={value === null || typeof value === "undefined" ? "" : value}
-          onChange={(event) => {
-            onChange(event.target.value);
-          }}
-        />
-      </div>
-      <FieldErrors errors={errors} />
-      <FieldHelp metadata={metadata} />
-    </li>
-  );
-}
-
-function SelectField({
-  errors,
-  fieldName,
-  metadata,
-  onChange,
-  value,
-}: {
-  errors?: string[];
-  fieldName: string;
-  metadata?: StudioFieldMetadata;
-  onChange: (nextValue: string) => void;
-  value: string;
-}) {
-  const choices = Array.isArray(metadata?.choices) ? metadata?.choices : [];
-
-  return (
-    <li className="field comp-setting-entry metadata_entry" data-field-name={fieldName}>
-      <div className="wrapper-comp-setting">
-        <label className="label setting-label" htmlFor={"xb-field-edit-" + fieldName}>
-          {metadata?.display_name || fieldName}
-        </label>
-        <div className="shortanswer-studio-select-shell">
-          <select
-            id={"xb-field-edit-" + fieldName}
-            className="field-data-control shortanswer-studio-select"
-            value={value}
-            onChange={(event) => {
-              onChange(event.target.value);
-            }}
-          >
-            {choices.map((choice, index) => {
-              return (
-                <option key={String(index)} value={choice.value || ""}>
-                  {choice.display_name || choice.value || ""}
-                </option>
-              );
-            })}
-          </select>
-          <span className="shortanswer-studio-select-icon" aria-hidden="true">
-            ▾
-          </span>
-        </div>
-      </div>
-      <FieldErrors errors={errors} />
-      <FieldHelp metadata={metadata} />
-    </li>
-  );
-}
-
-function BooleanField({
-  errors,
-  fieldName,
-  metadata,
-  onChange,
-  value,
-}: {
-  errors?: string[];
-  fieldName: string;
-  metadata?: StudioFieldMetadata;
-  onChange: (nextValue: boolean) => void;
-  value: boolean;
-}) {
-  return (
-    <li className="field comp-setting-entry metadata_entry" data-field-name={fieldName}>
-      <div className="wrapper-comp-setting">
-        <label className="label setting-label" htmlFor={"xb-field-edit-" + fieldName}>
-          {metadata?.display_name || fieldName}
-        </label>
-        <div className="shortanswer-studio-checkbox-control">
-          <input
-            id={"xb-field-edit-" + fieldName}
-            type="checkbox"
-            checked={value}
-            onChange={(event) => {
-              onChange(event.target.checked);
-            }}
-          />
-        </div>
-      </div>
-      <FieldErrors errors={errors} />
-      <FieldHelp metadata={metadata} />
-    </li>
-  );
-}
-
-function CoachingSettingsForm({
+function GeneralSection({
   fieldMetadata,
   lockMetadata,
   onChange,
@@ -444,224 +752,632 @@ function CoachingSettingsForm({
   fieldMetadata: Record<string, StudioFieldMetadata>;
   lockMetadata?: CoachingStudioLockMetadata;
   onChange: (fieldName: string, nextValue: unknown) => void;
-  validationErrors: ValidationErrors;
+  validationErrors: CoachingStudioValidationErrors;
   values: CoachingStudioState;
 }) {
   return (
-    <ul className="list-input settings-list">
-      <TextField
-        fieldName="display_name"
-        metadata={fieldMetadata.display_name}
-        value={values.display_name || ""}
-        errors={validationErrors.display_name}
-        onChange={(nextValue) => {
-          onChange("display_name", nextValue);
-        }}
-        type="text"
-      />
-      <SelectField
-        fieldName="model"
-        metadata={fieldMetadata.model}
-        value={values.model || ""}
-        errors={validationErrors.model}
-        onChange={(nextValue) => {
-          onChange("model", nextValue);
-        }}
-      />
-      <TextField
-        fieldName="model_api_key"
-        metadata={fieldMetadata.model_api_key}
-        value={values.model_api_key || ""}
-        errors={validationErrors.model_api_key}
-        locked={isModelApiKeyLocked(values, lockMetadata)}
-        onChange={(nextValue) => {
-          onChange("model_api_key", nextValue);
-        }}
-        type="text"
-      />
-      <TextField
-        fieldName="model_api_url"
-        metadata={fieldMetadata.model_api_url}
-        value={values.model_api_url || ""}
-        errors={validationErrors.model_api_url}
-        onChange={(nextValue) => {
-          onChange("model_api_url", nextValue);
-        }}
-        type="text"
-      />
-      <TextAreaField
-        fieldName="initial_message"
-        metadata={fieldMetadata.initial_message}
-        value={values.initial_message || ""}
-        errors={validationErrors.initial_message}
-        onChange={(nextValue) => {
-          onChange("initial_message", nextValue);
-        }}
-      />
-      <TextAreaField
-        fieldName="coach_initial_message"
-        metadata={fieldMetadata.coach_initial_message}
-        value={values.coach_initial_message || ""}
-        errors={validationErrors.coach_initial_message}
-        onChange={(nextValue) => {
-          onChange("coach_initial_message", nextValue);
-        }}
-      />
-      <TextAreaField
-        fieldName="scenario_data"
-        metadata={fieldMetadata.scenario_data}
-        value={values.scenario_data || ""}
-        errors={validationErrors.scenario_data}
-        rows={14}
-        onChange={(nextValue) => {
-          onChange("scenario_data", nextValue);
-        }}
-      />
-      <TextField
-        fieldName="workspace_title"
-        metadata={fieldMetadata.workspace_title}
-        value={values.workspace_title || ""}
-        errors={validationErrors.workspace_title}
-        onChange={(nextValue) => {
-          onChange("workspace_title", nextValue);
-        }}
-        type="text"
-      />
-      <TextField
-        fieldName="coach_title"
-        metadata={fieldMetadata.coach_title}
-        value={values.coach_title || ""}
-        errors={validationErrors.coach_title}
-        onChange={(nextValue) => {
-          onChange("coach_title", nextValue);
-        }}
-        type="text"
-      />
-      <TextAreaField
-        fieldName="intro_text"
-        metadata={fieldMetadata.intro_text}
-        value={values.intro_text || ""}
-        errors={validationErrors.intro_text}
-        onChange={(nextValue) => {
-          onChange("intro_text", nextValue);
-        }}
-      />
-      <TextField
-        fieldName="character_1_name"
-        metadata={fieldMetadata.character_1_name}
-        value={values.character_1_name || ""}
-        errors={validationErrors.character_1_name}
-        onChange={(nextValue) => {
-          onChange("character_1_name", nextValue);
-        }}
-        type="text"
-      />
-      <TextField
-        fieldName="character_1_role"
-        metadata={fieldMetadata.character_1_role}
-        value={values.character_1_role || ""}
-        errors={validationErrors.character_1_role}
-        onChange={(nextValue) => {
-          onChange("character_1_role", nextValue);
-        }}
-        type="text"
-      />
-      <TextAreaField
-        fieldName="character_1_prompt"
-        metadata={fieldMetadata.character_1_prompt}
-        value={values.character_1_prompt || ""}
-        errors={validationErrors.character_1_prompt}
-        onChange={(nextValue) => {
-          onChange("character_1_prompt", nextValue);
-        }}
-      />
-      <TextField
-        fieldName="character_1_avatar"
-        metadata={fieldMetadata.character_1_avatar}
-        value={values.character_1_avatar || ""}
-        errors={validationErrors.character_1_avatar}
-        onChange={(nextValue) => {
-          onChange("character_1_avatar", nextValue);
-        }}
-        type="text"
-      />
-      <TextField
-        fieldName="character_2_name"
-        metadata={fieldMetadata.character_2_name}
-        value={values.character_2_name || ""}
-        errors={validationErrors.character_2_name}
-        onChange={(nextValue) => {
-          onChange("character_2_name", nextValue);
-        }}
-        type="text"
-      />
-      <TextField
-        fieldName="character_2_role"
-        metadata={fieldMetadata.character_2_role}
-        value={values.character_2_role || ""}
-        errors={validationErrors.character_2_role}
-        onChange={(nextValue) => {
-          onChange("character_2_role", nextValue);
-        }}
-        type="text"
-      />
-      <TextAreaField
-        fieldName="character_2_prompt"
-        metadata={fieldMetadata.character_2_prompt}
-        value={values.character_2_prompt || ""}
-        errors={validationErrors.character_2_prompt}
-        onChange={(nextValue) => {
-          onChange("character_2_prompt", nextValue);
-        }}
-      />
-      <TextField
-        fieldName="character_2_avatar"
-        metadata={fieldMetadata.character_2_avatar}
-        value={values.character_2_avatar || ""}
-        errors={validationErrors.character_2_avatar}
-        onChange={(nextValue) => {
-          onChange("character_2_avatar", nextValue);
-        }}
-        type="text"
-      />
-      <TextAreaField
-        fieldName="evaluator_prompt"
-        metadata={fieldMetadata.evaluator_prompt}
-        value={values.evaluator_prompt || ""}
-        errors={validationErrors.evaluator_prompt}
-        onChange={(nextValue) => {
-          onChange("evaluator_prompt", nextValue);
-        }}
-      />
-      <TextAreaField
-        fieldName="blacklist"
-        metadata={fieldMetadata.blacklist}
-        value={values.blacklist || ""}
-        errors={validationErrors.blacklist}
-        rows={6}
-        onChange={(nextValue) => {
-          onChange("blacklist", nextValue);
-        }}
-      />
-      <NumberField
-        fieldName="max_attempts"
-        metadata={fieldMetadata.max_attempts}
-        value={values.max_attempts}
-        errors={validationErrors.max_attempts}
-        onChange={(nextValue) => {
-          onChange("max_attempts", nextValue);
-        }}
-      />
-      <BooleanField
-        fieldName="allow_reset"
-        metadata={fieldMetadata.allow_reset}
-        value={Boolean(values.allow_reset)}
-        errors={validationErrors.allow_reset}
-        onChange={(nextValue) => {
-          onChange("allow_reset", nextValue);
-        }}
-      />
-    </ul>
+    <div className="coaching-studio-section-stack">
+      <SectionCard>
+        <TextInputField
+          fieldName="display_name"
+          metadata={fieldMetadata.display_name}
+          description="Name of the XBlock component in Studio."
+          value={values.display_name || ""}
+          errors={validationErrors.display_name}
+          onChange={(nextValue) => {
+            onChange("display_name", nextValue);
+          }}
+        />
+        <SelectField
+          fieldName="model"
+          metadata={fieldMetadata.model}
+          description="Select the AI model used for workspace, coach, and evaluation responses."
+          value={values.model || ""}
+          errors={validationErrors.model}
+          onChange={(nextValue) => {
+            onChange("model", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="model_api_key"
+          metadata={fieldMetadata.model_api_key}
+          description="API key for the selected model when it is not provided globally."
+          value={values.model_api_key || ""}
+          errors={validationErrors.model_api_key}
+          locked={isModelApiKeyLocked(values, lockMetadata)}
+          onChange={(nextValue) => {
+            onChange("model_api_key", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="model_api_url"
+          metadata={fieldMetadata.model_api_url}
+          description="Optional endpoint override used for self-hosted or llama-style providers."
+          value={values.model_api_url || ""}
+          errors={validationErrors.model_api_url}
+          onChange={(nextValue) => {
+            onChange("model_api_url", nextValue);
+          }}
+        />
+        <NumberField
+          fieldName="max_attempts"
+          metadata={{
+            ...fieldMetadata.max_attempts,
+            display_name: "Maximum Responses",
+          }}
+          description="Number of times a learner can submit a workspace response."
+          value={values.max_attempts}
+          errors={validationErrors.max_attempts}
+          onChange={(nextValue) => {
+            onChange("max_attempts", nextValue);
+          }}
+        />
+        <BooleanChoiceField
+          fieldName="allow_reset"
+          metadata={{
+            ...fieldMetadata.allow_reset,
+            display_name: "Activity Reset",
+          }}
+          description="Let learners reset the activity. Only the latest score counts."
+          value={Boolean(values.allow_reset)}
+          errors={validationErrors.allow_reset}
+          onChange={(nextValue) => {
+            onChange("allow_reset", nextValue);
+          }}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function TaskDescriptionSection({
+  fieldMetadata,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  return (
+    <div className="coaching-studio-section-stack">
+      <SectionCard>
+        <TextAreaField
+          fieldName="intro_text"
+          metadata={fieldMetadata.intro_text}
+          value={values.intro_text || ""}
+          errors={validationErrors.intro_text}
+          rows={12}
+          showLabel={false}
+          onChange={(nextValue) => {
+            onChange("intro_text", nextValue);
+          }}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function TaskContextSection({
+  fieldMetadata,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  const scenario = getScenarioEditorModel(values.scenario_data);
+  const learningObjectives = getScenarioListItems(values.scenario_data, "learning_objectives");
+
+  return (
+    <div className="coaching-studio-section-stack">
+      <SectionFieldErrors errors={validationErrors.scenario_data} />
+      <SectionCard
+        title="Scenario"
+        description="Tell the AI model briefly what the learner’s task is."
+      >
+        <TextAreaField
+          fieldName="scenario_case_details"
+          metadata={{
+            display_name: "Scenario",
+          }}
+          counter={`${scenario.caseDetails.length}/300`}
+          value={scenario.caseDetails}
+          rows={4}
+          showLabel={false}
+          onChange={(nextValue) => {
+            onChange("scenario_data", updateScenarioDataValue(values.scenario_data, "case_details", nextValue));
+          }}
+        />
+      </SectionCard>
+      <SectionCard
+        title="Learning Objectives"
+        description="Tell the AI model what to look for in the learner’s response. Use one explicit row per objective."
+      >
+        <ListField
+          fieldName="scenario_learning_objectives"
+          label="Learning Objectives"
+          items={learningObjectives}
+          errors={validationErrors.scenario_learning_objectives}
+          addLabel="+ Add objective"
+          placeholder="Describe one learning objective"
+          showLabel={false}
+          onAdd={() => {
+            onChange(
+              "scenario_data",
+              updateScenarioListItems(
+                values.scenario_data,
+                "learning_objectives",
+                appendListItem(learningObjectives),
+              ),
+            );
+          }}
+          onChangeItem={(index, nextValue) => {
+            const nextItems =
+              learningObjectives.length > 0
+                ? updateListItemAtIndex(learningObjectives, index, nextValue)
+                : [{ value: nextValue }];
+            onChange(
+              "scenario_data",
+              updateScenarioListItems(values.scenario_data, "learning_objectives", nextItems),
+            );
+          }}
+          onRemoveItem={(index) => {
+            onChange(
+              "scenario_data",
+              updateScenarioListItems(
+                values.scenario_data,
+                "learning_objectives",
+                removeListItemAtIndex(learningObjectives, index),
+              ),
+            );
+          }}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function EvaluationSection({
+  fieldMetadata,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  const evaluationCriteria = getScenarioListItems(values.scenario_data, "evaluation_criteria");
+
+  return (
+    <div className="coaching-studio-section-stack">
+      <SectionCard
+        title="Evaluation Criteria"
+        description="Define the rubric used to score the learner after the conversation. Add one criterion per row."
+      >
+        <ListField
+          fieldName="scenario_evaluation_criteria"
+          label="Evaluation Criteria"
+          items={evaluationCriteria}
+          errors={validationErrors.scenario_evaluation_criteria}
+          addLabel="+ Add criterion"
+          placeholder="Name one evaluation criterion"
+          showLabel={false}
+          onAdd={() => {
+            onChange(
+              "scenario_data",
+              updateScenarioListItems(
+                values.scenario_data,
+                "evaluation_criteria",
+                appendListItem(evaluationCriteria),
+              ),
+            );
+          }}
+          onChangeItem={(index, nextValue) => {
+            const nextItems =
+              evaluationCriteria.length > 0
+                ? updateListItemAtIndex(evaluationCriteria, index, nextValue)
+                : [{ value: nextValue }];
+            onChange(
+              "scenario_data",
+              updateScenarioListItems(values.scenario_data, "evaluation_criteria", nextItems),
+            );
+          }}
+          onRemoveItem={(index) => {
+            onChange(
+              "scenario_data",
+              updateScenarioListItems(
+                values.scenario_data,
+                "evaluation_criteria",
+                removeListItemAtIndex(evaluationCriteria, index),
+              ),
+            );
+          }}
+        />
+      </SectionCard>
+      <SectionCard
+        title="Evaluator Prompt"
+        description="This prompt is sent to the evaluator model after the conversation finishes."
+      >
+        <TextAreaField
+          fieldName="evaluator_prompt"
+          metadata={fieldMetadata.evaluator_prompt}
+          value={values.evaluator_prompt || ""}
+          errors={validationErrors.evaluator_prompt}
+          rows={12}
+          showLabel={false}
+          onChange={(nextValue) => {
+            onChange("evaluator_prompt", nextValue);
+          }}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function WorkspaceSection({
+  fieldMetadata,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  return (
+    <div className="coaching-studio-section-stack">
+      <SectionCard
+        title="Workspace Details"
+        description="Set the workspace heading and the main persona the learner is speaking with."
+      >
+        <TextInputField
+          fieldName="workspace_title"
+          metadata={{
+            ...fieldMetadata.workspace_title,
+            display_name: "Title",
+          }}
+          description="Heading above the workspace."
+          value={values.workspace_title || ""}
+          errors={validationErrors.workspace_title}
+          onChange={(nextValue) => {
+            onChange("workspace_title", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="character_1_name"
+          metadata={{
+            ...fieldMetadata.character_1_name,
+            display_name: "Persona Name",
+          }}
+          description="Learner interacts with this persona in the workspace."
+          value={values.character_1_name || ""}
+          errors={validationErrors.character_1_name}
+          onChange={(nextValue) => {
+            onChange("character_1_name", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="character_1_role"
+          metadata={{
+            ...fieldMetadata.character_1_role,
+            display_name: "Persona Role",
+          }}
+          description="Tell the AI model what role the persona should play."
+          counter={`${(values.character_1_role || "").length}/30`}
+          value={values.character_1_role || ""}
+          errors={validationErrors.character_1_role}
+          onChange={(nextValue) => {
+            onChange("character_1_role", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="character_1_avatar"
+          metadata={{
+            ...fieldMetadata.character_1_avatar,
+            display_name: "Persona Avatar URL",
+          }}
+          description="Optional image shown next to the persona's chat messages."
+          value={values.character_1_avatar || ""}
+          errors={validationErrors.character_1_avatar}
+          onChange={(nextValue) => {
+            onChange("character_1_avatar", nextValue);
+          }}
+        />
+      </SectionCard>
+      <SectionCard
+        title="Conversation Starter"
+        description="This is the first message shown in the workspace pane."
+      >
+        <TextAreaField
+          fieldName="initial_message"
+          metadata={{
+            ...fieldMetadata.initial_message,
+            display_name: "Conversation Starter",
+          }}
+          description="Persona's first message in the workspace."
+          value={values.initial_message || ""}
+          errors={validationErrors.initial_message}
+          rows={5}
+          onChange={(nextValue) => {
+            onChange("initial_message", nextValue);
+          }}
+        />
+      </SectionCard>
+      <SectionCard
+        title="Persona Prompt"
+        description="Define the persona's role, boundaries, and speaking style."
+      >
+        <TextAreaField
+          fieldName="character_1_prompt"
+          metadata={{
+            ...fieldMetadata.character_1_prompt,
+            display_name: "Persona Prompt",
+          }}
+          description="Instructions that shape how the workspace persona responds."
+          value={values.character_1_prompt || ""}
+          errors={validationErrors.character_1_prompt}
+          rows={16}
+          onChange={(nextValue) => {
+            onChange("character_1_prompt", nextValue);
+          }}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function CoachChatSection({
+  fieldMetadata,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  return (
+    <div className="coaching-studio-section-stack">
+      <SectionCard
+        title="Coach Details"
+        description="Set the coach pane heading and the coach persona used for guidance."
+      >
+        <TextInputField
+          fieldName="coach_title"
+          metadata={{
+            ...fieldMetadata.coach_title,
+            display_name: "Title",
+          }}
+          description="Heading above the coach chat."
+          value={values.coach_title || ""}
+          errors={validationErrors.coach_title}
+          onChange={(nextValue) => {
+            onChange("coach_title", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="character_2_name"
+          metadata={{
+            ...fieldMetadata.character_2_name,
+            display_name: "Coach Name",
+          }}
+          description="Learner interacts with this coach in the coach chat."
+          value={values.character_2_name || ""}
+          errors={validationErrors.character_2_name}
+          onChange={(nextValue) => {
+            onChange("character_2_name", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="character_2_role"
+          metadata={{
+            ...fieldMetadata.character_2_role,
+            display_name: "Coach Role",
+          }}
+          description="Tell the AI model what role the coach should play."
+          counter={`${(values.character_2_role || "").length}/30`}
+          value={values.character_2_role || ""}
+          errors={validationErrors.character_2_role}
+          onChange={(nextValue) => {
+            onChange("character_2_role", nextValue);
+          }}
+        />
+        <TextInputField
+          fieldName="character_2_avatar"
+          metadata={{
+            ...fieldMetadata.character_2_avatar,
+            display_name: "Coach Avatar URL",
+          }}
+          description="Optional image shown next to the coach's chat messages."
+          value={values.character_2_avatar || ""}
+          errors={validationErrors.character_2_avatar}
+          onChange={(nextValue) => {
+            onChange("character_2_avatar", nextValue);
+          }}
+        />
+      </SectionCard>
+      <SectionCard
+        title="Conversation Starter"
+        description="This is the first message shown in the coach pane."
+      >
+        <TextAreaField
+          fieldName="coach_initial_message"
+          metadata={{
+            ...fieldMetadata.coach_initial_message,
+            display_name: "Conversation Starter",
+          }}
+          description="Coach's first message."
+          value={values.coach_initial_message || ""}
+          errors={validationErrors.coach_initial_message}
+          rows={5}
+          onChange={(nextValue) => {
+            onChange("coach_initial_message", nextValue);
+          }}
+        />
+      </SectionCard>
+      <SectionCard
+        title="Coach Prompt"
+        description="Define the coach's guidance style and what it should avoid doing for the learner."
+      >
+        <TextAreaField
+          fieldName="character_2_prompt"
+          metadata={{
+            ...fieldMetadata.character_2_prompt,
+            display_name: "Coach Prompt",
+          }}
+          description="Instructions that shape how the coach responds."
+          value={values.character_2_prompt || ""}
+          errors={validationErrors.character_2_prompt}
+          rows={16}
+          onChange={(nextValue) => {
+            onChange("character_2_prompt", nextValue);
+          }}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function AdvancedSection({
+  fieldMetadata,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  const blacklistItems = getBlacklistItems(values.blacklist);
+
+  return (
+    <div className="coaching-studio-section-stack">
+      <SectionCard
+        title="Output Blacklist"
+        description="Add one blocked word or phrase per row."
+      >
+        <ListField
+          fieldName="blacklist"
+          label={getFieldLabel(fieldMetadata.blacklist, "blacklist")}
+          helpText={fieldMetadata.blacklist?.help}
+          items={blacklistItems}
+          errors={validationErrors.blacklist}
+          addLabel="+ Add blocked phrase"
+          placeholder="Blocked word or phrase"
+          onAdd={() => {
+            onChange("blacklist", updateBlacklistItems(values.blacklist, appendListItem(blacklistItems)));
+          }}
+          onChangeItem={(index, nextValue) => {
+            const nextItems =
+              blacklistItems.length > 0
+                ? updateListItemAtIndex(blacklistItems, index, nextValue)
+                : [{ value: nextValue }];
+            onChange("blacklist", updateBlacklistItems(values.blacklist, nextItems));
+          }}
+          onRemoveItem={(index) => {
+            onChange(
+              "blacklist",
+              updateBlacklistItems(values.blacklist, removeListItemAtIndex(blacklistItems, index)),
+            );
+          }}
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function SectionPanel({
+  activeSection,
+  fieldMetadata,
+  lockMetadata,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  activeSection: CoachingStudioSectionId;
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  lockMetadata?: CoachingStudioLockMetadata;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  const activeSectionMeta = COACHING_STUDIO_SECTIONS.find((section) => section.id === activeSection);
+
+  return (
+    <div className="coaching-studio-panel" data-section-id={activeSection}>
+      <div className="coaching-studio-panel-header">
+        <h2 className="coaching-studio-panel-title">{activeSectionMeta?.title}</h2>
+        <p className="coaching-studio-panel-description">{activeSectionMeta?.description}</p>
+      </div>
+      {activeSection === "general" ? (
+        <GeneralSection
+          fieldMetadata={fieldMetadata}
+          lockMetadata={lockMetadata}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
+      {activeSection === "taskDescription" ? (
+        <TaskDescriptionSection
+          fieldMetadata={fieldMetadata}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
+      {activeSection === "taskContext" ? (
+        <TaskContextSection
+          fieldMetadata={fieldMetadata}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
+      {activeSection === "evaluation" ? (
+        <EvaluationSection
+          fieldMetadata={fieldMetadata}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
+      {activeSection === "workspace" ? (
+        <WorkspaceSection
+          fieldMetadata={fieldMetadata}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
+      {activeSection === "coachChat" ? (
+        <CoachChatSection
+          fieldMetadata={fieldMetadata}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
+      {activeSection === "advanced" ? (
+        <AdvancedSection
+          fieldMetadata={fieldMetadata}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -677,7 +1393,8 @@ export default function CoachingStudioApp({
     return normalizeInitialState(payload.initial_state);
   }, [payload.initial_state]);
   const [values, setValues] = useState(initialValues);
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [activeSection, setActiveSection] = useState<CoachingStudioSectionId>("general");
+  const [validationErrors, setValidationErrors] = useState<CoachingStudioValidationErrors>({});
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -687,11 +1404,25 @@ export default function CoachingStudioApp({
 
   useEffect(() => {
     setValues(initialValues);
+    setActiveSection("general");
+    setValidationErrors({});
+    setValidationWarnings([]);
+    setRequestError("");
   }, [initialValues]);
 
-  function handleSave(event: React.MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault();
+  function handleValidationResponse(
+    nextValidationErrors: CoachingStudioValidationErrors,
+    preferredSectionId?: CoachingStudioSectionId,
+  ) {
+    setValidationErrors(nextValidationErrors);
 
+    const nextSection = getFirstSectionWithErrors(nextValidationErrors, preferredSectionId);
+    if (nextSection) {
+      setActiveSection(nextSection);
+    }
+  }
+
+  function saveStudioSettings() {
     if (!payload.handler_urls.studio_submit || isSaving) {
       return;
     }
@@ -700,6 +1431,32 @@ export default function CoachingStudioApp({
       id: "coaching.studio.saving",
       defaultMessage: "Saving",
     });
+    const validationMessage = intl.formatMessage({
+      id: "coaching.studio.validationError",
+      defaultMessage: "Please fix the validation issues and try again.",
+    });
+    const sanitizedValues = {
+      ...values,
+      blacklist: sanitizeBlacklistValue(values.blacklist),
+    };
+    if (sanitizedValues.blacklist !== values.blacklist) {
+      setValues(sanitizedValues);
+    }
+    const frontendValidationErrors = buildFrontendValidationErrors(sanitizedValues);
+
+    if (Object.keys(frontendValidationErrors).length > 0) {
+      setRequestError(validationMessage);
+      setValidationWarnings([]);
+      handleValidationResponse(frontendValidationErrors, activeSection);
+      notifyRuntime(runtime, "error", {
+        title: intl.formatMessage({
+          id: "coaching.studio.saveFailed",
+          defaultMessage: "Unable to update settings",
+        }),
+        message: validationMessage,
+      });
+      return;
+    }
 
     setIsSaving(true);
     setRequestError("");
@@ -710,24 +1467,23 @@ export default function CoachingStudioApp({
       message: savingMessage,
     });
 
-    submitStudioPayload(payload.handler_urls.studio_submit, buildSubmitPayload(values))
+    submitStudioPayload(payload.handler_urls.studio_submit, buildSubmitPayload(sanitizedValues))
       .then((response: StudioSaveResponse) => {
-        setValidationErrors(normalizeValidationErrors(response.validation_errors));
+        const nextValidationErrors = normalizeValidationErrors(response.validation_errors);
         setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
+        handleValidationResponse(nextValidationErrors, activeSection);
         setIsSaving(false);
 
         if (response.success) {
           notifyRuntime(runtime, "save", { state: "end" });
         } else {
+          setRequestError(validationMessage);
           notifyRuntime(runtime, "error", {
             title: intl.formatMessage({
               id: "coaching.studio.saveFailed",
               defaultMessage: "Unable to update settings",
             }),
-            message: intl.formatMessage({
-              id: "coaching.studio.validationError",
-              defaultMessage: "Please fix the validation issues and try again.",
-            }),
+            message: validationMessage,
           });
         }
       })
@@ -736,13 +1492,11 @@ export default function CoachingStudioApp({
 
         if (error instanceof RequestError && error.payload) {
           const normalizedResponse = normalizeStudioSaveResponse(error.payload);
-          setValidationErrors(normalizeValidationErrors(normalizedResponse.validation_errors));
+          const nextValidationErrors = normalizeValidationErrors(normalizedResponse.validation_errors);
+          handleValidationResponse(nextValidationErrors, activeSection);
           setValidationWarnings(normalizeValidationWarnings(normalizedResponse.validation_warnings));
           if (Object.keys(normalizedResponse.validation_errors).length > 0) {
-            inlineRequestError = intl.formatMessage({
-              id: "coaching.studio.validationError",
-              defaultMessage: "Please fix the validation issues and try again.",
-            });
+            inlineRequestError = validationMessage;
           }
         }
 
@@ -769,71 +1523,102 @@ export default function CoachingStudioApp({
       });
   }
 
+  function handleCancel(event?: Event | React.SyntheticEvent<HTMLElement>) {
+    if (event && "preventDefault" in event) {
+      event.preventDefault();
+    }
+
+    notifyRuntime(runtime, "cancel", {});
+  }
+
+  useEffect(() => {
+    const root = document.querySelector(".coaching-react-studio");
+    const modal = root?.closest(".edit-xblock-modal");
+    const modalActions = modal?.querySelector(".modal-actions") as HTMLElement | null;
+    const saveItem = modalActions?.querySelector(".action-save")?.closest("li") as HTMLLIElement | null;
+    const cancelItem = modalActions?.querySelector(".action-cancel")?.closest("li") as HTMLLIElement | null;
+    const saveAction = modalActions?.querySelector(".action-save") as HTMLAnchorElement | null;
+    const cancelAction = modalActions?.querySelector(".action-cancel") as HTMLAnchorElement | null;
+
+    if (!modalActions || !saveItem || !cancelItem || !saveAction || !cancelAction) {
+      return undefined;
+    }
+
+    const saveLabel = isSaving
+      ? intl.formatMessage({
+          id: "coaching.studio.savingButton",
+          defaultMessage: "Saving...",
+        })
+      : intl.formatMessage({
+          id: "coaching.studio.save",
+          defaultMessage: "Save",
+        });
+    const cancelLabel = intl.formatMessage({
+      id: "coaching.studio.cancel",
+      defaultMessage: "Cancel",
+    });
+    const onSaveClick = (nativeEvent: Event) => {
+      nativeEvent.preventDefault();
+      saveStudioSettings();
+    };
+    const onCancelClick = (nativeEvent: Event) => {
+      handleCancel(nativeEvent);
+    };
+
+    modalActions.style.display = "block";
+    saveItem.style.display = "inline-block";
+    cancelItem.style.display = "inline-block";
+    saveAction.className = "button action-primary action-save";
+    cancelAction.className = "button action-cancel";
+    saveAction.textContent = saveLabel;
+    cancelAction.textContent = cancelLabel;
+    saveAction.setAttribute("aria-disabled", String(isSaving));
+    saveAction.classList.toggle("disabled", isSaving);
+    saveAction.classList.toggle("is-disabled", isSaving);
+    saveAction.addEventListener("click", onSaveClick);
+    cancelAction.addEventListener("click", onCancelClick);
+
+    return () => {
+      saveAction.removeEventListener("click", onSaveClick);
+      cancelAction.removeEventListener("click", onCancelClick);
+    };
+  }, [intl, isSaving, runtime, saveStudioSettings]);
+
   return (
     <div
-      className="editor-with-buttons shortanswer-react-studio coaching-react-studio"
+      className="shortanswer-react-studio coaching-react-studio"
       data-block-kind="coaching"
     >
-      <div className="wrapper-comp-settings is-active editor-with-buttons" id="settings-tab">
-        <StudioValidationSummary
-          requestError={requestError}
-          validationWarnings={validationWarnings}
-        />
-        <CoachingSettingsForm
-          fieldMetadata={fieldMetadata}
-          lockMetadata={lockMetadata}
-          validationErrors={validationErrors}
-          values={values}
-          onChange={(fieldName, nextValue) => {
-            setValues((currentValues) => {
-              return {
-                ...currentValues,
-                [fieldName]: nextValue,
-              };
-            });
-          }}
-        />
-      </div>
-      <div className="xblock-actions">
-        <ul>
-          <li className="action-item">
-            <a
-              href="#"
-              className="button action-primary action-save shortanswer-studio-save-button"
-              aria-disabled={isSaving}
-              onClick={handleSave}
-            >
-              <span className="action-button-text">
-                {isSaving
-                  ? intl.formatMessage({
-                      id: "coaching.studio.savingButton",
-                      defaultMessage: "Saving...",
-                    })
-                  : intl.formatMessage({
-                      id: "coaching.studio.save",
-                      defaultMessage: "Save",
-                    })}
-              </span>
-            </a>
-          </li>
-          <li className="action-item">
-            <a
-              href="#"
-              className="button action-cancel shortanswer-studio-cancel-button"
-              onClick={(event) => {
-                event.preventDefault();
-                notifyRuntime(runtime, "cancel", {});
+      <div className="wrapper-comp-settings is-active" id="settings-tab">
+        <div className="coaching-studio-shell">
+          <StudioValidationSummary
+            requestError={requestError}
+            validationWarnings={validationWarnings}
+          />
+
+          <div className="coaching-studio-body">
+            <SectionNav
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              validationErrors={validationErrors}
+            />
+            <SectionPanel
+              activeSection={activeSection}
+              fieldMetadata={fieldMetadata}
+              lockMetadata={lockMetadata}
+              onChange={(fieldName, nextValue) => {
+                setValues((currentValues) => {
+                  return {
+                    ...currentValues,
+                    [fieldName]: nextValue,
+                  };
+                });
               }}
-            >
-              <span className="action-button-text">
-                {intl.formatMessage({
-                  id: "coaching.studio.cancel",
-                  defaultMessage: "Cancel",
-                })}
-              </span>
-            </a>
-          </li>
-        </ul>
+              validationErrors={validationErrors}
+              values={values}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
