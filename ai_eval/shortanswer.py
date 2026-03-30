@@ -368,14 +368,10 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
         if response:
-            self.sessions[-1].append({
-                "source": "user",
-                "content": user_submission,
-            })
-            self.sessions[-1].append({
-                "source": "llm",
-                "content": response,
-            })
+            self._replace_current_session(self.sessions[-1] + [
+                {"source": "user", "content": user_submission},
+                {"source": "llm", "content": response},
+            ])
             return {"response": response}
 
         raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")

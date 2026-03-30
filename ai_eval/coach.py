@@ -13,7 +13,6 @@ from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
-from xblock.validation import ValidationMessage
 from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
 
@@ -996,7 +995,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             parsed_value = json.loads(raw_value)
         except json.JSONDecodeError:
             label = self._get_field_display_name(field_name)
-            return None, _(f"{label} must be valid JSON.")
+            return None, _("{label} must be valid JSON.").format(label=label)
 
         if field_name == "scenario_data" and not isinstance(parsed_value, dict):
             return None, _("Scenario data must be a JSON object (dictionary).")

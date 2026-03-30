@@ -112,6 +112,20 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     block_settings_key = "ai_eval"
 
+    def _replace_current_session(self, session_data):
+        """
+        Replace the current session entry so XBlock dirty-tracking persists it.
+
+        Mutating nested keys inside ``self.sessions[-1]`` is not reliably detected by
+        the field persistence layer.
+        """
+        sessions = list(self.sessions or [])  # pylint: disable=access-member-before-definition
+        if sessions:
+            sessions[-1] = session_data
+        else:
+            sessions = [session_data]
+        self.sessions = sessions  # pylint: disable=attribute-defined-outside-init
+
     def _get_settings(self) -> dict:  # pragma: nocover
         """Get the XBlock settings bucket via the SettingsService."""
         settings_service = self.runtime.service(self, "settings")
@@ -280,7 +294,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         if callable(values_provider):
             values = values_provider(self)
         elif hasattr(field, "values"):
-            values = getattr(field, "values")
+            values = field.values
 
         if not values:
             return []

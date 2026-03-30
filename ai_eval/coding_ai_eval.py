@@ -111,20 +111,6 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         """Handy helper for getting resources from our kit."""
         return files("ai_eval").joinpath(path).read_text(encoding="utf8")
 
-    def _replace_current_session(self, session_data):
-        """
-        Replace the current session entry so XBlock dirty-tracking persists it.
-
-        Mutating nested keys inside ``self.sessions[-1]`` is not reliably detected by
-        the field persistence layer.
-        """
-        sessions = list(self.sessions or [])
-        if sessions:
-            sessions[-1] = session_data
-        else:
-            sessions = [session_data]
-        self.sessions = sessions
-
     def student_view(self, context=None):
         """
         The primary view of the CodingAIEvalXBlock, shown to students

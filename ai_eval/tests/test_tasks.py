@@ -87,7 +87,7 @@ def test_get_coach_export_sessions_does_not_fallback_when_sessions_field_exists(
     ):
         result = _get_coach_export_sessions(Mock(), Mock(), Mock())
 
-    assert result == []
+    assert not result
 
 
 def test_iter_coach_messages_preserves_coaching_export_order():

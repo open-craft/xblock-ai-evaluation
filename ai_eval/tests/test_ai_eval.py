@@ -446,9 +446,9 @@ def test_coach_block_migrates_older_state_to_sessions(coach_block_data):
 
     assert block._get_active_session() == expected_session
     assert block.sessions == [expected_session]
-    assert block.workspace_history == []
-    assert block.coach_history == []
-    assert block.evaluation_fragments == []
+    assert not block.workspace_history
+    assert not block.coach_history
+    assert not block.evaluation_fragments
     assert block.attempts_used == 0
     assert block.finished is False
     assert block.final_submission == ""
@@ -499,7 +499,7 @@ def test_coach_get_character_response_uses_session_runtime_state(
         "final_submission": "",
         "final_evaluation_markdown": "",
     }]
-    assert block.workspace_history == []
+    assert not block.workspace_history
     mock_get_llm.assert_called_once()
 
 
