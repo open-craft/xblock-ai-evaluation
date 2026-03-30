@@ -770,8 +770,11 @@ function GeneralSection({
         />
         <SelectField
           fieldName="model"
-          metadata={fieldMetadata.model}
-          description="Select the AI model used for workspace, coach, and evaluation responses."
+          metadata={{
+            ...fieldMetadata.model,
+            display_name: "Model",
+          }}
+          description="Choose the LLM (Large Launguage Model)."
           value={values.model || ""}
           errors={validationErrors.model}
           onChange={(nextValue) => {
@@ -780,8 +783,11 @@ function GeneralSection({
         />
         <TextInputField
           fieldName="model_api_key"
-          metadata={fieldMetadata.model_api_key}
-          description="API key for the selected model when it is not provided globally."
+          metadata={{
+            ...fieldMetadata.model_api_key,
+            display_name: "API Key",
+          }}
+          description="API key for the selected LLM. Leave blank if configured by your admin."
           value={values.model_api_key || ""}
           errors={validationErrors.model_api_key}
           locked={isModelApiKeyLocked(values, lockMetadata)}
@@ -791,8 +797,11 @@ function GeneralSection({
         />
         <TextInputField
           fieldName="model_api_url"
-          metadata={fieldMetadata.model_api_url}
-          description="Optional endpoint override used for self-hosted or llama-style providers."
+          metadata={{
+            ...fieldMetadata.model_api_url,
+            display_name: "API URL (optional)",
+          }}
+          description="Only needed for Llama (models that don't have an official provider). Leave blank if configured globally by your admin."
           value={values.model_api_url || ""}
           errors={validationErrors.model_api_url}
           onChange={(nextValue) => {
@@ -805,7 +814,7 @@ function GeneralSection({
             ...fieldMetadata.max_attempts,
             display_name: "Maximum Responses",
           }}
-          description="Number of times a learner can submit a workspace response."
+          description="Number of times a learner can submit a response."
           value={values.max_attempts}
           errors={validationErrors.max_attempts}
           onChange={(nextValue) => {
@@ -960,7 +969,7 @@ function EvaluationSection({
     <div className="coaching-studio-section-stack">
       <SectionCard
         title="Evaluation Criteria"
-        description="Define the rubric used to score the learner after the conversation. Add one criterion per row."
+        description="Tell the AI model what criteria to use when evaluating the learner’s response. Add one criterion per row."
       >
         <ListField
           fieldName="scenario_evaluation_criteria"
@@ -1004,7 +1013,7 @@ function EvaluationSection({
       </SectionCard>
       <SectionCard
         title="Evaluator Prompt"
-        description="This prompt is sent to the evaluator model after the conversation finishes."
+        description="Instructions sent to the AI model to guide how learner responses are evaluated."
       >
         <TextAreaField
           fieldName="evaluator_prompt"
@@ -1035,10 +1044,7 @@ function WorkspaceSection({
 }) {
   return (
     <div className="coaching-studio-section-stack">
-      <SectionCard
-        title="Workspace Details"
-        description="Set the workspace heading and the main persona the learner is speaking with."
-      >
+      <SectionCard>
         <TextInputField
           fieldName="workspace_title"
           metadata={{
@@ -1093,10 +1099,7 @@ function WorkspaceSection({
           }}
         />
       </SectionCard>
-      <SectionCard
-        title="Conversation Starter"
-        description="This is the first message shown in the workspace pane."
-      >
+      <SectionCard>
         <TextAreaField
           fieldName="initial_message"
           metadata={{
@@ -1112,17 +1115,14 @@ function WorkspaceSection({
           }}
         />
       </SectionCard>
-      <SectionCard
-        title="Persona Prompt"
-        description="Define the persona's role, boundaries, and speaking style."
-      >
+      <SectionCard>
         <TextAreaField
           fieldName="character_1_prompt"
           metadata={{
             ...fieldMetadata.character_1_prompt,
             display_name: "Persona Prompt",
           }}
-          description="Instructions that shape how the workspace persona responds."
+          description="Instructions that define the persona’s role, personality and perspective. This text shapes how the AI model responds."
           value={values.character_1_prompt || ""}
           errors={validationErrors.character_1_prompt}
           rows={16}
@@ -1148,10 +1148,7 @@ function CoachChatSection({
 }) {
   return (
     <div className="coaching-studio-section-stack">
-      <SectionCard
-        title="Coach Details"
-        description="Set the coach pane heading and the coach persona used for guidance."
-      >
+      <SectionCard>
         <TextInputField
           fieldName="coach_title"
           metadata={{
@@ -1206,10 +1203,7 @@ function CoachChatSection({
           }}
         />
       </SectionCard>
-      <SectionCard
-        title="Conversation Starter"
-        description="This is the first message shown in the coach pane."
-      >
+      <SectionCard>
         <TextAreaField
           fieldName="coach_initial_message"
           metadata={{
@@ -1225,17 +1219,14 @@ function CoachChatSection({
           }}
         />
       </SectionCard>
-      <SectionCard
-        title="Coach Prompt"
-        description="Define the coach's guidance style and what it should avoid doing for the learner."
-      >
+      <SectionCard>
         <TextAreaField
           fieldName="character_2_prompt"
           metadata={{
             ...fieldMetadata.character_2_prompt,
             display_name: "Coach Prompt",
           }}
-          description="Instructions that shape how the coach responds."
+          description="Instructions that define the coach’s role, personality and perspective. This text shapes how the AI model responds."
           value={values.character_2_prompt || ""}
           errors={validationErrors.character_2_prompt}
           rows={16}
@@ -1263,14 +1254,11 @@ function AdvancedSection({
 
   return (
     <div className="coaching-studio-section-stack">
-      <SectionCard
-        title="Output Blacklist"
-        description="Add one blocked word or phrase per row."
-      >
+      <SectionCard>
         <ListField
           fieldName="blacklist"
-          label={getFieldLabel(fieldMetadata.blacklist, "blacklist")}
-          helpText={fieldMetadata.blacklist?.help}
+          label="Language to Avoid (optional)"
+          description="Words or phrases the AI model must not use in any responses."
           items={blacklistItems}
           errors={validationErrors.blacklist}
           addLabel="+ Add blocked phrase"

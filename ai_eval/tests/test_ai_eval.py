@@ -3,8 +3,9 @@ Testing module.
 """
 # pylint: disable=redefined-outer-name,protected-access
 
-import urllib.request
 import io
+import json
+import urllib.request
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -113,6 +114,8 @@ def coach_block_data():
         },
         "max_attempts": 3,
         "allow_reset": True,
+        "conversation_format": "<conversation>{{ messages|length }}</conversation>",
+        "message_content_tag": "content",
     }
 
 
@@ -286,6 +289,109 @@ def test_shortanswer_block_studio_view(shortanswer_block_data):
     assert frag.json_init_args["initial_state"]["question"] == shortanswer_block_data["question"]
     assert frag.json_init_args["meta"]["lock_metadata"]["initial_model"] == SupportedModels.GPT4O.value
     assert "question" in frag.json_init_args["meta"]["field_metadata"]
+    assert frag.json_init_args["meta"]["field_metadata"]["model"]["choices"] == [
+        {
+            "display_name": "— Select a model —",
+            "value": "",
+        },
+        {
+            "display_name": SupportedModels.GPT4O.value,
+            "value": SupportedModels.GPT4O.value,
+        },
+    ]
+
+
+def test_coach_block_student_view(coach_block_data):
+    """Coaching student view should boot the React learner payload."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+
+    with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+        frag = block.student_view()
+
+    assert frag.js_init_fn == "CoachAIEvalXBlock"
+    assert frag.json_init_args == {
+        "view": "student",
+        "handler_urls": {
+            "get_character_response": "/handler/get_character_response",
+            "get_evaluator_response": "/handler/get_evaluator_response",
+            "reset_all": "/handler/reset_all",
+        },
+        "initial_state": {
+            "chat_histories": [[], []],
+            "finished": False,
+            "attempts": {
+                "max_attempts": 3,
+                "attempts_used": 0,
+                "attempts_remaining": 3,
+                "can_retry": True,
+            },
+        },
+        "meta": {
+            "characters": [
+                {
+                    "name": "Patient",
+                    "role": "Patient",
+                    "avatar": "",
+                    "pane": "workspace",
+                },
+                {
+                    "name": "Coach",
+                    "role": "Coach",
+                    "avatar": "",
+                    "pane": "coach",
+                },
+            ],
+            "initial_message": {
+                "character": {
+                    "name": "Patient",
+                    "role": "Patient",
+                    "avatar": "",
+                    "pane": "workspace",
+                },
+                "content": "",
+            },
+            "coach_initial_message": {
+                "character": {
+                    "name": "Coach",
+                    "role": "Coach",
+                    "avatar": "",
+                    "pane": "coach",
+                },
+                "content": "",
+            },
+            "titles": {
+                "workspace": "Add your answer",
+                "coach": "Coach",
+            },
+            "marked_html": block.resource_string("static/html/marked-iframe.html"),
+            "allow_reset": True,
+            "intro_text": "",
+        },
+    }
+    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+
+
+def test_coach_block_studio_view(coach_block_data):
+    """Coaching Studio should boot the React editor payload."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+                frag = block.studio_view()
+
+    assert frag.js_init_fn == "CoachAIEvalXBlockStudio"
+    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+    assert frag.json_init_args["view"] == "studio"
+    assert frag.json_init_args["handler_urls"] == {
+        "studio_submit": "/handler/studio_submit",
+    }
+    assert frag.json_init_args["initial_state"]["scenario_data"] == coach_block_data["scenario_data"]
+    assert frag.json_init_args["initial_state"]["max_attempts"] == coach_block_data["max_attempts"]
+    assert frag.json_init_args["meta"]["lock_metadata"]["initial_model"] == SupportedModels.GPT4O.value
+    assert "scenario_data" in frag.json_init_args["meta"]["field_metadata"]
     assert frag.json_init_args["meta"]["field_metadata"]["model"]["choices"] == [
         {
             "display_name": "— Select a model —",
@@ -507,6 +613,335 @@ def test_coach_reset_all_avoids_duplicate_empty_sessions(coach_block_data):
     assert result["finished"] is False
     assert block.sessions == [_empty_coach_session()]
     assert block.thread_map == {}
+
+
+def test_coach_studio_submit_success(coach_block_data):
+    """Coaching React Studio saves should persist fields and return the shared response shape."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+    scenario_data = {
+        "case_details": "Updated case details",
+        "learning_objectives": ["Updated objective"],
+        "evaluation_criteria": [{"name": "Updated criterion"}],
+    }
+
+    payload = {
+        field_name: getattr(block, field_name)
+        for field_name in block.editable_fields
+    }
+    payload.update({
+        "display_name": "Updated Coaching Title",
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "updated-key",
+        "model_api_url": "",
+        "initial_message": "Start here",
+        "coach_initial_message": "Ask me anything",
+        "scenario_data": json.dumps(scenario_data),
+        "workspace_title": "Workspace",
+        "coach_title": "Mentor",
+        "intro_text": "<p>Updated intro</p>",
+        "character_1_name": "Learner Patient",
+        "character_1_role": "Patient",
+        "character_1_prompt": block.character_1_prompt,
+        "character_1_avatar": "/static/patient.png",
+        "character_2_name": "Support Coach",
+        "character_2_role": "Coach",
+        "character_2_prompt": block.character_2_prompt,
+        "character_2_avatar": "/static/coach.png",
+        "evaluator_prompt": block.evaluator_prompt,
+        "blacklist": json.dumps(["AI assistant", "forbidden phrase"]),
+        "max_attempts": "4",
+        "allow_reset": False,
+    })
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(block, payload)
+
+    assert response["success"] is True
+    assert response["validation_errors"] == {}
+    assert response["validation_warnings"] == []
+    assert block.display_name == "Updated Coaching Title"
+    assert block.initial_message == "Start here"
+    assert block.coach_initial_message == "Ask me anything"
+    assert block.scenario_data == scenario_data
+    assert block.workspace_title == "Workspace"
+    assert block.coach_title == "Mentor"
+    assert block.character_1_avatar == "/static/patient.png"
+    assert block.character_2_avatar == "/static/coach.png"
+    assert block.blacklist == ["AI assistant", "forbidden phrase"]
+    assert block.max_attempts == 4
+    assert block.allow_reset is False
+
+
+def test_coach_studio_submit_validation_errors(coach_block_data):
+    """Coaching Studio should keep invalid values unsaved and return field errors."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    payload = {
+        field_name: getattr(block, field_name)
+        for field_name in block.editable_fields
+    }
+    payload.update({
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "updated-key",
+        "scenario_data": "[]",
+        "blacklist": "{}",
+    })
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(block, payload)
+
+    assert response["success"] is False
+    assert response["validation_errors"] == {
+        "scenario_data": ["Scenario data must be a JSON object (dictionary)."],
+        "blacklist": ["Output blacklist must be a JSON array."],
+    }
+    assert response["validation_warnings"] == []
+    assert block.scenario_data == coach_block_data["scenario_data"]
+    assert block.blacklist == ["AI assistant"]
+
+
+def test_coach_studio_submit_scenario_field_validation_errors(coach_block_data):
+    """Coaching Studio should map malformed scenario data to specific authoring fields."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    payload = {
+        field_name: getattr(block, field_name)
+        for field_name in block.editable_fields
+    }
+    payload.update({
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "updated-key",
+        "scenario_data": json.dumps({
+            "case_details": 7,
+            "learning_objectives": ["Keep this one", 2],
+            "evaluation_criteria": [{}, "bad"],
+        }),
+        "blacklist": json.dumps(block.blacklist),
+    })
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(block, payload)
+
+    assert response["success"] is False
+    assert response["validation_errors"] == {
+        "scenario_case_details": ["Scenario must be a valid string."],
+        "scenario_learning_objectives": ["Learning objective 2 must be text."],
+        "scenario_evaluation_criteria": [
+            "Evaluation criterion 1 must include a name.",
+            "Evaluation criterion 2 must be a valid criterion.",
+        ],
+    }
+    assert response["validation_warnings"] == []
+    assert block.scenario_data == coach_block_data["scenario_data"]
+
+
+def test_coach_studio_submit_strips_empty_blacklist_entries(coach_block_data):
+    """Coaching Studio should drop empty blacklist rows before persisting them."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    payload = {
+        field_name: getattr(block, field_name)
+        for field_name in block.editable_fields
+    }
+    payload.update({
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "updated-key",
+        "scenario_data": json.dumps(block.scenario_data),
+        "blacklist": json.dumps(["AI assistant", "", "   "]),
+    })
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(block, payload)
+
+    assert response["success"] is True
+    assert response["validation_errors"] == {}
+    assert block.blacklist == ["AI assistant"]
+
+
+def test_coach_studio_submit_rejects_incomplete_payload(coach_block_data):
+    """Coaching Studio saves should fail loudly when the frontend omits editable fields."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(
+                block,
+                {
+                    "display_name": "Updated title",
+                    "model": SupportedModels.GPT4O.value,
+                },
+            )
+
+    assert response["success"] is False
+    assert response["validation_errors"] == {
+        "model_api_key": ["Missing field in Studio payload."],
+        "model_api_url": ["Missing field in Studio payload."],
+        "initial_message": ["Missing field in Studio payload."],
+        "coach_initial_message": ["Missing field in Studio payload."],
+        "scenario_data": ["Missing field in Studio payload."],
+        "workspace_title": ["Missing field in Studio payload."],
+        "coach_title": ["Missing field in Studio payload."],
+        "intro_text": ["Missing field in Studio payload."],
+        "character_1_name": ["Missing field in Studio payload."],
+        "character_1_role": ["Missing field in Studio payload."],
+        "character_1_prompt": ["Missing field in Studio payload."],
+        "character_1_avatar": ["Missing field in Studio payload."],
+        "character_2_name": ["Missing field in Studio payload."],
+        "character_2_role": ["Missing field in Studio payload."],
+        "character_2_prompt": ["Missing field in Studio payload."],
+        "character_2_avatar": ["Missing field in Studio payload."],
+        "evaluator_prompt": ["Missing field in Studio payload."],
+        "blacklist": ["Missing field in Studio payload."],
+        "max_attempts": ["Missing field in Studio payload."],
+        "allow_reset": ["Missing field in Studio payload."],
+    }
+
+
+def test_coach_studio_submit_allows_warnings(coach_block_data):
+    """Coaching Studio warnings should not block a successful save."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+
+    payload = {
+        field_name: getattr(block, field_name)
+        for field_name in block.editable_fields
+    }
+    payload.update({
+        "display_name": "Updated Coaching Title",
+        "model": SupportedModels.GPT4O.value,
+        "model_api_key": "updated-key",
+        "model_api_url": "",
+        "scenario_data": json.dumps(block.scenario_data),
+        "blacklist": json.dumps(block.blacklist),
+        "max_attempts": "4",
+        "allow_reset": True,
+    })
+
+    with patch.object(
+        CoachAIEvalXBlock,
+        "_collect_studio_validation_issues",
+        return_value=({}, ["Non-blocking warning"]),
+    ):
+        with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+            response = block.studio_submit.__wrapped__(block, payload)
+
+    assert response["success"] is True
+    assert response["validation_errors"] == {}
+    assert response["validation_warnings"] == ["Non-blocking warning"]
+    assert block.display_name == "Updated Coaching Title"
+
+
+def test_coach_messages_for_character_include_blacklist_instruction(coach_block_data):
+    """Character prompts should instruct the model to avoid blocked language."""
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**coach_block_data, "blacklist": ["AI assistant", "out of character"]}),
+        None,
+    )
+
+    messages = list(block._messages_for_character(0, "second answer"))
+
+    assert messages[0]["role"] == "system"
+    assert (
+        'Do not use any of these words or phrases in your response: '
+        '"AI assistant", "out of character".'
+    ) in messages[0]["content"]
+
+
+@patch("ai_eval.coach.get_llm_service", return_value=Mock())
+@patch.object(CoachAIEvalXBlock, "_render_final_report", return_value="<article>report</article>")
+def test_coach_get_evaluator_response_includes_blacklist_instruction(
+    _mock_render_report,
+    _mock_get_llm_service,
+    coach_block_data,
+):
+    """Evaluator prompts should also instruct the model to avoid blocked language."""
+    session = _empty_coach_session()
+    session["workspace_history"] = [{
+        "character_index": 0,
+        "user_message": "final learner answer",
+        "character_message": "patient reply",
+    }]
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**coach_block_data, "sessions": [session], "blacklist": ["AI assistant"]}),
+        None,
+    )
+
+    captured_messages = {}
+
+    def _capture_messages(messages, tag=None):
+        captured_messages["tag"] = tag
+        captured_messages["messages"] = list(messages)
+        return "# Evaluation Report"
+
+    with patch.object(CoachAIEvalXBlock, "get_llm_response", side_effect=_capture_messages):
+        block.get_evaluator_response.__wrapped__(block, data={})
+
+    assert captured_messages["messages"][0]["role"] == "system"
+    assert (
+        'Do not use any of these words or phrases in your response: "AI assistant".'
+    ) in captured_messages["messages"][0]["content"]
+
+
+@patch("ai_eval.coach.get_llm_service", return_value=Mock())
+def test_coach_thread_tag_changes_when_blacklist_changes(
+    _mock_get_llm_service,
+    coach_block_data,
+):
+    """Blacklist changes should reset thread tags because they change the system prompt."""
+    runtime = ToyRuntime()
+    block_without_blacklist = CoachAIEvalXBlock(
+        runtime,
+        DictFieldData({**coach_block_data, "blacklist": []}),
+        None,
+    )
+    block_with_blacklist = CoachAIEvalXBlock(
+        runtime,
+        DictFieldData({**coach_block_data, "blacklist": ["AI assistant"]}),
+        None,
+    )
+
+    assert (
+        block_without_blacklist._get_thread_tag("character0")
+        != block_with_blacklist._get_thread_tag("character0")
+    )
+
+
+@patch("ai_eval.coach.get_llm_service", return_value=Mock())
+@patch.object(CoachAIEvalXBlock, "get_llm_response", return_value="patient follow-up")
+def test_coach_get_character_response_ignores_empty_blacklist_entries(
+    mock_get_llm,
+    _mock_get_llm_service,
+    coach_block_data,
+):
+    """Empty blacklist entries should not trigger runtime response blocking."""
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**coach_block_data, "blacklist": ["", "AI assistant"]}),
+        None,
+    )
+
+    result = block.get_character_response.__wrapped__(
+        block,
+        data={"character_index": 0, "user_input": "second answer"},
+    )
+
+    assert result["message"]["content"] == "patient follow-up"
+    mock_get_llm.assert_called_once()
 
 
 def test_shortanswer_studio_submit_success(shortanswer_block_data):

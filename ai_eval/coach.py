@@ -108,11 +108,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     evaluator_prompt = String(
         display_name=_("Evaluator prompt"),
-        help=_(
-            "Prompt used to instructs the model how to evaluate learners. "
-            "You can use Jinja variables (e.g. scenario_data.evaluation_criteria). "
-            "Learn more: https://jinja.palletsprojects.com/en/stable/templates/"
-        ),
+        help=_(""),
         multiline_editor=True,
         default=DEFAULT_EVALUATOR_PROMPT,
         scope=Scope.settings,
@@ -180,7 +176,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     intro_text = String(
         display_name=_("Introductory text"),
-        help=_("Optional introductory paragraph shown above the chat panes. HTML is allowed here."),
+        help=_(""),
         default="",
         scope=Scope.settings,
         multiline_editor=True,
@@ -467,6 +463,25 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             for value in values
             if not (isinstance(value, str) and value.strip() == "")
         ]
+
+    def _get_blacklist_terms(self):
+        """Return normalized blacklist terms suitable for prompts and runtime checks."""
+        values = self._sanitize_blacklist_values(self.blacklist)
+        if not isinstance(values, list):
+            return []
+        return [value for value in values if isinstance(value, str)]
+
+    def _build_blacklist_instruction(self):
+        """Return a prompt instruction that steers the model away from blocked terms."""
+        blacklist_terms = self._get_blacklist_terms()
+        if not blacklist_terms:
+            return ""
+
+        joined_terms = ", ".join(f'"{term}"' for term in blacklist_terms)
+        return (
+            "Do not use any of these words or phrases in your response: "
+            f"{joined_terms}."
+        )
 
     def _collect_studio_validation_issues(
         self,
@@ -847,6 +862,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             scenario_data=self.scenario_data,
             character_data=self._get_character_data(character_index),
         )
+        blacklist_instruction = self._build_blacklist_instruction()
+        if blacklist_instruction:
+            prompt += "\n\n" + blacklist_instruction
         prompt += "\n\n" + self._render_template(
             self.conversation_format,
             messages=chat_history,
@@ -897,6 +915,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         _update_hash(self.character_1_prompt)
         _update_hash(self.character_2_prompt)
         _update_hash(self.evaluator_prompt)
+        _update_hash(json.dumps(self._get_blacklist_terms(), ensure_ascii=True))
 
         prompt_hash = prompt_hasher.hexdigest()
         context = context or "workspace"
@@ -1096,7 +1115,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self._messages_for_character(character_index, user_input),
             tag=self._get_thread_tag(thread_context),
         )
-        blacklist_terms = self._sanitize_blacklist_values(self.blacklist)
+        blacklist_terms = self._get_blacklist_terms()
         if blacklist_terms:
             if re.search(fr"\b({'|'.join(map(re.escape, blacklist_terms))})\b",
                          message, re.I):
@@ -1170,6 +1189,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self.evaluator_prompt,
             scenario_data=scenario_data,
         )
+        blacklist_instruction = self._build_blacklist_instruction()
+        if blacklist_instruction:
+            prompt += "\n\n" + blacklist_instruction
         conversation_messages = [
             {
                 "character": {"name": "", "role": "user"},

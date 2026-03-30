@@ -188,7 +188,7 @@
 }
 
 .coaching-react-studio .coaching-studio-card-header {
-    margin-bottom: 18px;
+    margin-bottom: 4px;
 }
 
 .coaching-react-studio .coaching-studio-card-title {
@@ -218,7 +218,7 @@
 }
 
 .coaching-react-studio .coaching-studio-field-header {
-    margin-bottom: 8px;
+    margin-bottom: 2px;
 }
 
 .coaching-react-studio .coaching-studio-field-title-row {
@@ -284,7 +284,7 @@
 }
 
 .coaching-react-studio .coaching-studio-list-row {
-    align-items: flex-start;
+    align-items: center;
     display: flex;
     gap: 10px;
 }
@@ -347,19 +347,33 @@
 
 .coaching-react-studio .coaching-studio-list-remove {
     align-items: center;
-    background: #fff5f5;
-    border-color: #e5b7b7;
+    align-self: center;
+    background: #ff2d20;
+    border: 1px solid #ff2d20;
     border-radius: 999px;
-    color: var(--coaching-danger);
+    box-shadow: none;
+    color: transparent;
     display: inline-flex;
-    font-size: 18px;
-    height: 28px;
+    font-size: 0;
+    height: 18px;
     justify-content: center;
-    line-height: 1;
-    min-height: 28px;
-    min-width: 28px;
+    line-height: 0;
+    margin-top: 2px;
+    max-height: 18px;
+    max-width: 18px;
+    min-height: 18px;
+    min-width: 18px;
+    overflow: hidden;
     padding: 0;
-    width: 28px;
+    width: 18px;
+}
+
+.coaching-react-studio .coaching-studio-list-remove span {
+    color: #fff;
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .coaching-react-studio .coaching-studio-list-add:hover {
@@ -368,9 +382,8 @@
 }
 
 .coaching-react-studio .coaching-studio-list-remove:hover {
-    background: #ffe7e7;
-    border-color: #d08b8b;
-    color: #8d1313;
+    background: #ff1305;
+    border-color: #ff1305;
 }
 
 .coaching-react-studio .coaching-studio-radio-group {

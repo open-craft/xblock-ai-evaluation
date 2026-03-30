@@ -24,25 +24,25 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
   {
     id: "taskDescription",
     title: "Task Description",
-    description: "Instructions shown to the learner.",
+    description: "Instructions shown to the learner. HTML is allowed here.",
     fieldNames: ["intro_text"],
   },
   {
     id: "taskContext",
     title: "Task Context for AI",
-    description: "Give the AI the task background and objectives it should reference.",
+    description: "",
     fieldNames: ["scenario_data", "scenario_case_details", "scenario_learning_objectives"],
   },
   {
     id: "evaluation",
     title: "Evaluation",
-    description: "Define the rubric and evaluator behavior used after the conversation ends.",
+    description: "",
     fieldNames: ["scenario_evaluation_criteria", "evaluator_prompt"],
   },
   {
     id: "workspace",
     title: "Workspace",
-    description: "Configure the primary character and the main learner workspace.",
+    description: "",
     fieldNames: [
       "workspace_title",
       "character_1_name",
@@ -55,7 +55,7 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
   {
     id: "coachChat",
     title: "Coach Chat",
-    description: "Configure the coach pane, coach persona, and its opening guidance.",
+    description: "",
     fieldNames: [
       "coach_title",
       "character_2_name",
@@ -68,7 +68,7 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
   {
     id: "advanced",
     title: "Advanced",
-    description: "Control blocked words and phrases in AI output.",
+    description: "",
     fieldNames: ["blacklist"],
   },
 ];
