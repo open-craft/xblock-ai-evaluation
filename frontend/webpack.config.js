@@ -46,7 +46,53 @@ module.exports = function webpackConfig(_, argv) {
         },
         {
           test: /\.css$/i,
+          include: /node_modules/,
+          use: [
+            MiniCssExtractPlugin.loader,
+            "css-loader",
+            {
+              loader: "postcss-loader",
+              options: {
+                postcssOptions: {
+                  plugins: [
+                    [
+                      "postcss-prefix-selector",
+                      {
+                        prefix: ".ai-eval-paragon",
+                        transform: function transform(prefix, selector) {
+                          if (
+                            selector === "body" ||
+                            selector === "html" ||
+                            selector === ":root"
+                          ) {
+                            return prefix;
+                          }
+                          return prefix + " " + selector;
+                        },
+                      },
+                    ],
+                  ],
+                },
+              },
+            },
+          ],
+          sideEffects: true,
+        },
+        {
+          test: /\.css$/i,
+          exclude: /node_modules/,
           use: [MiniCssExtractPlugin.loader, "css-loader"],
+          sideEffects: true,
+        },
+        {
+          test: /\.scss$/i,
+          include: /node_modules/,
+          use: [MiniCssExtractPlugin.loader, "css-loader", "sass-loader"],
+          sideEffects: true,
+        },
+        {
+          test: /\.svg$/i,
+          type: "asset/inline",
         },
       ],
     },

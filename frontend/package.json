@@ -8,6 +8,7 @@
     "watch": "webpack --mode development --watch"
   },
   "dependencies": {
+    "@openedx/paragon": "^22.8.1",
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "react-intl": "7.1.14"
@@ -17,6 +18,11 @@
     "@types/react-dom": "17.0.26",
     "css-loader": "^7.1.2",
     "mini-css-extract-plugin": "^2.9.2",
+    "postcss": "^8.5.8",
+    "postcss-loader": "^8.2.1",
+    "postcss-prefix-selector": "^2.1.1",
+    "sass": "^1.99.0",
+    "sass-loader": "^16.0.7",
     "terser-webpack-plugin": "^5.3.14",
     "ts-loader": "9.5.4",
     "typescript": "5.9.3",

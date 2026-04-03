@@ -44,6 +44,7 @@ export function mountReactTree(
   selector?: string,
 ) {
   const mountNode = resolveMountNode(element, selector);
+  mountNode.classList.add("ai-eval-paragon");
 
   ReactDOM.render(
     <SharedIntlProvider>{reactElement}</SharedIntlProvider>,

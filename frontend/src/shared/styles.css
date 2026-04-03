@@ -1,3 +1,19 @@
+/*
+ * Reset Paragon's body-level styles on the scoping wrapper so the XBlock
+ * inherits font/color from the host page (Studio or LMS).  Paragon component
+ * styles (.btn, .form-control, etc.) still apply inside the wrapper.
+ * This override can be removed when Redwood support is dropped and XBlocks
+ * render in iframes everywhere (Ulmo+).
+ */
+.ai-eval-paragon {
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  background-color: transparent;
+}
+
 :root {
   --ai-eval-react-spacing-sm: 0.5rem;
   --ai-eval-react-spacing-md: 1rem;

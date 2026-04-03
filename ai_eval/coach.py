@@ -355,6 +355,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def studio_view(self, context=None):
         """Render the React Studio editor for Coaching."""
         fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
+        fragment.add_css(self.resource_string("static/bundles/shared.css"))
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
         fragment.add_css(self.resource_string("static/css/coach_studio.css"))
@@ -943,6 +944,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         active_session = self._get_active_session()
         characters = list(map(self._get_character_data, range(2)))
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
+        frag.add_css(self.resource_string("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript(self.resource_string("static/bundles/coaching.js"))
         marked_html = self.resource_string("static/html/marked-iframe.html")
