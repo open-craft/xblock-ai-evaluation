@@ -1,4 +1,4 @@
-import { SharedPayload, UnknownRecord } from "../shared/types";
+import { SharedPayload, StudioFieldMetadata, UnknownRecord } from "../shared/types";
 
 export interface CoachingCharacter extends UnknownRecord {
   avatar?: string;
@@ -61,18 +61,6 @@ export type CoachingStudentPayload = SharedPayload<
   CoachingStudentInitialState,
   CoachingStudentMeta
 >;
-
-export interface StudioChoice {
-  display_name?: string;
-  value?: string;
-}
-
-export interface StudioFieldMetadata {
-  choices?: StudioChoice[];
-  default?: unknown;
-  display_name?: string;
-  help?: string;
-}
 
 export interface CoachingStudioLockMetadata extends UnknownRecord {
   initial_model?: string;

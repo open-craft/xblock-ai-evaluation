@@ -179,12 +179,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         The primary view of the ShortAnswerAIEvalXBlock, shown to students
         when viewing courses.
         """
-        frag = Fragment(
-            self.loader.render_django_template(
-                "/templates/shortanswer.html",
-                {},
-            )
-        )
+        frag = Fragment('<div data-ai-eval-react-root="true"></div>')
 
         frag.add_css(self.resource_string("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
@@ -293,10 +288,10 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         return urllib.parse.urlparse(url).path.split('/')[-1]
 
     def _get_attachments(self, attachment_urls):
-        pool = Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS)
-        attachments = pool.map(self._download_attachment, attachment_urls)
-        filenames = map(self._filename_for_url, attachment_urls)
-        return zip(filenames, attachments)
+        with Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS) as pool:
+            attachments = pool.map(self._download_attachment, attachment_urls)
+            filenames = map(self._filename_for_url, attachment_urls)
+            return list(zip(filenames, attachments))
 
     @XBlock.json_handler
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument

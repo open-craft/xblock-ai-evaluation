@@ -116,12 +116,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         The primary view of the CodingAIEvalXBlock, shown to students
         when viewing courses.
         """
-        frag = Fragment(
-            self.loader.render_django_template(
-                "/templates/coding_ai_eval.html",
-                {},
-            )
-        )
+        frag = Fragment('<div data-ai-eval-react-root="true"></div>')
         frag.add_css(self.resource_string("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/coding_ai_eval.css"))
         frag.add_javascript(self.resource_string("static/bundles/coding.js"))

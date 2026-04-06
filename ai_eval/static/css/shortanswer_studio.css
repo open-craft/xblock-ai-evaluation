@@ -6,19 +6,12 @@
     padding: 0;
 }
 
-.shortanswer-react-studio .settings-list {
-    margin: 0;
-    padding: 0;
-}
+/* --- AttachmentUrlsEditor --- */
 
 .shortanswer-react-studio .metadata_entry {
     border-bottom: 1px solid #e5e5e5;
     margin: 0;
     padding: 1rem 0;
-}
-
-.shortanswer-react-studio .metadata_entry:first-child {
-    padding-top: 0;
 }
 
 .shortanswer-react-studio .metadata_entry:last-child {
@@ -44,10 +37,8 @@
     white-space: normal;
 }
 
-.shortanswer-react-studio .field-data-control,
-.shortanswer-react-studio .shortanswer-studio-select-shell,
 .shortanswer-react-studio .shortanswer-studio-attachment-list,
-.shortanswer-react-studio .shortanswer-studio-checkbox-control {
+.shortanswer-react-studio .field-data-control {
     grid-column: 2;
     width: 100%;
 }
@@ -67,63 +58,6 @@
     border-color: #0a3055;
     box-shadow: 0 0 0 1px #0a3055;
     outline: none;
-}
-
-.shortanswer-react-studio textarea.field-data-control {
-    min-height: 8rem;
-    resize: vertical;
-}
-
-.shortanswer-react-studio .tip.setting-help,
-.shortanswer-react-studio .shortanswer-studio-errors {
-    color: #6b6b6b;
-    display: block;
-    font-size: 0.85rem;
-    line-height: 1.45;
-    margin-top: 0.45rem;
-}
-
-.shortanswer-react-studio .shortanswer-studio-errors {
-    color: #a11d1d;
-    font-size: 1.25rem;
-    grid-column: 2;
-    margin: 0.35rem 0 0;
-    padding-left: 1.25rem;
-}
-
-.shortanswer-react-studio .shortanswer-studio-select-shell {
-    max-width: 620px;
-    position: relative;
-}
-
-.shortanswer-react-studio .shortanswer-studio-select {
-    appearance: none;
-    cursor: pointer;
-    padding-right: 2.5rem;
-    width: 100% !important;
-}
-
-.shortanswer-react-studio .shortanswer-studio-select-icon {
-    color: #6b6b6b;
-    pointer-events: none;
-    position: absolute;
-    right: 0.85rem;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.shortanswer-react-studio .shortanswer-studio-checkbox-control {
-    align-self: start;
-    min-height: auto;
-    padding-top: 0.68rem;
-}
-
-.shortanswer-react-studio .shortanswer-studio-checkbox-control input[type="checkbox"] {
-    height: 18px;
-    margin: 0;
-    min-width: 18px;
-    transform: translateX(-301px);
-    width: 18px;
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-list {
@@ -176,6 +110,15 @@
     max-width: 200px;
 }
 
+.shortanswer-react-studio .shortanswer-studio-attachment-errors {
+    color: #a11d1d;
+    grid-column: 2;
+    margin: 0.35rem 0 0;
+    padding-left: 1.25rem;
+}
+
+/* --- Save/Cancel buttons --- */
+
 .shortanswer-react-studio .xblock-actions {
     box-sizing: border-box;
     margin-top: 1rem;
@@ -207,14 +150,8 @@
 
     .shortanswer-react-studio .setting-label,
     .shortanswer-react-studio .field-data-control,
-    .shortanswer-react-studio .shortanswer-studio-select-shell,
-    .shortanswer-react-studio .shortanswer-studio-attachment-list,
-    .shortanswer-react-studio .shortanswer-studio-checkbox-control {
+    .shortanswer-react-studio .shortanswer-studio-attachment-list {
         grid-column: 1;
         width: 100%;
-    }
-
-    .shortanswer-react-studio .shortanswer-studio-checkbox-control input[type="checkbox"] {
-        transform: none;
     }
 }

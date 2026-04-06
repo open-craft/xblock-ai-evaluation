@@ -1,24 +1,24 @@
-import { SharedPayload, UnknownRecord } from "../shared/types";
+import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
-export interface CodingStudentHandlerUrls extends UnknownRecord {
+export interface CodingStudentHandlerUrls {
   get_response?: string;
   get_submission_result_handler?: string;
   reset_handler?: string;
   submit_code_handler?: string;
 }
 
-export interface CodingExecutionResult extends UnknownRecord {
+export interface CodingExecutionResult {
   stderr?: string;
   stdout?: string;
 }
 
-export interface CodingStudentInitialState extends UnknownRecord {
+export interface CodingStudentInitialState {
   ai_evaluation?: unknown;
   code?: string;
   code_exec_result?: CodingExecutionResult;
 }
 
-export interface CodingStudentMeta extends UnknownRecord {
+export interface CodingStudentMeta {
   language?: string;
   marked_html?: string;
   monaco_html?: string;
@@ -31,19 +31,7 @@ export type CodingStudentPayload = SharedPayload<
   CodingStudentMeta
 >;
 
-export interface StudioChoice {
-  display_name?: string;
-  value?: string;
-}
-
-export interface StudioFieldMetadata {
-  choices?: StudioChoice[];
-  default?: unknown;
-  display_name?: string;
-  help?: string;
-}
-
-export interface CodingStudioLockMetadata extends UnknownRecord {
+export interface CodingStudioLockMetadata {
   initial_model?: string;
   lock_judge0_api_key?: boolean;
   lock_model_api_key_initial?: boolean;
@@ -51,7 +39,7 @@ export interface CodingStudioLockMetadata extends UnknownRecord {
   use_custom_llm_service?: boolean;
 }
 
-export interface CodingStudioState extends UnknownRecord {
+export interface CodingStudioState {
   display_name?: string;
   evaluation_prompt?: string;
   judge0_api_key?: string;
@@ -62,11 +50,11 @@ export interface CodingStudioState extends UnknownRecord {
   question?: string;
 }
 
-export interface CodingStudioHandlerUrls extends UnknownRecord {
+export interface CodingStudioHandlerUrls {
   studio_submit?: string;
 }
 
-export interface CodingStudioMeta extends UnknownRecord {
+export interface CodingStudioMeta {
   field_metadata?: Record<string, StudioFieldMetadata>;
   lock_metadata?: CodingStudioLockMetadata;
 }

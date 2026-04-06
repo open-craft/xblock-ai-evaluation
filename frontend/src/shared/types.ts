@@ -12,9 +12,9 @@ export interface XBlockRuntime {
 }
 
 export interface SharedPayload<
-  HandlerUrls extends UnknownRecord = UnknownRecord,
-  InitialState extends UnknownRecord = UnknownRecord,
-  Meta extends UnknownRecord = UnknownRecord,
+  HandlerUrls = UnknownRecord,
+  InitialState = UnknownRecord,
+  Meta = UnknownRecord,
 > {
   view: string;
   handler_urls: HandlerUrls;
@@ -27,3 +27,15 @@ export type XBlockPropsFactory<Props> = (
   element: XBlockElementLike,
   data: unknown,
 ) => Props;
+
+export interface StudioChoice {
+  display_name?: string;
+  value?: string;
+}
+
+export interface StudioFieldMetadata {
+  choices?: StudioChoice[];
+  default?: unknown;
+  display_name?: string;
+  help?: string;
+}

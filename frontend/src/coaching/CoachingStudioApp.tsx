@@ -5,11 +5,16 @@ import { Alert } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
+  getSaveErrorMessage,
+  isModelApiKeyLocked,
   normalizeStudioSaveResponse,
+  normalizeValidationErrors,
+  normalizeValidationWarnings,
+  notifyRuntime,
   StudioSaveResponse,
   submitStudioPayload,
 } from "../shared/studio";
-import { UnknownRecord, XBlockRuntime } from "../shared/types";
+import { XBlockRuntime } from "../shared/types";
 import {
   CoachingListItem,
   getBlacklistItems,
@@ -29,12 +34,12 @@ import {
   getFirstSectionWithErrors,
   getSectionErrorCount,
 } from "./coachingStudioValidation";
+import { StudioFieldMetadata } from "../shared/types";
 import {
   CoachingStudioLockMetadata,
   CoachingStudioMeta,
   CoachingStudioPayload,
   CoachingStudioState,
-  StudioFieldMetadata,
 } from "./types";
 
 function stringifyJsonValue(value: unknown) {
@@ -93,70 +98,6 @@ function normalizeInitialState(initialState: CoachingStudioState): CoachingStudi
     workspace_title:
       typeof initialState.workspace_title === "string" ? initialState.workspace_title : "",
   };
-}
-
-function normalizeValidationWarnings(rawWarnings: unknown): string[] {
-  if (!Array.isArray(rawWarnings)) {
-    return [];
-  }
-
-  return rawWarnings
-    .filter((warning) => typeof warning === "string")
-    .map((warning) => String(warning));
-}
-
-function normalizeValidationErrors(rawErrors: unknown): CoachingStudioValidationErrors {
-  if (!rawErrors || typeof rawErrors !== "object") {
-    return {};
-  }
-
-  const validationErrors = rawErrors as Record<string, unknown>;
-
-  return Object.keys(validationErrors).reduce<CoachingStudioValidationErrors>(
-    (errors, fieldName) => {
-      const fieldErrors = validationErrors[fieldName];
-
-      if (Array.isArray(fieldErrors)) {
-        errors[fieldName] = fieldErrors
-          .filter((entry) => typeof entry === "string")
-          .map((entry) => String(entry));
-      } else if (typeof fieldErrors === "string" && fieldErrors) {
-        errors[fieldName] = [fieldErrors];
-      }
-
-      return errors;
-    },
-    {},
-  );
-}
-
-function getSaveErrorMessage(error: unknown, fallbackMessage: string) {
-  if (error instanceof RequestError && error.payload) {
-    const normalizedResponse = normalizeStudioSaveResponse(error.payload);
-    const payloadHasIssues =
-      Object.keys(normalizedResponse.validation_errors).length > 0 ||
-      normalizedResponse.validation_warnings.length > 0;
-
-    if (payloadHasIssues) {
-      return error.message;
-    }
-  }
-
-  if (error instanceof RequestError && error.message) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallbackMessage;
-}
-
-function notifyRuntime(runtime: XBlockRuntime | undefined, name: string, payload?: UnknownRecord) {
-  if (runtime && typeof runtime.notify === "function") {
-    runtime.notify(name, payload);
-  }
 }
 
 function updateListItemAtIndex(items: CoachingListItem[], index: number, nextValue: string) {
@@ -233,22 +174,6 @@ function buildSubmitPayload(values: CoachingStudioState) {
     scenario_data: values.scenario_data || "{}",
     workspace_title: values.workspace_title || "",
   };
-}
-
-function isModelApiKeyLocked(values: CoachingStudioState, lockMetadata?: CoachingStudioLockMetadata) {
-  if (lockMetadata?.use_custom_llm_service) {
-    return true;
-  }
-
-  const modelName = values.model || lockMetadata?.initial_model || "";
-  if (
-    lockMetadata?.model_key_presence &&
-    Object.prototype.hasOwnProperty.call(lockMetadata.model_key_presence, modelName)
-  ) {
-    return Boolean(lockMetadata.model_key_presence[modelName]);
-  }
-
-  return Boolean(lockMetadata?.lock_model_api_key_initial);
 }
 
 function getFieldLabel(metadata: StudioFieldMetadata | undefined, fallbackLabel: string) {

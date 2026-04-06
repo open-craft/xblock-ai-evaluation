@@ -1,20 +1,20 @@
-import { SharedPayload, UnknownRecord } from "../shared/types";
+import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface ShortAnswerMessage {
   source?: string;
   content?: string;
 }
 
-export interface ShortAnswerStudentHandlerUrls extends UnknownRecord {
+export interface ShortAnswerStudentHandlerUrls {
   get_response?: string;
   reset?: string;
 }
 
-export interface ShortAnswerStudentInitialState extends UnknownRecord {
+export interface ShortAnswerStudentInitialState {
   messages?: ShortAnswerMessage[];
 }
 
-export interface ShortAnswerStudentMeta extends UnknownRecord {
+export interface ShortAnswerStudentMeta {
   allow_reset?: boolean;
   character_image?: string;
   marked_html?: string;
@@ -28,26 +28,14 @@ export type ShortAnswerStudentPayload = SharedPayload<
   ShortAnswerStudentMeta
 >;
 
-export interface StudioChoice {
-  display_name?: string;
-  value?: string;
-}
-
-export interface StudioFieldMetadata {
-  choices?: StudioChoice[];
-  default?: unknown;
-  display_name?: string;
-  help?: string;
-}
-
-export interface StudioLockMetadata extends UnknownRecord {
+export interface StudioLockMetadata {
   initial_model?: string;
   lock_model_api_key_initial?: boolean;
   model_key_presence?: Record<string, boolean>;
   use_custom_llm_service?: boolean;
 }
 
-export interface ShortAnswerStudioState extends UnknownRecord {
+export interface ShortAnswerStudioState {
   allow_reset?: boolean;
   attachment_urls?: string[];
   character_image?: string;
@@ -60,11 +48,11 @@ export interface ShortAnswerStudioState extends UnknownRecord {
   question?: string;
 }
 
-export interface ShortAnswerStudioHandlerUrls extends UnknownRecord {
+export interface ShortAnswerStudioHandlerUrls {
   studio_submit?: string;
 }
 
-export interface ShortAnswerStudioMeta extends UnknownRecord {
+export interface ShortAnswerStudioMeta {
   field_metadata?: Record<string, StudioFieldMetadata>;
   lock_metadata?: StudioLockMetadata;
 }
