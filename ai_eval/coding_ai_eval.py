@@ -117,7 +117,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         when viewing courses.
         """
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
-        frag.add_css(self.resource_string("static/bundles/shared.css"))
+        frag.add_css_url(self._static_url("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/coding_ai_eval.css"))
         frag.add_javascript(self.resource_string("static/bundles/coding.js"))
 
@@ -161,7 +161,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         Render the React Studio editor for Coding.
         """
         fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
-        fragment.add_css(self.resource_string("static/bundles/shared.css"))
+        fragment.add_css_url(self._static_url("static/bundles/shared.css"))
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
         fragment.add_javascript(self.resource_string("static/bundles/coding.studio.js"))

@@ -481,6 +481,12 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         return self.runtime.handler_url(self, handler_name)
 
+    def _static_url(self, path: str) -> str:
+        """
+        Return a cacheable URL for a static resource.
+        """
+        return self.runtime.local_resource_url(self, path)
+
     @staticmethod
     def _studio_submit_response(
         success: bool,
