@@ -81,34 +81,12 @@
     font-size: 0.85rem;
     line-height: 1.45;
     margin-top: 0.45rem;
-    max-width: 300px;
 }
 
-.shortanswer-react-studio .shortanswer-studio-summary {
-    background: #fff8e5;
-    border: 1px solid #ead9a4;
-    border-radius: 3px;
-    margin-bottom: 1rem;
-    padding: 0.75rem 0.875rem;
-}
-
-.shortanswer-react-studio .shortanswer-studio-summary__error,
 .shortanswer-react-studio .shortanswer-studio-errors {
     color: #a11d1d;
-}
-
-.shortanswer-react-studio .shortanswer-studio-summary__error {
-    font-weight: 600;
-    margin-bottom: 0.35rem;
-}
-
-.shortanswer-react-studio .shortanswer-studio-summary__warnings {
-    color: #8a5a00;
-    margin: 0.35rem 0 0;
-    padding-left: 1.25rem;
-}
-
-.shortanswer-react-studio .shortanswer-studio-errors {
+    font-size: 1.25rem;
+    grid-column: 2;
     margin: 0.35rem 0 0;
     padding-left: 1.25rem;
 }

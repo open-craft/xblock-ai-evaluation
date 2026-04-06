@@ -87,7 +87,19 @@ module.exports = function webpackConfig(_, argv) {
         {
           test: /\.scss$/i,
           include: /node_modules/,
-          use: [MiniCssExtractPlugin.loader, "css-loader", "sass-loader"],
+          use: [
+            MiniCssExtractPlugin.loader,
+            {
+              loader: "css-loader",
+              options: {
+                modules: {
+                  auto: true,
+                  namedExport: false,
+                },
+              },
+            },
+            "sass-loader",
+          ],
           sideEffects: true,
         },
         {

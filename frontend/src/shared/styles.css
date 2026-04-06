@@ -49,3 +49,13 @@
   margin-top: var(--ai-eval-react-spacing-sm);
   min-height: 1.25rem;
 }
+
+.ai-eval-alert-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.ai-eval-section-errors-title {
+  font-weight: 700;
+  margin: 0 0 4px;
+}

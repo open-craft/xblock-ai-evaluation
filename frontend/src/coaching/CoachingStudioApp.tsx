@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
+import { Alert } from "@openedx/paragon";
 
 import { RequestError } from "../shared/request";
+import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   normalizeStudioSaveResponse,
   StudioSaveResponse,
@@ -662,41 +664,23 @@ function SectionCard({
   );
 }
 
-function StudioValidationSummary({
-  requestError,
-  validationWarnings,
-}: {
-  requestError: string;
-  validationWarnings: string[];
-}) {
-  if (!requestError && validationWarnings.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="coaching-studio-summary">
-      {requestError ? <div className="coaching-studio-summary__error">{requestError}</div> : null}
-      {validationWarnings.length > 0 ? (
-        <ul className="coaching-studio-summary__warnings">
-          {validationWarnings.map((warning, index) => {
-            return <li key={String(index)}>{warning}</li>;
-          })}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
 function SectionFieldErrors({ errors }: { errors?: string[] }) {
+  const intl = useIntl();
+
   if (!errors || errors.length === 0) {
     return null;
   }
 
   return (
-    <div className="coaching-studio-section-errors">
-      <p className="coaching-studio-section-errors__title">This section has validation issues.</p>
+    <Alert variant="danger">
+      <p className="ai-eval-section-errors-title">
+        {intl.formatMessage({
+          id: "coaching.studio.sectionFieldErrors.title",
+          defaultMessage: "This section has validation issues.",
+        })}
+      </p>
       <FieldErrors errors={errors} />
-    </div>
+    </Alert>
   );
 }
 

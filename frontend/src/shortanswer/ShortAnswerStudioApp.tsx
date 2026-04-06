@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
-
 import { RequestError } from "../shared/request";
+import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   normalizeStudioSaveResponse,
   StudioSaveResponse,
@@ -165,30 +165,6 @@ function FieldErrors({ errors }: { errors?: string[] }) {
   );
 }
 
-function StudioValidationSummary({
-  requestError,
-  validationWarnings,
-}: {
-  requestError: string;
-  validationWarnings: string[];
-}) {
-  if (!requestError && validationWarnings.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="shortanswer-studio-summary">
-      {requestError ? <div className="shortanswer-studio-summary__error">{requestError}</div> : null}
-      {validationWarnings.length > 0 ? (
-        <ul className="shortanswer-studio-summary__warnings">
-          {validationWarnings.map((warning, index) => {
-            return <li key={String(index)}>{warning}</li>;
-          })}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
 
 function AttachmentUrlsEditor({
   errors,
@@ -259,8 +235,8 @@ function AttachmentUrlsEditor({
             })}
           </button>
         </div>
+        <FieldErrors errors={errors} />
       </div>
-      <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
     </li>
   );
@@ -306,8 +282,8 @@ function TextField({
             onChange(event.target.value);
           }}
         />
+        <FieldErrors errors={errors} />
       </div>
-      <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
     </li>
   );
@@ -342,8 +318,8 @@ function TextAreaField({
             onChange(event.target.value);
           }}
         />
+        <FieldErrors errors={errors} />
       </div>
-      <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
     </li>
   );
@@ -380,8 +356,8 @@ function NumberField({
             onChange(event.target.value);
           }}
         />
+        <FieldErrors errors={errors} />
       </div>
-      <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
     </li>
   );
@@ -429,8 +405,8 @@ function SelectField({
             ▾
           </span>
         </div>
+        <FieldErrors errors={errors} />
       </div>
-      <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
     </li>
   );
@@ -465,8 +441,8 @@ function BooleanField({
             }}
           />
         </div>
+        <FieldErrors errors={errors} />
       </div>
-      <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
     </li>
   );
