@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
 import { Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
+import { useStudioModalActions } from "../shared/useStudioModalActions";
 import {
   getSaveErrorMessage,
   isModelApiKeyLocked,
@@ -240,9 +241,7 @@ export default function CodingStudioApp({
     setValues(initialValues);
   }, [initialValues]);
 
-  function handleSave(event: React.MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault();
-
+  const handleSave = useCallback(function handleSave() {
     if (!payload.handler_urls.studio_submit || isSaving) {
       return;
     }
@@ -318,16 +317,29 @@ export default function CodingStudioApp({
           message: inlineRequestError,
         });
       });
-  }
+  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime, values]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
+  const handleCancel = useCallback(() => {
+    notifyRuntime(runtime, "cancel", {});
+  }, [runtime]);
+
+  useStudioModalActions({
+    rootSelector: ".coding-react-studio",
+    intl,
+    isSaving,
+    onSave: handleSave,
+    onCancel: handleCancel,
+    i18nPrefix: "coding",
+  });
+
   return (
     <div
-      className="editor-with-buttons shortanswer-react-studio coding-react-studio"
+      className="shortanswer-react-studio coding-react-studio"
       data-block-kind="coding"
     >
-      <div className="wrapper-comp-settings is-active editor-with-buttons" id="settings-tab">
+      <div className="wrapper-comp-settings is-active" id="settings-tab">
         <StudioValidationSummary
           hasFieldErrors={hasFieldErrors}
           requestError={requestError}
@@ -347,47 +359,6 @@ export default function CodingStudioApp({
             });
           }}
         />
-      </div>
-      <div className="xblock-actions">
-        <ul>
-          <li className="action-item">
-            <a
-              href="#"
-              className="button action-primary action-save shortanswer-studio-save-button"
-              aria-disabled={isSaving}
-              onClick={handleSave}
-            >
-              <span className="action-button-text">
-                {isSaving
-                  ? intl.formatMessage({
-                      id: "coding.studio.savingButton",
-                      defaultMessage: "Saving...",
-                    })
-                  : intl.formatMessage({
-                      id: "coding.studio.save",
-                      defaultMessage: "Save",
-                    })}
-              </span>
-            </a>
-          </li>
-          <li className="action-item">
-            <a
-              href="#"
-              className="button action-cancel shortanswer-studio-cancel-button"
-              onClick={(event) => {
-                event.preventDefault();
-                notifyRuntime(runtime, "cancel", {});
-              }}
-            >
-              <span className="action-button-text">
-                {intl.formatMessage({
-                  id: "coding.studio.cancel",
-                  defaultMessage: "Cancel",
-                })}
-              </span>
-            </a>
-          </li>
-        </ul>
       </div>
     </div>
   );

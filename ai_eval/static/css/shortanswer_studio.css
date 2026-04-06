@@ -6,152 +6,116 @@
     padding: 0;
 }
 
-/* --- AttachmentUrlsEditor --- */
+/* --- Paragon Form.Group two-column layout --- */
 
-.shortanswer-react-studio .metadata_entry {
-    border-bottom: 1px solid #e5e5e5;
-    margin: 0;
-    padding: 1rem 0;
-}
-
-.shortanswer-react-studio .metadata_entry:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.shortanswer-react-studio .wrapper-comp-setting {
+.shortanswer-react-studio .pgn__form-group {
     align-items: start;
-    column-gap: 2rem;
+    border-bottom: 1px solid #e5e5e5;
+    column-gap: 10rem;
     display: grid;
-    grid-template-columns: 440px minmax(440px, 620px);
+    grid-template-columns: 220px minmax(300px, 600px);
+    padding: 1rem 0 1rem 3rem;
 }
 
-.shortanswer-react-studio .setting-label {
+.shortanswer-react-studio .pgn__form-group:last-of-type {
+    border-bottom: none;
+}
+
+.shortanswer-react-studio .pgn__form-group > .pgn__form-label {
     color: #3c3c3c;
-    font-size: 0.95rem;
+    font-size: 16px;
     font-weight: 600;
     grid-column: 1;
-    line-height: 1.35;
-    margin: 0;
-    padding-top: 0.65rem;
-    white-space: normal;
+    padding-top: 0.5rem;
 }
 
-.shortanswer-react-studio .shortanswer-studio-attachment-list,
-.shortanswer-react-studio .field-data-control {
+.shortanswer-react-studio .pgn__form-group > :not(.pgn__form-label) {
     grid-column: 2;
-    width: 100%;
 }
 
-.shortanswer-react-studio .field-data-control {
-    background: #ffffff;
-    border: 1px solid #c8c8c8;
-    border-radius: 3px;
-    box-sizing: border-box;
+.shortanswer-react-studio .pgn__form-group input.form-control,
+.shortanswer-react-studio .pgn__form-group select.form-control {
+    font-size: 15px;
+    height: 44px;
+    min-height: 44px;
+    padding: 8px 12px;
+}
+
+.shortanswer-react-studio .pgn__form-group textarea.form-control {
+    font-size: 14px;
+}
+
+.shortanswer-react-studio .pgn__form-group .pgn__form-text {
+    color: #707070;
+    font-size: 12px;
+}
+
+.shortanswer-react-studio .pgn__form-group .pgn__form-text-invalid {
+    color: #a11d1d;
+}
+
+.shortanswer-react-studio .pgn__form-group .pgn__form-text-invalid .pgn__icon {
+    display: none;
+}
+
+.shortanswer-react-studio .pgn__form-group .pgn__form-checkbox {
+    column-gap: 10rem;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: 220px auto;
+}
+
+.shortanswer-react-studio .pgn__form-group .pgn__form-checkbox > div {
+    grid-column: 1;
+    order: 1;
+}
+
+.shortanswer-react-studio .pgn__form-group .pgn__form-checkbox > div .pgn__form-label {
     color: #3c3c3c;
-    min-height: 2.5rem;
-    padding: 0.625rem 0.75rem;
-    width: 100% !important;
+    font-size: 16px;
+    font-weight: 600;
 }
 
-.shortanswer-react-studio .field-data-control:focus {
-    border-color: #0a3055;
-    box-shadow: 0 0 0 1px #0a3055;
-    outline: none;
+.shortanswer-react-studio .pgn__form-group .pgn__form-checkbox-input {
+    grid-column: 2;
+    height: 18px;
+    margin-top: 0.3rem;
+    order: 2;
+    width: 18px;
 }
 
-.shortanswer-react-studio .shortanswer-studio-attachment-list {
-    max-width: 620px;
-}
+/* --- AttachmentUrlsEditor --- */
 
 .shortanswer-react-studio .shortanswer-studio-attachment-row {
     align-items: center;
-    display: grid;
+    display: flex;
     gap: 0.5rem;
-    grid-template-columns: minmax(0, 1fr) 20px;
+    margin-bottom: 0.35rem;
 }
 
-.shortanswer-react-studio .shortanswer-studio-attachment-input-shell {
+.shortanswer-react-studio .shortanswer-studio-attachment-row .form-control {
+    flex: 1 1 auto;
     min-width: 0;
 }
 
-.shortanswer-react-studio .shortanswer-studio-attachment-input-shell .field-data-control {
-    border: 1px solid #c8d2dd;
-    border-radius: 6px;
-    box-shadow: none;
-    padding: 0.55rem 0.7rem;
-}
-
-.shortanswer-react-studio .shortanswer-studio-attachment-remove {
-    align-items: center;
-    background: #d94a4a !important;
-    border: 0 !important;
-    border-radius: 50% !important;
-    box-shadow: none !important;
-    color: #fff !important;
-    display: inline-flex !important;
-    font-size: 12px !important;
-    height: 20px !important;
-    justify-content: center;
-    line-height: 20px !important;
-    min-height: 20px !important;
-    min-width: 20px !important;
-    padding: 0 !important;
-    width: 20px !important;
-}
-
-.shortanswer-react-studio .shortanswer-studio-attachment-remove:hover {
-    background: #c53b3b !important;
-    color: #fff !important;
-}
-
-.shortanswer-react-studio .shortanswer-studio-attachment-add {
-    margin-top: 0.35rem;
-    max-width: 200px;
-}
-
-.shortanswer-react-studio .shortanswer-studio-attachment-errors {
-    color: #a11d1d;
-    grid-column: 2;
-    margin: 0.35rem 0 0;
-    padding-left: 1.25rem;
-}
-
-/* --- Save/Cancel buttons --- */
-
-.shortanswer-react-studio .xblock-actions {
-    box-sizing: border-box;
-    margin-top: 1rem;
-    padding-left: 12px;
-}
-
-.shortanswer-react-studio .xblock-actions ul {
-    align-items: center;
-    display: inline-flex;
-    float: left;
-    gap: 0.85rem;
-    justify-content: flex-start;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.shortanswer-react-studio .shortanswer-studio-save-button,
-.shortanswer-react-studio .shortanswer-studio-cancel-button {
-    display: inline-block;
-    min-width: 5.75rem;
-    text-align: center;
+.shortanswer-react-studio .shortanswer-studio-attachment-list > .btn {
+    margin-top: 0.25rem;
 }
 
 @media (max-width: 1180px) {
-    .shortanswer-react-studio .wrapper-comp-setting {
+    .shortanswer-react-studio .pgn__form-group {
         grid-template-columns: 1fr;
+        padding-left: 1rem;
+        column-gap: 0;
     }
 
-    .shortanswer-react-studio .setting-label,
-    .shortanswer-react-studio .field-data-control,
-    .shortanswer-react-studio .shortanswer-studio-attachment-list {
+    .shortanswer-react-studio .pgn__form-group > .pgn__form-label,
+    .shortanswer-react-studio .pgn__form-group > :not(.pgn__form-label) {
         grid-column: 1;
-        width: 100%;
+    }
+
+    .shortanswer-react-studio .pgn__form-group .pgn__form-checkbox {
+        grid-template-columns: 1fr;
+        column-gap: 0;
     }
 }

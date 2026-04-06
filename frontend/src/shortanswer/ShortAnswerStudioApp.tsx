@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
-import { Form } from "@openedx/paragon";
+import { Button, Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
+import { useStudioModalActions } from "../shared/useStudioModalActions";
 import {
   getSaveErrorMessage,
   isModelApiKeyLocked,
@@ -90,66 +91,51 @@ function AttachmentUrlsEditor({
   });
 
   return (
-    <li className="field comp-setting-entry metadata_entry" data-field-name="attachment_urls">
-      <div className="wrapper-comp-setting">
-        <label className="label setting-label shortanswer-studio-section-label">
-          {metadata?.display_name || "Attachment URLs"}
-        </label>
-        <div className="shortanswer-studio-attachment-list">
-          {attachmentUrls.map((attachmentUrl, index) => {
-            return (
-              <div className="shortanswer-studio-attachment-row" key={String(index)}>
-                <div className="shortanswer-studio-attachment-input-shell">
-                  <input
-                    type="text"
-                    className="field-data-control"
-                    value={attachmentUrl}
-                    onChange={(event) => {
-                      const nextUrls = attachmentUrls.slice();
-                      nextUrls[index] = event.target.value;
-                      onChange(nextUrls);
-                    }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="button shortanswer-studio-attachment-remove"
-                  aria-label={removeAttachmentLabel}
-                  title={removeAttachmentLabel}
-                  onClick={() => {
-                    const nextUrls = attachmentUrls.filter((_, urlIndex) => urlIndex !== index);
-                    onChange(nextUrls);
-                  }}
-                  disabled={attachmentUrls.length === 1 && !attachmentUrl}
-                >
-                  <span aria-hidden="true">&times;</span>
-                </button>
-              </div>
-            );
+    <Form.Group isInvalid={Boolean(errors && errors.length > 0)}>
+      <Form.Label>{metadata?.display_name || "Attachment URLs"}</Form.Label>
+      <div className="shortanswer-studio-attachment-list">
+        {attachmentUrls.map((attachmentUrl, index) => (
+          <div className="shortanswer-studio-attachment-row" key={String(index)}>
+            <Form.Control
+              type="text"
+              value={attachmentUrl}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                const nextUrls = attachmentUrls.slice();
+                nextUrls[index] = event.target.value;
+                onChange(nextUrls);
+              }}
+            />
+            <Button
+              variant="outline-danger"
+              size="sm"
+              aria-label={removeAttachmentLabel}
+              title={removeAttachmentLabel}
+              onClick={() => {
+                const nextUrls = attachmentUrls.filter((_, urlIndex) => urlIndex !== index);
+                onChange(nextUrls);
+              }}
+              disabled={attachmentUrls.length === 1 && !attachmentUrl}
+            >
+              &times;
+            </Button>
+          </div>
+        ))}
+        <Button
+          variant="outline-primary"
+          size="sm"
+          onClick={() => {
+            onChange(attachmentUrls.concat(""));
+          }}
+        >
+          {intl.formatMessage({
+            id: "shortanswer.studio.addAttachment",
+            defaultMessage: "Add URL",
           })}
-          <button
-            type="button"
-            className="button shortanswer-studio-attachment-add"
-            onClick={() => {
-              onChange(attachmentUrls.concat(""));
-            }}
-          >
-            {intl.formatMessage({
-              id: "shortanswer.studio.addAttachment",
-              defaultMessage: "Add URL",
-            })}
-          </button>
-        </div>
-        {errors && errors.length > 0 ? (
-          <ul className="shortanswer-studio-attachment-errors">
-            {errors.map((error, errorIndex) => (
-              <li key={String(errorIndex)}>{error}</li>
-            ))}
-          </ul>
-        ) : null}
+        </Button>
       </div>
+      <FieldErrors errors={errors} />
       <FieldHelp metadata={metadata} />
-    </li>
+    </Form.Group>
   );
 }
 
@@ -344,9 +330,7 @@ export default function ShortAnswerStudioApp({
     setValues(initialValues);
   }, [initialValues]);
 
-  function handleSave(event: React.MouseEvent<HTMLAnchorElement>) {
-    event.preventDefault();
-
+  const handleSave = useCallback(function handleSave() {
     if (!payload.handler_urls.studio_submit || isSaving) {
       return;
     }
@@ -422,13 +406,26 @@ export default function ShortAnswerStudioApp({
           message: inlineRequestError,
         });
       });
-  }
+  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime, values]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
+  const handleCancel = useCallback(() => {
+    notifyRuntime(runtime, "cancel", {});
+  }, [runtime]);
+
+  useStudioModalActions({
+    rootSelector: ".shortanswer-react-studio",
+    intl,
+    isSaving,
+    onSave: handleSave,
+    onCancel: handleCancel,
+    i18nPrefix: "shortanswer",
+  });
+
   return (
-    <div className="editor-with-buttons shortanswer-react-studio" data-block-kind="shortanswer">
-      <div className="wrapper-comp-settings is-active editor-with-buttons" id="settings-tab">
+    <div className="shortanswer-react-studio" data-block-kind="shortanswer">
+      <div className="wrapper-comp-settings is-active" id="settings-tab">
         <StudioValidationSummary
           hasFieldErrors={hasFieldErrors}
           requestError={requestError}
@@ -448,47 +445,6 @@ export default function ShortAnswerStudioApp({
             });
           }}
         />
-      </div>
-      <div className="xblock-actions">
-        <ul>
-          <li className="action-item">
-            <a
-              href="#"
-              className="button action-primary action-save shortanswer-studio-save-button"
-              aria-disabled={isSaving}
-              onClick={handleSave}
-            >
-              <span className="action-button-text">
-                {isSaving
-                  ? intl.formatMessage({
-                      id: "shortanswer.studio.savingButton",
-                      defaultMessage: "Saving...",
-                    })
-                  : intl.formatMessage({
-                      id: "shortanswer.studio.save",
-                      defaultMessage: "Save",
-                    })}
-              </span>
-            </a>
-          </li>
-          <li className="action-item">
-            <a
-              href="#"
-              className="button action-cancel shortanswer-studio-cancel-button"
-              onClick={(event) => {
-                event.preventDefault();
-                notifyRuntime(runtime, "cancel", {});
-              }}
-            >
-              <span className="action-button-text">
-                {intl.formatMessage({
-                  id: "shortanswer.studio.cancel",
-                  defaultMessage: "Cancel",
-                })}
-              </span>
-            </a>
-          </li>
-        </ul>
       </div>
     </div>
   );
