@@ -24,8 +24,7 @@ function parseJsonValue(rawValue: unknown, fallback: unknown) {
 }
 
 function asJsonObject(rawValue: unknown): JsonObject {
-  const parsedValue =
-    typeof rawValue === "string" ? parseJsonValue(rawValue, {}) : rawValue;
+  const parsedValue = parseJsonValue(rawValue, {});
 
   if (parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue)) {
     return parsedValue as JsonObject;
@@ -138,10 +137,7 @@ export function updateScenarioDataValue(
   fieldName: "case_details",
   nextValue: string,
 ) {
-  const scenarioData = {
-    ...asJsonObject(rawScenarioData),
-  };
-
+  const scenarioData = asJsonObject(rawScenarioData);
   scenarioData.case_details = nextValue;
 
   return stringifyJson(scenarioData);
@@ -152,9 +148,7 @@ export function updateScenarioListItems(
   fieldName: "learning_objectives" | "evaluation_criteria",
   nextItems: CoachingListItem[],
 ) {
-  const scenarioData = {
-    ...asJsonObject(rawScenarioData),
-  };
+  const scenarioData = asJsonObject(rawScenarioData);
 
   if (fieldName === "learning_objectives") {
     scenarioData.learning_objectives = nextItems.map((item) => {

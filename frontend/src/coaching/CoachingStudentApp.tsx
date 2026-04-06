@@ -178,20 +178,13 @@ function MessageAvatar({
       <div className="coach-message__avatar">
         <img
           src={character.avatar}
-          alt={
-            character.name
-              ? intl.formatMessage(
-                  {
-                    id: "coaching.student.avatarForName",
-                    defaultMessage: "Avatar for {name}",
-                  },
-                  { name: character.name },
-                )
-              : intl.formatMessage({
-                  id: "coaching.student.avatar",
-                  defaultMessage: "Avatar",
-                })
-          }
+          alt={intl.formatMessage(
+            {
+              id: "coaching.student.avatar",
+              defaultMessage: "{name, select, none {Avatar} other {Avatar for {name}}}",
+            },
+            { name: character.name || "none" },
+          )}
         />
       </div>
     );
@@ -212,11 +205,7 @@ function ChatMessage({ message }: { message: PendingCoachingMessage }) {
   const pane = message.pane === "coach" ? "coach" : "workspace";
   const isUser = Boolean(message.is_user);
   const character = normalizeCharacter(message.character, pane);
-  const className =
-    "coach-message coach-message--pane-" +
-    pane +
-    (isUser ? " coach-message--user" : " coach-message--ai") +
-    (message.pending ? " coach-message--pending" : "");
+  const className = `coach-message coach-message--pane-${pane} ${isUser ? "coach-message--user" : "coach-message--ai"}${message.pending ? " coach-message--pending" : ""}`;
 
   return (
     <div className={className}>
