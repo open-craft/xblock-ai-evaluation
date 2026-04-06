@@ -83,6 +83,15 @@ class CoachScenarioData(pydantic.BaseModel):
     learning_objectives: typing.List[pydantic.StrictStr]
     evaluation_criteria: typing.List[EvaluationCriterion]
 
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def check_is_dict(cls, data: typing.Any) -> typing.Any:
+        if not isinstance(data, dict):
+            raise ValueError(
+                "Scenario data must be a JSON object (dictionary)."
+            )
+        return data
+
 
 class CoachAIEvalXBlock(AIEvalXBlock):
     """
@@ -404,6 +413,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         location = tuple(error.get("loc", ()))
         mapped_field = self._map_scenario_data_validation_error_field(location)
 
+        # model_validator errors (e.g. "not a dict") carry their own message.
+        if error.get("type") == "value_error" and not location:
+            msg = str(error.get("ctx", {}).get("error", ""))
+            if msg:
+                return mapped_field, msg
+            return mapped_field, _(
+                "Scenario data must be a JSON object (dictionary)."
+            )
+
         if mapped_field == "scenario_case_details":
             return mapped_field, _("Scenario must be a valid string.")
 
@@ -493,19 +511,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         validation_errors, validation_warnings = super()._collect_studio_validation_issues(data)
         scenario_data = data.scenario_data
         has_scenario_schema_errors = False
-        if not isinstance(scenario_data, dict):
-            has_scenario_schema_errors = True
-            self._add_studio_validation_error(
-                validation_errors,
-                "scenario_data",
-                _(
-                    "Scenario data must be a JSON object (dictionary)."
-                ),
-            )
-            scenario_data = {}
 
         try:
-            CoachScenarioData(**scenario_data)
+            CoachScenarioData.model_validate(scenario_data)
         except pydantic.ValidationError as e:
             has_scenario_schema_errors = True
             for error in e.errors():
@@ -515,6 +523,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                     field_name,
                     message,
                 )
+
+        if not isinstance(scenario_data, dict):
+            scenario_data = {}
         template_scenario_data = self._get_template_validation_scenario_data(
             scenario_data,
             has_scenario_schema_errors,

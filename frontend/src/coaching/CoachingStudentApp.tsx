@@ -3,7 +3,6 @@ import { useIntl } from "react-intl";
 
 import { postJson } from "../shared/request";
 import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
-import { UnknownRecord } from "../shared/types";
 import {
   CoachingAttemptState,
   CoachingCharacter,
@@ -19,13 +18,15 @@ interface PendingCoachingMessage extends CoachingMessage {
   pending?: boolean;
 }
 
-interface CharacterResponse extends UnknownRecord {
+interface CharacterResponse {
   attempts?: unknown;
+  chat_histories?: unknown;
   finished?: boolean;
   message?: unknown;
   report_html?: string;
   evaluation_markdown?: string;
   final_submission?: string;
+  [key: string]: unknown;
 }
 
 function normalizeCharacter(character: unknown, fallbackPane: PaneKey): CoachingCharacter {

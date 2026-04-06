@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
-import { Alert } from "@openedx/paragon";
+import { Alert, Button, Form } from "@openedx/paragon";
 
 import { RequestError } from "../shared/request";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
@@ -40,24 +40,29 @@ import {
   CoachingStudioMeta,
   CoachingStudioPayload,
   CoachingStudioState,
+  ScenarioData,
 } from "./types";
 
-function stringifyJsonValue(value: unknown) {
-  if (typeof value === "string") {
-    return value;
+function normalizeScenarioData(value: unknown): ScenarioData {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as ScenarioData;
   }
 
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (error) {
-    return "";
+  return {};
+}
+
+function normalizeBlacklist(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value as string[];
   }
+
+  return [];
 }
 
 function normalizeInitialState(initialState: CoachingStudioState): CoachingStudioState {
   return {
     allow_reset: Boolean(initialState.allow_reset),
-    blacklist: stringifyJsonValue(initialState.blacklist || []),
+    blacklist: normalizeBlacklist(initialState.blacklist),
     character_1_avatar:
       typeof initialState.character_1_avatar === "string" ? initialState.character_1_avatar : "",
     character_1_name:
@@ -94,7 +99,7 @@ function normalizeInitialState(initialState: CoachingStudioState): CoachingStudi
       typeof initialState.model_api_key === "string" ? initialState.model_api_key : "",
     model_api_url:
       typeof initialState.model_api_url === "string" ? initialState.model_api_url : "",
-    scenario_data: stringifyJsonValue(initialState.scenario_data || {}),
+    scenario_data: normalizeScenarioData(initialState.scenario_data),
     workspace_title:
       typeof initialState.workspace_title === "string" ? initialState.workspace_title : "",
   };
@@ -171,7 +176,7 @@ function buildSubmitPayload(values: CoachingStudioState) {
     model: values.model || "",
     model_api_key: values.model_api_key || "",
     model_api_url: values.model_api_url || "",
-    scenario_data: values.scenario_data || "{}",
+    scenario_data: values.scenario_data || {},
     workspace_title: values.workspace_title || "",
   };
 }
@@ -194,60 +199,17 @@ function FieldErrors({ errors }: { errors?: string[] }) {
   );
 }
 
-function FieldHelp({ description, helpText }: { description?: string; helpText?: string }) {
+function FieldDescription({ description, helpText }: { description?: string; helpText?: string }) {
   if (!description && !helpText) {
     return null;
   }
 
   return (
     <div className="coaching-studio-field-copy">
-      {description ? <p className="coaching-studio-field-description">{description}</p> : null}
+      {description ? <Form.Text className="coaching-studio-field-description">{description}</Form.Text> : null}
       {!description && helpText ? (
-        <p className="coaching-studio-field-help">{helpText}</p>
+        <Form.Text className="coaching-studio-field-help">{helpText}</Form.Text>
       ) : null}
-    </div>
-  );
-}
-
-function FieldShell({
-  children,
-  counter,
-  description,
-  errors,
-  helpText,
-  label,
-  locked,
-  showLabel = true,
-}: {
-  children: React.ReactNode;
-  counter?: string;
-  description?: string;
-  errors?: string[];
-  helpText?: string;
-  label: string;
-  locked?: boolean;
-  showLabel?: boolean;
-}) {
-  return (
-    <div className="coaching-studio-field">
-      <div className="coaching-studio-field-header">
-        {showLabel || counter ? (
-          <div className="coaching-studio-field-title-row">
-            {showLabel ? (
-              <p className="coaching-studio-field-label">
-                {label}
-                {locked ? <span className="ai-eval-lock-badge"> Locked by admin</span> : null}
-              </p>
-            ) : (
-              <span aria-hidden="true" />
-            )}
-            {counter ? <p className="coaching-studio-field-counter">{counter}</p> : null}
-          </div>
-        ) : null}
-        <FieldHelp description={description} helpText={helpText} />
-      </div>
-      <div className="coaching-studio-field-control">{children}</div>
-      <FieldErrors errors={errors} />
     </div>
   );
 }
@@ -273,29 +235,33 @@ function TextInputField({
   placeholder?: string;
   value: string;
 }) {
+  const label = getFieldLabel(metadata, fieldName);
+
   return (
-    <FieldShell
-      label={getFieldLabel(metadata, fieldName)}
-      description={description}
-      helpText={metadata?.help}
-      errors={errors}
-      counter={counter}
-      locked={locked}
-    >
-      <input
-        id={"xb-field-edit-" + fieldName}
-        type="text"
-        className="field-data-control coaching-studio-input"
-        disabled={Boolean(locked)}
-        aria-disabled={Boolean(locked)}
-        aria-invalid={Boolean(errors?.length)}
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-    </FieldShell>
+    <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
+      <div className="coaching-studio-field-header">
+        <div className="coaching-studio-field-title-row">
+          <Form.Label className="coaching-studio-field-label">
+            {label}
+            {locked ? <span className="ai-eval-lock-badge"> Locked by admin</span> : null}
+          </Form.Label>
+          {counter ? <p className="coaching-studio-field-counter">{counter}</p> : null}
+        </div>
+        <FieldDescription description={description} helpText={metadata?.help} />
+      </div>
+      <div className="coaching-studio-field-control">
+        <Form.Control
+          className="coaching-studio-input"
+          disabled={Boolean(locked)}
+          placeholder={placeholder}
+          value={value}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange(event.target.value);
+          }}
+        />
+      </div>
+      <FieldErrors errors={errors} />
+    </Form.Group>
   );
 }
 
@@ -314,26 +280,30 @@ function NumberField({
   onChange: (nextValue: string) => void;
   value: number | string | null | undefined;
 }) {
+  const label = getFieldLabel(metadata, fieldName);
+
   return (
-    <FieldShell
-      label={getFieldLabel(metadata, fieldName)}
-      description={description}
-      helpText={metadata?.help}
-      errors={errors}
-    >
-      <input
-        id={"xb-field-edit-" + fieldName}
-        type="number"
-        min={0}
-        step={1}
-        className="field-data-control coaching-studio-input coaching-studio-input--compact"
-        aria-invalid={Boolean(errors?.length)}
-        value={value === null || typeof value === "undefined" ? "" : value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-    </FieldShell>
+    <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
+      <div className="coaching-studio-field-header">
+        <div className="coaching-studio-field-title-row">
+          <Form.Label className="coaching-studio-field-label">{label}</Form.Label>
+        </div>
+        <FieldDescription description={description} helpText={metadata?.help} />
+      </div>
+      <div className="coaching-studio-field-control">
+        <Form.Control
+          className="coaching-studio-input coaching-studio-input--compact"
+          type="number"
+          min={0}
+          step={1}
+          value={value === null || typeof value === "undefined" ? "" : value}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange(event.target.value);
+          }}
+        />
+      </div>
+      <FieldErrors errors={errors} />
+    </Form.Group>
   );
 }
 
@@ -358,26 +328,36 @@ function TextAreaField({
   showLabel?: boolean;
   value: string;
 }) {
+  const label = getFieldLabel(metadata, fieldName);
+
   return (
-    <FieldShell
-      label={getFieldLabel(metadata, fieldName)}
-      description={description}
-      helpText={metadata?.help}
-      errors={errors}
-      counter={counter}
-      showLabel={showLabel}
-    >
-      <textarea
-        id={"xb-field-edit-" + fieldName}
-        className="field-data-control coaching-studio-input coaching-studio-textarea"
-        rows={rows || 8}
-        aria-invalid={Boolean(errors?.length)}
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-    </FieldShell>
+    <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
+      <div className="coaching-studio-field-header">
+        {showLabel || counter ? (
+          <div className="coaching-studio-field-title-row">
+            {showLabel ? (
+              <Form.Label className="coaching-studio-field-label">{label}</Form.Label>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            {counter ? <p className="coaching-studio-field-counter">{counter}</p> : null}
+          </div>
+        ) : null}
+        <FieldDescription description={description} helpText={metadata?.help} />
+      </div>
+      <div className="coaching-studio-field-control">
+        <Form.Control
+          className="coaching-studio-input coaching-studio-textarea"
+          as="textarea"
+          rows={rows || 8}
+          value={value}
+          onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => {
+            onChange(event.target.value);
+          }}
+        />
+      </div>
+      <FieldErrors errors={errors} />
+    </Form.Group>
   );
 }
 
@@ -397,21 +377,22 @@ function SelectField({
   value: string;
 }) {
   const choices = Array.isArray(metadata?.choices) ? metadata?.choices : [];
+  const label = getFieldLabel(metadata, fieldName);
 
   return (
-    <FieldShell
-      label={getFieldLabel(metadata, fieldName)}
-      description={description}
-      helpText={metadata?.help}
-      errors={errors}
-    >
-      <div className="shortanswer-studio-select-shell coaching-studio-select-shell">
-        <select
-          id={"xb-field-edit-" + fieldName}
-          className="field-data-control shortanswer-studio-select coaching-studio-input"
-          aria-invalid={Boolean(errors?.length)}
+    <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
+      <div className="coaching-studio-field-header">
+        <div className="coaching-studio-field-title-row">
+          <Form.Label className="coaching-studio-field-label">{label}</Form.Label>
+        </div>
+        <FieldDescription description={description} helpText={metadata?.help} />
+      </div>
+      <div className="coaching-studio-field-control">
+        <Form.Control
+          className="coaching-studio-input"
+          as="select"
           value={value}
-          onChange={(event) => {
+          onChange={(event: React.ChangeEvent<HTMLSelectElement>) => {
             onChange(event.target.value);
           }}
         >
@@ -422,12 +403,10 @@ function SelectField({
               </option>
             );
           })}
-        </select>
-        <span className="shortanswer-studio-select-icon coaching-studio-select-icon" aria-hidden="true">
-          ▾
-        </span>
+        </Form.Control>
       </div>
-    </FieldShell>
+      <FieldErrors errors={errors} />
+    </Form.Group>
   );
 }
 
@@ -446,38 +425,32 @@ function BooleanChoiceField({
   onChange: (nextValue: boolean) => void;
   value: boolean;
 }) {
+  const label = getFieldLabel(metadata, fieldName);
+
   return (
-    <FieldShell
-      label={getFieldLabel(metadata, fieldName)}
-      description={description}
-      helpText={metadata?.help}
-      errors={errors}
-    >
-      <div className="coaching-studio-radio-group" role="radiogroup" aria-label={fieldName}>
-        <label className="coaching-studio-radio-option">
-          <input
-            type="radio"
-            name={fieldName}
-            checked={value}
-            onChange={() => {
-              onChange(true);
-            }}
-          />
-          <span>Yes</span>
-        </label>
-        <label className="coaching-studio-radio-option">
-          <input
-            type="radio"
-            name={fieldName}
-            checked={!value}
-            onChange={() => {
-              onChange(false);
-            }}
-          />
-          <span>No</span>
-        </label>
+    <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
+      <div className="coaching-studio-field-header">
+        <div className="coaching-studio-field-title-row">
+          <Form.Label className="coaching-studio-field-label">{label}</Form.Label>
+        </div>
+        <FieldDescription description={description} helpText={metadata?.help} />
       </div>
-    </FieldShell>
+      <div className="coaching-studio-field-control">
+        <Form.RadioSet
+          className="coaching-studio-radio-group"
+          name={fieldName}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange(event.target.value === "true");
+          }}
+          value={String(value)}
+          isInline
+        >
+          <Form.Radio value="true">Yes</Form.Radio>
+          <Form.Radio value="false">No</Form.Radio>
+        </Form.RadioSet>
+      </div>
+      <FieldErrors errors={errors} />
+    </Form.Group>
   );
 }
 
@@ -511,59 +484,61 @@ function ListField({
   const displayItems = items.length > 0 ? items : [{ value: "" }];
 
   return (
-    <FieldShell
-      label={label}
-      description={description}
-      helpText={helpText}
-      errors={errors}
-      showLabel={showLabel}
-    >
-      <div className="coaching-studio-list-field">
-        <div className="coaching-studio-list-rows">
-          {displayItems.map((item, index) => {
-            const canRemove = items.length > 0;
-
-            return (
-              <div className="coaching-studio-list-row-group" key={fieldName + "-" + String(index)}>
-                <div className="coaching-studio-list-row">
-                  <input
-                    id={"xb-field-edit-" + fieldName + "-" + String(index)}
-                    type="text"
-                    className="field-data-control coaching-studio-input"
-                    aria-invalid={Boolean(errors?.length || item.error)}
-                    value={item.value}
-                    placeholder={placeholder}
-                    onChange={(event) => {
-                      onChangeItem(index, event.target.value);
-                    }}
-                  />
-                  {canRemove ? (
-                    <button
-                      type="button"
-                      className="button coaching-studio-list-remove"
-                      aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
-                      onClick={() => {
-                        onRemoveItem(index);
-                      }}
-                    >
-                      <span aria-hidden="true">×</span>
-                    </button>
-                  ) : null}
-                </div>
-                <FieldErrors errors={item.error ? [item.error] : undefined} />
-              </div>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          className="button coaching-studio-list-add"
-          onClick={onAdd}
-        >
-          {addLabel}
-        </button>
+    <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
+      <div className="coaching-studio-field-header">
+        {showLabel ? (
+          <div className="coaching-studio-field-title-row">
+            <Form.Label className="coaching-studio-field-label">{label}</Form.Label>
+          </div>
+        ) : null}
+        <FieldDescription description={description} helpText={helpText} />
       </div>
-    </FieldShell>
+      <div className="coaching-studio-field-control">
+        <div className="coaching-studio-list-field">
+          <div className="coaching-studio-list-rows">
+            {displayItems.map((item, index) => {
+              const canRemove = items.length > 0;
+
+              return (
+                <div className="coaching-studio-list-row-group" key={fieldName + "-" + String(index)}>
+                  <div className="coaching-studio-list-row">
+                    <Form.Control
+                      className="coaching-studio-input"
+                      value={item.value}
+                      placeholder={placeholder}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                        onChangeItem(index, event.target.value);
+                      }}
+                    />
+                    {canRemove ? (
+                      <Button
+                        className="coaching-studio-list-remove"
+                        variant="link"
+                        aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
+                        onClick={() => {
+                          onRemoveItem(index);
+                        }}
+                      >
+                        <span aria-hidden="true">×</span>
+                      </Button>
+                    ) : null}
+                  </div>
+                  <FieldErrors errors={item.error ? [item.error] : undefined} />
+                </div>
+              );
+            })}
+          </div>
+          <Button
+            className="coaching-studio-list-add"
+            variant="link"
+            onClick={onAdd}
+          >
+            {addLabel}
+          </Button>
+        </div>
+      </div>
+      <FieldErrors errors={errors} />
+    </Form.Group>
   );
 }
 
@@ -797,7 +772,7 @@ function TaskContextSection({
       <SectionFieldErrors errors={validationErrors.scenario_data} />
       <SectionCard
         title="Scenario"
-        description="Tell the AI model briefly what the learner’s task is."
+        description="Tell the AI model briefly what the learner's task is."
       >
         <TextAreaField
           fieldName="scenario_case_details"
@@ -815,7 +790,7 @@ function TaskContextSection({
       </SectionCard>
       <SectionCard
         title="Learning Objectives"
-        description="Tell the AI model what to look for in the learner’s response. Use one explicit row per objective."
+        description="Tell the AI model what to look for in the learner's response. Use one explicit row per objective."
       >
         <ListField
           fieldName="scenario_learning_objectives"
@@ -878,7 +853,7 @@ function EvaluationSection({
     <div className="coaching-studio-section-stack">
       <SectionCard
         title="Evaluation Criteria"
-        description="Tell the AI model what criteria to use when evaluating the learner’s response. Add one criterion per row."
+        description="Tell the AI model what criteria to use when evaluating the learner's response. Add one criterion per row."
       >
         <ListField
           fieldName="scenario_evaluation_criteria"
@@ -1031,7 +1006,7 @@ function WorkspaceSection({
             ...fieldMetadata.character_1_prompt,
             display_name: "Persona Prompt",
           }}
-          description="Instructions that define the persona’s role, personality and perspective. This text shapes how the AI model responds."
+          description="Instructions that define the persona's role, personality and perspective. This text shapes how the AI model responds."
           value={values.character_1_prompt || ""}
           errors={validationErrors.character_1_prompt}
           rows={16}
@@ -1135,7 +1110,7 @@ function CoachChatSection({
             ...fieldMetadata.character_2_prompt,
             display_name: "Coach Prompt",
           }}
-          description="Instructions that define the coach’s role, personality and perspective. This text shapes how the AI model responds."
+          description="Instructions that define the coach's role, personality and perspective. This text shapes how the AI model responds."
           value={values.character_2_prompt || ""}
           errors={validationErrors.character_2_prompt}
           rows={16}
@@ -1173,19 +1148,19 @@ function AdvancedSection({
           addLabel="+ Add blocked phrase"
           placeholder="Blocked word or phrase"
           onAdd={() => {
-            onChange("blacklist", updateBlacklistItems(values.blacklist, appendListItem(blacklistItems)));
+            onChange("blacklist", updateBlacklistItems(appendListItem(blacklistItems)));
           }}
           onChangeItem={(index, nextValue) => {
             const nextItems =
               blacklistItems.length > 0
                 ? updateListItemAtIndex(blacklistItems, index, nextValue)
                 : [{ value: nextValue }];
-            onChange("blacklist", updateBlacklistItems(values.blacklist, nextItems));
+            onChange("blacklist", updateBlacklistItems(nextItems));
           }}
           onRemoveItem={(index) => {
             onChange(
               "blacklist",
-              updateBlacklistItems(values.blacklist, removeListItemAtIndex(blacklistItems, index)),
+              updateBlacklistItems(removeListItemAtIndex(blacklistItems, index)),
             );
           }}
         />
@@ -1332,11 +1307,12 @@ export default function CoachingStudioApp({
       id: "coaching.studio.validationError",
       defaultMessage: "Please fix the validation issues and try again.",
     });
+    const sanitizedBlacklist = sanitizeBlacklistValue(values.blacklist);
     const sanitizedValues = {
       ...values,
-      blacklist: sanitizeBlacklistValue(values.blacklist),
+      blacklist: sanitizedBlacklist,
     };
-    if (sanitizedValues.blacklist !== values.blacklist) {
+    if (sanitizedBlacklist.length !== values.blacklist?.length) {
       setValues(sanitizedValues);
     }
     const frontendValidationErrors = buildFrontendValidationErrors(sanitizedValues);

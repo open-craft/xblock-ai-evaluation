@@ -1,4 +1,4 @@
-type JsonObject = Record<string, unknown>;
+import { EvaluationCriterion, ScenarioData } from "./types";
 
 export interface CoachingScenarioEditorModel {
   caseDetails: string;
@@ -9,28 +9,6 @@ export interface CoachingListItem {
   preserveRawValue?: boolean;
   rawValue?: unknown;
   value: string;
-}
-
-function parseJsonValue(rawValue: unknown, fallback: unknown) {
-  if (typeof rawValue !== "string") {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(rawValue);
-  } catch (error) {
-    return fallback;
-  }
-}
-
-function asJsonObject(rawValue: unknown): JsonObject {
-  const parsedValue = parseJsonValue(rawValue, {});
-
-  if (parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue)) {
-    return parsedValue as JsonObject;
-  }
-
-  return {};
 }
 
 function formatEditorValue(value: unknown): string {
@@ -66,12 +44,15 @@ function createInvalidListItem(rawValue: unknown, error: string): CoachingListIt
   };
 }
 
-function getStringListItems(values: unknown, invalidEntryMessage: string): CoachingListItem[] {
-  if (!Array.isArray(values)) {
+function getStringListItems(
+  values: string[] | undefined,
+  invalidEntryMessage: string,
+): CoachingListItem[] {
+  if (!values) {
     return [];
   }
 
-  return values.map((value) => {
+  return (values as unknown[]).map((value) => {
     if (typeof value === "string") {
       return createValidListItem(value);
     }
@@ -80,14 +61,16 @@ function getStringListItems(values: unknown, invalidEntryMessage: string): Coach
   });
 }
 
-function getEvaluationCriteriaItems(values: unknown): CoachingListItem[] {
-  if (!Array.isArray(values)) {
+function getEvaluationCriteriaItems(
+  values: EvaluationCriterion[] | undefined,
+): CoachingListItem[] {
+  if (!values) {
     return [];
   }
 
-  return values.map((value) => {
+  return (values as unknown[]).map((value) => {
     if (value && typeof value === "object" && !Array.isArray(value)) {
-      const criterion = value as JsonObject;
+      const criterion = value as Record<string, unknown>;
       if (typeof criterion.name === "string") {
         return createValidListItem(criterion.name);
       }
@@ -103,79 +86,68 @@ function getEvaluationCriteriaItems(values: unknown): CoachingListItem[] {
   });
 }
 
-function stringifyJson(value: unknown) {
-  return JSON.stringify(value, null, 2);
-}
-
-export function getScenarioEditorModel(rawScenarioData: unknown): CoachingScenarioEditorModel {
-  const scenarioData = asJsonObject(rawScenarioData);
-
+export function getScenarioEditorModel(
+  scenarioData: ScenarioData | undefined,
+): CoachingScenarioEditorModel {
   return {
-    caseDetails:
-      typeof scenarioData.case_details === "string" ? scenarioData.case_details : "",
+    caseDetails: scenarioData?.case_details ?? "",
   };
 }
 
 export function getScenarioListItems(
-  rawScenarioData: unknown,
+  scenarioData: ScenarioData | undefined,
   fieldName: "learning_objectives" | "evaluation_criteria",
 ): CoachingListItem[] {
-  const scenarioData = asJsonObject(rawScenarioData);
-
   if (fieldName === "learning_objectives") {
     return getStringListItems(
-      scenarioData.learning_objectives,
+      scenarioData?.learning_objectives,
       "Saved learning objective must be text.",
     );
   }
 
-  return getEvaluationCriteriaItems(scenarioData.evaluation_criteria);
+  return getEvaluationCriteriaItems(scenarioData?.evaluation_criteria);
 }
 
 export function updateScenarioDataValue(
-  rawScenarioData: unknown,
+  scenarioData: ScenarioData | undefined,
   fieldName: "case_details",
   nextValue: string,
-) {
-  const scenarioData = asJsonObject(rawScenarioData);
-  scenarioData.case_details = nextValue;
-
-  return stringifyJson(scenarioData);
+): ScenarioData {
+  return { ...scenarioData, case_details: nextValue };
 }
 
 export function updateScenarioListItems(
-  rawScenarioData: unknown,
+  scenarioData: ScenarioData | undefined,
   fieldName: "learning_objectives" | "evaluation_criteria",
   nextItems: CoachingListItem[],
-) {
-  const scenarioData = asJsonObject(rawScenarioData);
-
+): ScenarioData {
   if (fieldName === "learning_objectives") {
-    scenarioData.learning_objectives = nextItems.map((item) => {
-      return item.preserveRawValue ? item.rawValue : item.value;
-    });
-  } else {
-    scenarioData.evaluation_criteria = nextItems.map((item) => {
+    return {
+      ...scenarioData,
+      learning_objectives: nextItems.map((item) => {
+        return (item.preserveRawValue ? item.rawValue : item.value) as string;
+      }),
+    };
+  }
+
+  return {
+    ...scenarioData,
+    evaluation_criteria: nextItems.map((item) => {
       if (item.preserveRawValue) {
-        return item.rawValue;
+        return item.rawValue as EvaluationCriterion;
       }
 
       return { name: item.value };
-    });
-  }
-
-  return stringifyJson(scenarioData);
+    }),
+  };
 }
 
-export function getBlacklistItems(rawBlacklist: unknown): CoachingListItem[] {
-  const parsedValue =
-    typeof rawBlacklist === "string" ? parseJsonValue(rawBlacklist, []) : rawBlacklist;
-
-  if (!Array.isArray(parsedValue)) {
+export function getBlacklistItems(blacklist: string[] | undefined): CoachingListItem[] {
+  if (!blacklist) {
     return [];
   }
 
-  return parsedValue.map((value) => {
+  return (blacklist as unknown[]).map((value) => {
     if (typeof value === "string") {
       return createValidListItem(value);
     }
@@ -184,22 +156,18 @@ export function getBlacklistItems(rawBlacklist: unknown): CoachingListItem[] {
   });
 }
 
-export function updateBlacklistItems(rawBlacklist: unknown, nextItems: CoachingListItem[]) {
-  void rawBlacklist;
-  return stringifyJson(nextItems.map((item) => {
-    return item.preserveRawValue ? item.rawValue : item.value;
-  }));
+export function updateBlacklistItems(nextItems: CoachingListItem[]): string[] {
+  return nextItems.map((item) => {
+    return (item.preserveRawValue ? item.rawValue : item.value) as string;
+  });
 }
 
-export function sanitizeBlacklistValue(rawBlacklist: unknown) {
-  const parsedValue =
-    typeof rawBlacklist === "string" ? parseJsonValue(rawBlacklist, []) : rawBlacklist;
-
-  if (!Array.isArray(parsedValue)) {
-    return "[]";
+export function sanitizeBlacklistValue(blacklist: string[] | undefined): string[] {
+  if (!blacklist) {
+    return [];
   }
 
-  return stringifyJson(parsedValue.filter((value) => {
-    return !(typeof value === "string" && value.trim() === "");
-  }));
+  return (blacklist as unknown[]).filter((value): value is string => {
+    return typeof value === "string" && value.trim() !== "";
+  });
 }

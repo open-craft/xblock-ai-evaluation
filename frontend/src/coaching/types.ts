@@ -1,27 +1,27 @@
-import { SharedPayload, StudioFieldMetadata, UnknownRecord } from "../shared/types";
+import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
-export interface CoachingCharacter extends UnknownRecord {
+export interface CoachingCharacter {
   avatar?: string;
   name?: string;
   pane?: string;
   role?: string;
 }
 
-export interface CoachingMessage extends UnknownRecord {
+export interface CoachingMessage {
   character?: CoachingCharacter;
   content?: string;
   is_user?: boolean;
   pane?: string;
 }
 
-export interface CoachingAttemptState extends UnknownRecord {
+export interface CoachingAttemptState {
   attempts_remaining?: number | null;
   attempts_used?: number;
   can_retry?: boolean;
   max_attempts?: number;
 }
 
-export interface CoachingFinalReport extends UnknownRecord {
+export interface CoachingFinalReport {
   attempts?: CoachingAttemptState;
   evaluation_markdown?: string;
   final_submission?: string;
@@ -30,20 +30,20 @@ export interface CoachingFinalReport extends UnknownRecord {
   show_report_card?: boolean;
 }
 
-export interface CoachingStudentHandlerUrls extends UnknownRecord {
+export interface CoachingStudentHandlerUrls {
   get_character_response?: string;
   get_evaluator_response?: string;
   reset_all?: string;
 }
 
-export interface CoachingStudentInitialState extends UnknownRecord {
+export interface CoachingStudentInitialState {
   attempts?: CoachingAttemptState;
   chat_histories?: CoachingMessage[][];
   final_report?: CoachingFinalReport;
   finished?: boolean;
 }
 
-export interface CoachingStudentMeta extends UnknownRecord {
+export interface CoachingStudentMeta {
   allow_reset?: boolean;
   characters?: CoachingCharacter[];
   coach_initial_message?: CoachingMessage;
@@ -62,16 +62,26 @@ export type CoachingStudentPayload = SharedPayload<
   CoachingStudentMeta
 >;
 
-export interface CoachingStudioLockMetadata extends UnknownRecord {
+export interface CoachingStudioLockMetadata {
   initial_model?: string;
   lock_model_api_key_initial?: boolean;
   model_key_presence?: Record<string, boolean>;
   use_custom_llm_service?: boolean;
 }
 
-export interface CoachingStudioState extends UnknownRecord {
+export interface EvaluationCriterion {
+  name: string;
+}
+
+export interface ScenarioData {
+  case_details?: string;
+  evaluation_criteria?: EvaluationCriterion[];
+  learning_objectives?: string[];
+}
+
+export interface CoachingStudioState {
   allow_reset?: boolean;
-  blacklist?: string;
+  blacklist?: string[];
   character_1_avatar?: string;
   character_1_name?: string;
   character_1_prompt?: string;
@@ -90,15 +100,15 @@ export interface CoachingStudioState extends UnknownRecord {
   model?: string;
   model_api_key?: string;
   model_api_url?: string;
-  scenario_data?: string;
+  scenario_data?: ScenarioData;
   workspace_title?: string;
 }
 
-export interface CoachingStudioHandlerUrls extends UnknownRecord {
+export interface CoachingStudioHandlerUrls {
   studio_submit?: string;
 }
 
-export interface CoachingStudioMeta extends UnknownRecord {
+export interface CoachingStudioMeta {
   field_metadata?: Record<string, StudioFieldMetadata>;
   lock_metadata?: CoachingStudioLockMetadata;
 }
