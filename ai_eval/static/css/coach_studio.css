@@ -158,12 +158,12 @@
 .coaching-react-studio .coaching-studio-section-stack {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 5px;
 }
 
 .coaching-react-studio .coaching-studio-card {
     border-radius: 3px;
-    padding: 20px;
+    padding: 8px 20px 20px;
 }
 
 .coaching-react-studio .coaching-studio-card-header {
@@ -189,7 +189,7 @@
 .coaching-react-studio .coaching-studio-card-body {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 10px;
 }
 
 .coaching-react-studio .coaching-studio-field {
@@ -197,7 +197,7 @@
 }
 
 .coaching-react-studio .coaching-studio-field-header {
-    margin-bottom: 2px;
+    margin-bottom: 0;
 }
 
 .coaching-react-studio .coaching-studio-field-title-row {
@@ -205,7 +205,7 @@
     display: flex;
     gap: 12px;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .coaching-react-studio .coaching-studio-field-counter {
@@ -306,7 +306,29 @@
 
 /* Paragon Form component overrides — keep coaching visual design */
 .coaching-react-studio .coaching-studio-field.pgn__form-group {
-    margin-bottom: 0;
+    display: block;
+    margin: 0;
+    padding: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-control {
+    max-width: 700px;
+}
+
+.coaching-react-studio input.form-control,
+.coaching-react-studio select.form-control {
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.coaching-react-studio .coaching-studio-list-row .coaching-studio-input {
+    max-width: calc(100% - 28px);
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-list-row .form-control {
+    box-sizing: border-box;
 }
 
 .coaching-react-studio .coaching-studio-field-label.pgn__form-label {

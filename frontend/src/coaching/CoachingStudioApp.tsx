@@ -333,14 +333,9 @@ function TextAreaField({
   return (
     <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
       <div className="coaching-studio-field-header">
-        {showLabel || counter ? (
+        {showLabel ? (
           <div className="coaching-studio-field-title-row">
-            {showLabel ? (
-              <Form.Label className="coaching-studio-field-label">{label}</Form.Label>
-            ) : (
-              <span aria-hidden="true" />
-            )}
-            {counter ? <p className="coaching-studio-field-counter">{counter}</p> : null}
+            <Form.Label className="coaching-studio-field-label">{label}</Form.Label>
           </div>
         ) : null}
         <FieldDescription description={description} helpText={metadata?.help} />
@@ -356,6 +351,7 @@ function TextAreaField({
           }}
         />
       </div>
+      {counter ? <p className="coaching-studio-field-counter">{counter}</p> : null}
       <FieldErrors errors={errors} />
     </Form.Group>
   );

@@ -1,3 +1,17 @@
+/*
+ * Studio's CMS CSS sets `display: inline-block` on inputs inside
+ * `.wrapper-comp-settings`, which shrinks Paragon Form.Control inputs.
+ * Override with `display: block; width: 100%` so inputs fill their grid cell.
+ * This must be in an inline CSS file (add_css), not shared.css (add_css_url),
+ * so it loads after Studio's stylesheets and wins the cascade.
+ */
+.wrapper-comp-settings .pgn__form-control-decorator-group input,
+.wrapper-comp-settings .pgn__form-control-decorator-group select,
+.wrapper-comp-settings .pgn__form-control-decorator-group textarea {
+    display: block !important;
+    width: 100% !important;
+}
+
 .shortanswer-react-studio {
     color: #2d3b45;
 }
@@ -10,15 +24,15 @@
 
 .shortanswer-react-studio .pgn__form-group {
     align-items: start;
-    border-bottom: 1px solid #e5e5e5;
     column-gap: 10rem;
     display: grid;
     grid-template-columns: 220px minmax(300px, 600px);
-    padding: 1rem 0 1rem 3rem;
+    margin: 3rem 0;
+    padding: 0 0 0 5rem;
 }
 
 .shortanswer-react-studio .pgn__form-group:last-of-type {
-    border-bottom: none;
+    margin-bottom: 0;
 }
 
 .shortanswer-react-studio .pgn__form-group > .pgn__form-label {
@@ -93,9 +107,42 @@
     margin-bottom: 0.35rem;
 }
 
+.shortanswer-react-studio .shortanswer-studio-attachment-row .pgn__form-control-decorator-group {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
 .shortanswer-react-studio .shortanswer-studio-attachment-row .form-control {
+    box-sizing: border-box;
     flex: 1 1 auto;
     min-width: 0;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-row .btn-outline-danger {
+    align-items: center;
+    background: #ff2d20;
+    border: 1px solid #ff2d20;
+    border-radius: 999px;
+    box-shadow: none;
+    color: #fff;
+    display: inline-flex;
+    font-size: 15px;
+    font-weight: 700;
+    height: 18px;
+    justify-content: center;
+    line-height: 1;
+    max-height: 18px;
+    max-width: 18px;
+    min-height: 18px;
+    min-width: 18px;
+    overflow: hidden;
+    padding: 0;
+    width: 18px;
+}
+
+.shortanswer-react-studio .shortanswer-studio-attachment-row .btn-outline-danger:hover {
+    background: #ff1305;
+    border-color: #ff1305;
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-list > .btn {
