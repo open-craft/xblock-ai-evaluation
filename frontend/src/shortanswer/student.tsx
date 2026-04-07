@@ -6,7 +6,6 @@ import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
 type ShortAnswerPayloadInput = Partial<ShortAnswerStudentPayload> & {
   allow_reset?: boolean;
   character_image?: string;
-  marked_html?: string;
   max_responses?: number;
   messages?: unknown[];
   question?: string;
@@ -33,7 +32,6 @@ function normalizePayload(
       character_image: payloadData.character_image,
       question: payloadData.question,
       max_responses: payloadData.max_responses,
-      marked_html: payloadData.marked_html,
     },
   };
 }

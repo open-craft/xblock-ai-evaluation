@@ -49,7 +49,6 @@ export interface CoachingStudentMeta {
   coach_initial_message?: CoachingMessage;
   initial_message?: CoachingMessage;
   intro_text?: string;
-  marked_html?: string;
   titles?: {
     coach?: string;
     workspace?: string;

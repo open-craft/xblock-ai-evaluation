@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Spinner } from "@openedx/paragon";
 
 import { postJson, RequestError } from "../shared/request";
-import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
+import { renderMarkdown } from "../shared/renderMarkdown";
 import {
   CodingExecutionResult,
   CodingStudentPayload,
@@ -454,13 +454,9 @@ export default function CodingStudentApp({
       ? payload.initial_state.ai_evaluation
       : "";
   const initialExecutionResult = normalizeExecutionResult(payload.initial_state.code_exec_result);
-  const [questionHtml, setQuestionHtml] = useState(() => {
-    return renderMarkdown(payload.meta.question);
-  });
+  const questionHtml = useMemo(() => renderMarkdown(payload.meta.question), [payload.meta.question]);
   const [feedbackMarkdown, setFeedbackMarkdown] = useState(initialFeedback);
-  const [feedbackHtml, setFeedbackHtml] = useState(() => {
-    return renderMarkdown(initialFeedback);
-  });
+  const feedbackHtml = useMemo(() => renderMarkdown(feedbackMarkdown), [feedbackMarkdown]);
   const [stdout, setStdout] = useState(initialExecutionResult.stdout || "");
   const [stderr, setStderr] = useState(initialExecutionResult.stderr || "");
   const [previewHtml, setPreviewHtml] = useState("");
@@ -476,23 +472,6 @@ export default function CodingStudentApp({
   const instructionsId = "coding-instructions-" + usageId;
   const resultPanelId = "coding-results-" + usageId;
   const language = typeof payload.meta.language === "string" ? payload.meta.language : "";
-
-  useEffect(() => {
-    let isActive = true;
-
-    ensureMarkdownRenderer(payload.meta.marked_html).then(() => {
-      if (!isActive) {
-        return;
-      }
-
-      setQuestionHtml(renderMarkdown(payload.meta.question));
-      setFeedbackHtml(renderMarkdown(feedbackMarkdown));
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [feedbackMarkdown, payload.meta.marked_html, payload.meta.question]);
 
   useEffect(() => {
     return () => {
@@ -551,7 +530,6 @@ export default function CodingStudentApp({
 
   function resetVisualState() {
     setFeedbackMarkdown("");
-    setFeedbackHtml("");
     setHasFeedbackNotification(false);
     setStdout("");
     setStderr("");

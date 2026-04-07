@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 
 import { postJson } from "../shared/request";
-import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
+import { renderMarkdown } from "../shared/renderMarkdown";
 import {
   CoachingAttemptState,
   CoachingCharacter,
@@ -202,7 +202,7 @@ function MessageAvatar({
   return <div className="coach-message__avatar coach-message__avatar--empty" aria-hidden="true" />;
 }
 
-function ChatMessage({ message }: { message: PendingCoachingMessage }) {
+const ChatMessage = React.memo(function ChatMessage({ message }: { message: PendingCoachingMessage }) {
   const pane = message.pane === "coach" ? "coach" : "workspace";
   const isUser = Boolean(message.is_user);
   const character = normalizeCharacter(message.character, pane);
@@ -224,7 +224,7 @@ function ChatMessage({ message }: { message: PendingCoachingMessage }) {
       </div>
     </div>
   );
-}
+});
 
 function ReportCard({
   evaluationHtml,
@@ -310,7 +310,6 @@ export default function CoachingStudentApp({
     coach: "",
     workspace: "",
   });
-  const [markdownReady, setMarkdownReady] = useState(false);
   const workspaceHistoryRef = useRef<HTMLDivElement>(null);
   const coachHistoryRef = useRef<HTMLDivElement>(null);
   const workspaceTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -353,6 +352,10 @@ export default function CoachingStudentApp({
     !evaluationPending;
   const reviewMode = mode === "review";
   const reportMode = mode === "report";
+  const evaluationHtml = useMemo(
+    () => renderMarkdown(report?.evaluation_markdown),
+    [report?.evaluation_markdown],
+  );
 
   useEffect(() => {
     setHistories(initialHistories);
@@ -371,20 +374,6 @@ export default function CoachingStudentApp({
   ]);
 
   useEffect(() => {
-    let active = true;
-
-    ensureMarkdownRenderer(meta.marked_html).then(() => {
-      if (active) {
-        setMarkdownReady(true);
-      }
-    });
-
-    return () => {
-      active = false;
-    };
-  }, [meta.marked_html]);
-
-  useEffect(() => {
     autoResizeTextarea(workspaceTextareaRef.current);
   }, [workspaceDraft]);
 
@@ -397,14 +386,14 @@ export default function CoachingStudentApp({
     if (history) {
       history.scrollTop = history.scrollHeight;
     }
-  }, [displayedWorkspaceMessages, markdownReady, mode, busyByPane.workspace]);
+  }, [displayedWorkspaceMessages, mode, busyByPane.workspace]);
 
   useEffect(() => {
     const history = coachHistoryRef.current;
     if (history) {
       history.scrollTop = history.scrollHeight;
     }
-  }, [displayedCoachMessages, markdownReady, mode, busyByPane.coach]);
+  }, [displayedCoachMessages, mode, busyByPane.coach]);
 
   useEffect(() => {
     if (reviewMode) {
@@ -765,7 +754,6 @@ export default function CoachingStudentApp({
     <section
       className={"coach-block" + (reviewMode ? " coach-mode--review" : "")}
       data-block-kind="coaching"
-      data-markdown-ready={markdownReady ? "true" : "false"}
       data-view={payload.view}
     >
       {meta.intro_text ? (
@@ -928,7 +916,7 @@ export default function CoachingStudentApp({
 
           {reportMode && report ? (
             <ReportCard
-              evaluationHtml={renderMarkdown(report.evaluation_markdown)}
+              evaluationHtml={evaluationHtml}
               onReviewConversation={() => {
                 setMode("review");
                 setPaneStatus(

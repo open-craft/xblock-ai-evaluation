@@ -8,7 +8,6 @@ type CodingPayloadInput = Partial<CodingStudentPayload> & {
   code?: string;
   code_exec_result?: unknown;
   language?: string;
-  marked_html?: string;
   monaco_html?: string;
   question?: string;
 };
@@ -41,7 +40,6 @@ function normalizePayload(
       question: payloadData.question,
       language: payloadData.language,
       monaco_html: payloadData.monaco_html,
-      marked_html: payloadData.marked_html,
     },
   };
 }

@@ -17,7 +17,6 @@ export interface ShortAnswerStudentInitialState {
 export interface ShortAnswerStudentMeta {
   allow_reset?: boolean;
   character_image?: string;
-  marked_html?: string;
   max_responses?: number;
   question?: string;
 }

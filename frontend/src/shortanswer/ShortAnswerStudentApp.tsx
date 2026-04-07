@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 
 import { postJson, RequestError } from "../shared/request";
-import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
+import { renderMarkdown } from "../shared/renderMarkdown";
 import { UnknownRecord } from "../shared/types";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
 
@@ -43,10 +43,6 @@ function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
     return count + (message.source === "user" ? 1 : 0);
   }, 0);
-}
-
-function toHtml(markdown?: string) {
-  return { __html: renderMarkdown(markdown) };
 }
 
 function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
@@ -99,6 +95,11 @@ function MessageList({
   pending: boolean;
   historyRef: React.RefObject<HTMLDivElement>;
 }) {
+  const renderedMessages = useMemo(
+    () => messages.map((msg) => renderMarkdown(msg.content)),
+    [messages],
+  );
+
   return (
     <div
       className="chat-history"
@@ -116,7 +117,7 @@ function MessageList({
         return (
           <div className="chat-message-container" key={String(index)}>
             <div className={"chat-message " + messageClassName}>
-              <div dangerouslySetInnerHTML={toHtml(message.content)} />
+              <div dangerouslySetInnerHTML={{ __html: renderedMessages[index] }} />
             </div>
           </div>
         );
@@ -247,9 +248,7 @@ export default function ShortAnswerStudentApp({
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
-  const [questionHtml, setQuestionHtml] = useState(
-    renderMarkdown(payload.meta.question),
-  );
+  const questionHtml = useMemo(() => renderMarkdown(payload.meta.question), [payload.meta.question]);
   const [chatMinHeight, setChatMinHeight] = useState<number | null>(null);
   const historyRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -266,20 +265,6 @@ export default function ShortAnswerStudentApp({
   useEffect(() => {
     setMessages(initialMessages);
   }, [initialMessages]);
-
-  useEffect(() => {
-    let isActive = true;
-
-    ensureMarkdownRenderer(payload.meta.marked_html).then(() => {
-      if (isActive) {
-        setQuestionHtml(renderMarkdown(payload.meta.question));
-      }
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [payload.meta.marked_html, payload.meta.question]);
 
   useEffect(() => {
     autoResizeTextarea(textareaRef.current);

@@ -20,7 +20,6 @@ export interface CodingStudentInitialState {
 
 export interface CodingStudentMeta {
   language?: string;
-  marked_html?: string;
   monaco_html?: string;
   question?: string;
 }

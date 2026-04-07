@@ -72,13 +72,6 @@ def shortanswer_block_data():
         "allow_reset": False,
         "character_image": "",
         "attachment_urls": [],
-        "marked_html": (
-            '<!doctype html>\n<html lang="en">\n<head></head>\n<body>\n'
-            '    <script type="text/javascript" '
-            'src="https://cdnjs.cloudflare.com'
-            '/ajax/libs/marked/13.0.2/marked.min.js"></script>\n'
-            "</body>\n</html>"
-        ),
     }
 
 
@@ -170,7 +163,6 @@ def test_coding_block_student_view(coding_block_data):
             "question": coding_block_data["question"],
             "language": coding_block_data["language"],
             "monaco_html": monaco_html,
-            "marked_html": block.resource_string("static/html/marked-iframe.html"),
         },
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
@@ -229,7 +221,6 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "max_responses": shortanswer_block_data["max_responses"],
             "allow_reset": shortanswer_block_data["allow_reset"],
             "character_image": shortanswer_block_data["character_image"],
-            "marked_html": block.resource_string("static/html/marked-iframe.html"),
         },
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
@@ -363,7 +354,6 @@ def test_coach_block_student_view(coach_block_data):
                 "workspace": "Add your answer",
                 "coach": "Coach",
             },
-            "marked_html": block.resource_string("static/html/marked-iframe.html"),
             "allow_reset": True,
             "intro_text": "",
         },

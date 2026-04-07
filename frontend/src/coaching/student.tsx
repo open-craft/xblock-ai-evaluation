@@ -13,7 +13,6 @@ type CoachingPayloadInput = Partial<CoachingStudentPayload> & {
   finished?: boolean;
   initial_message?: unknown;
   intro_text?: string;
-  marked_html?: string;
   titles?: unknown;
 };
 
@@ -38,7 +37,6 @@ function normalizePayload(
     coach_initial_message:
       payloadData.coach_initial_message as CoachingStudentPayload["meta"]["coach_initial_message"],
     titles: payloadData.titles as CoachingStudentPayload["meta"]["titles"],
-    marked_html: payloadData.marked_html,
   };
 
   return {

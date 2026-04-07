@@ -127,7 +127,6 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 "monaco_language": SUPPORTED_LANGUAGE_MAP[self.language].monaco_id,
             },
         )
-        marked_html = self.resource_string("static/html/marked-iframe.html")
         current_session = self.sessions[-1]
         frag.initialize_js(
             "CodingAIEvalXBlock",
@@ -150,7 +149,6 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                     "question": self.question,
                     "language": self.language,
                     "monaco_html": monaco_html,
-                    "marked_html": marked_html,
                 },
             ),
         )

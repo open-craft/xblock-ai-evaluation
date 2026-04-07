@@ -79,6 +79,8 @@ class EvaluationCriterion(pydantic.BaseModel):
 
 
 class CoachScenarioData(pydantic.BaseModel):
+    """Schema for the scenario_data XBlock field."""
+
     case_details: pydantic.StrictStr
     learning_objectives: typing.List[pydantic.StrictStr]
     evaluation_criteria: typing.List[EvaluationCriterion]
@@ -86,6 +88,7 @@ class CoachScenarioData(pydantic.BaseModel):
     @pydantic.model_validator(mode="before")
     @classmethod
     def check_is_dict(cls, data: typing.Any) -> typing.Any:
+        """Reject non-dict input before field validation runs."""
         if not isinstance(data, dict):
             raise ValueError(
                 "Scenario data must be a JSON object (dictionary)."
@@ -958,7 +961,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         frag.add_css_url(self._static_url("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript(self.resource_string("static/bundles/coaching.js"))
-        marked_html = self.resource_string("static/html/marked-iframe.html")
         js_data = self._build_view_payload(
             view="student",
             handler_urls={
@@ -985,7 +987,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                     "workspace": self.workspace_title,
                     "coach": self.coach_title,
                 },
-                "marked_html": marked_html,
                 "allow_reset": self.allow_reset,
                 "intro_text": self.intro_text,
             },

@@ -185,7 +185,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript(self.resource_string("static/bundles/shortanswer.js"))
 
-        marked_html = self.resource_string("static/html/marked-iframe.html")
         js_data = self._build_view_payload(
             view="student",
             handler_urls={
@@ -200,7 +199,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 "max_responses": self.max_responses,
                 "allow_reset": self.allow_reset,
                 "character_image": self.character_image,
-                "marked_html": marked_html,
             },
         )
         frag.initialize_js("ShortAnswerAIEvalXBlock", js_data)
