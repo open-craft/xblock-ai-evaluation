@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useIntl } from "react-intl";
+import { Spinner } from "@openedx/paragon";
 
 import { postJson, RequestError } from "../shared/request";
 import { ensureMarkdownRenderer, renderMarkdown } from "../shared/renderMarkdown";
-import { UnknownRecord } from "../shared/types";
 import {
   CodingExecutionResult,
   CodingStudentPayload,
@@ -15,23 +15,27 @@ const HTML_PLACEHOLDER =
 const MAX_JUDGE0_RETRY_ITER = 5;
 const WAIT_TIME_MS = 1000;
 
-interface Judge0Status extends UnknownRecord {
+interface Judge0Status {
   id?: number;
+  [key: string]: unknown;
 }
 
-interface Judge0SubmissionResponse extends UnknownRecord {
+interface Judge0SubmissionResponse {
   submission_id?: string;
+  [key: string]: unknown;
 }
 
-interface Judge0ResultResponse extends UnknownRecord {
+interface Judge0ResultResponse {
   compile_output?: string;
   status?: Judge0Status;
   stderr?: string;
   stdout?: string;
+  [key: string]: unknown;
 }
 
-interface CodingFeedbackResponse extends UnknownRecord {
+interface CodingFeedbackResponse {
   response?: string;
+  [key: string]: unknown;
 }
 
 interface MonacoEditorInstance {
@@ -138,7 +142,17 @@ function ActionBar({
           id: "coding.student.submit",
           defaultMessage: "Submit Code",
         })}
-        {pending ? <span className="submit-loader" aria-hidden="true" /> : null}
+        {pending ? (
+          <Spinner
+            animation="border"
+            size="sm"
+            className="submit-loader"
+            screenReaderText={intl.formatMessage({
+              id: "coding.student.submittingSpinner",
+              defaultMessage: "Submitting…",
+            })}
+          />
+        ) : null}
       </button>
     </div>
   );
