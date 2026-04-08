@@ -77,7 +77,7 @@
   overflow: auto;
   max-height: 200px;
   padding: 0.7rem 0.9rem;
-  resize: none;
+  resize: none !important;
 }
 
 .chat-submit-row textarea:focus {
@@ -112,14 +112,14 @@
 .chat-submit-row .chat-reset-button,
 .chat-submit-row .chat-finish-button {
   background: #ffffff;
-  border-color: #8a8c8f;
-  color: #414141;
+  border-color: #333333 !important;
+  color: #0a0a0a;
 }
 
 .chat-submit-row .chat-reset-button:hover,
 .chat-submit-row .chat-finish-button:hover {
   background: #f2f2f2;
-  border-color: #6f7275;
+  border-color: #6f7275 !important;
 }
 
 .chat-submit-row .disabled {
@@ -236,6 +236,7 @@
 .coach-pane--coach {
   flex: 1 1 0;
   background: #ffffff;
+  border: 1px solid #d9e2ec;
 }
 
 .coach-pane__header {
@@ -252,14 +253,15 @@
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
+  text-transform: none !important;
 }
 
 .coach-pane__title--workspace {
-  color: #ffffff;
+  color: #ffffff !important;
 }
 
 .coach-pane__title--coach {
-  color: #1f2933;
+  color: #1f2933 !important;
 }
 
 .coach-history {
@@ -439,7 +441,7 @@
   flex: 1 1 auto;
   border: none;
   background: #ffffff;
-  resize: none;
+  resize: none !important;
   color: #1f2933;
   font-size: 1rem;
   min-height: 2.4rem;
@@ -475,6 +477,7 @@
   background: #0b74de;
   color: #ffffff;
   box-shadow: 0 10px 18px rgba(11, 116, 222, 0.35);
+  border-radius: 8px !important;
 }
 
 .coach-back-to-report {
@@ -543,19 +546,29 @@
 }
 
 .coach-button--icon {
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 999px;
-  background: #1f2933;
-  color: #ffffff;
+  width: 3.5rem !important;
+  height: 3.5rem !important;
+  min-width: 3.5rem !important;
+  min-height: 3.5rem !important;
+  border-radius: 999px !important;
+  background: none !important;
+  color: #1f2933;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* box-shadow: 0 8px 16px rgba(11, 116, 222, 0.35); */
+  padding: 0 !important;
+}
+
+.coach-send-icon {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.coach-send-icon svg {
+  fill: #1f2933;
 }
 
 .coach-pane--coach .coach-button--icon {
-  background: #1f2933;
   box-shadow: none;
 }
 
@@ -720,23 +733,26 @@
   box-shadow: none;
 }
 
-.coach-global-actions {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 1rem;
-}
-
-.coach-global-actions .coach-button--secondary {
-  background: #e4ebf5;
-  color: #1f2933;
-}
-
 .coach-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 1rem;
   flex-wrap: wrap;
+  margin-top: 1rem;
+  max-width: calc((1.7 / 2.7) * (100% - 1.5rem));
+}
+
+.coach-actions .coach-reset-all {
+  background: #ffffff;
+  border: 1px solid #333333 !important;
+  border-radius: 8px !important;
+  color: #0a0a0a;
+  font-weight: 400;
+}
+
+.coach-actions .coach-reset-all:hover {
+  background: #f2f2f2;
+  border-color: #6f7275 !important;
 }
 
 .coach-mode--review .coach-actions {
@@ -747,11 +763,12 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-right: auto;
+  margin-left: auto;
 }
 
 .coach-attempts__label {
-  font-weight: 600;
+  font-weight: 400;
+  color: #1f2933;
 }
 
 .coach-attempts__label--warning {

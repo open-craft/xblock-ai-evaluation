@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Icon } from "@openedx/paragon";
+import { PlayCircleFilled } from "@openedx/paragon/icons";
 import { useIntl } from "react-intl";
 
 import { postJson } from "../shared/request";
@@ -859,59 +861,8 @@ export default function CoachingStudentApp({
                 sendMessage("workspace");
               }}
             >
-              <i className="fa fa-paper-plane" aria-hidden="true" />
+              <Icon src={PlayCircleFilled} className="coach-send-icon" />
             </button>
-          </div>
-
-          <div className="coach-actions">
-            {!reviewMode ? (
-              <div className="coach-attempts">
-                <span
-                  className={
-                    "coach-attempts__label" +
-                    (attemptsRemaining === 1 ? " coach-attempts__label--warning" : "")
-                  }
-                  aria-live="polite"
-                >
-                  {renderAttemptsLabel()}
-                </span>
-              </div>
-            ) : null}
-            {reviewMode && report ? (
-              <button
-                type="button"
-                className="coach-button coach-button--secondary coach-back-to-report"
-                ref={backToReportRef}
-                onClick={() => {
-                  setMode("report");
-                  setPaneStatus(
-                    "workspace",
-                    intl.formatMessage({
-                      id: "coaching.student.reportShown",
-                      defaultMessage: "Evaluation report shown.",
-                    }),
-                  );
-                }}
-              >
-                {intl.formatMessage({
-                  id: "coaching.student.backToReport",
-                  defaultMessage: "Back to report",
-                })}
-              </button>
-            ) : null}
-            {!reviewMode ? (
-              <button
-                type="button"
-                className="coach-button coach-button--primary coach-submit-evaluation"
-                disabled={!canSubmitForEvaluation}
-                onClick={submitForEvaluation}
-              >
-                {intl.formatMessage({
-                  id: "coaching.student.submitForEvaluation",
-                  defaultMessage: "Submit for evaluation",
-                })}
-              </button>
-            ) : null}
           </div>
 
           {reportMode && report ? (
@@ -985,7 +936,7 @@ export default function CoachingStudentApp({
             <label htmlFor="coach-side-input" className="sr-only">
               {intl.formatMessage({
                 id: "coaching.student.coachPlaceholder",
-                defaultMessage: "Ask the coach a question",
+                defaultMessage: "Start typing...",
               })}
             </label>
             <textarea
@@ -996,7 +947,7 @@ export default function CoachingStudentApp({
               maxLength={1000}
               placeholder={intl.formatMessage({
                 id: "coaching.student.coachPlaceholder",
-                defaultMessage: "Ask the coach a question",
+                defaultMessage: "Start typing...",
               })}
               rows={1}
               value={coachDraft}
@@ -1025,14 +976,14 @@ export default function CoachingStudentApp({
                 sendMessage("coach");
               }}
             >
-              <i className="fa fa-paper-plane" aria-hidden="true" />
+              <Icon src={PlayCircleFilled} className="coach-send-icon" />
             </button>
           </div>
         </aside>
       </div>
 
-      {allowReset && !reviewMode ? (
-        <div className="coach-global-actions">
+      <div className="coach-actions">
+        {allowReset && !reviewMode ? (
           <button
             type="button"
             className="coach-button coach-button--secondary coach-reset-all"
@@ -1041,11 +992,59 @@ export default function CoachingStudentApp({
           >
             {intl.formatMessage({
               id: "coaching.student.reset",
-              defaultMessage: "Reset",
+              defaultMessage: "Start again",
             })}
           </button>
-        </div>
-      ) : null}
+        ) : null}
+        {!reviewMode ? (
+          <div className="coach-attempts">
+            <span
+              className={
+                "coach-attempts__label" +
+                (attemptsRemaining === 1 ? " coach-attempts__label--warning" : "")
+              }
+              aria-live="polite"
+            >
+              {renderAttemptsLabel()}
+            </span>
+          </div>
+        ) : null}
+        {reviewMode && report ? (
+          <button
+            type="button"
+            className="coach-button coach-button--secondary coach-back-to-report"
+            ref={backToReportRef}
+            onClick={() => {
+              setMode("report");
+              setPaneStatus(
+                "workspace",
+                intl.formatMessage({
+                  id: "coaching.student.reportShown",
+                  defaultMessage: "Evaluation report shown.",
+                }),
+              );
+            }}
+          >
+            {intl.formatMessage({
+              id: "coaching.student.backToReport",
+              defaultMessage: "Back to report",
+            })}
+          </button>
+        ) : null}
+        {!reviewMode ? (
+          <button
+            type="button"
+            className="coach-button coach-button--primary coach-submit-evaluation"
+            disabled={!canSubmitForEvaluation}
+            onClick={submitForEvaluation}
+          >
+            {intl.formatMessage({
+              id: "coaching.student.submitForEvaluation",
+              defaultMessage: "Submit for evaluation",
+            })}
+          </button>
+        ) : null}
+      </div>
     </section>
   );
 }

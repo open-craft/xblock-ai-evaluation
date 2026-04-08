@@ -72,6 +72,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     Base class for Xblocks with AI evaluation
     """
 
+    resources_dir = ""
+    public_dir = "static"
+
     loader = ResourceLoader(__name__)
 
     icon_class = "problem"
