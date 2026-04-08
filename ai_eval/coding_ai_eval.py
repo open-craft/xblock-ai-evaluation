@@ -119,7 +119,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
         frag.add_css_url(self._static_url("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/coding_ai_eval.css"))
-        frag.add_javascript(self.resource_string("static/bundles/coding.js"))
+        frag.add_javascript_url(self._static_url("static/bundles/coding.js"))
 
         monaco_html = self.loader.render_django_template(
             "/templates/monaco.html",
@@ -162,7 +162,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         fragment.add_css_url(self._static_url("static/bundles/shared.css"))
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
-        fragment.add_javascript(self.resource_string("static/bundles/coding.studio.js"))
+        fragment.add_javascript_url(self._static_url("static/bundles/coding.studio.js"))
         fragment.initialize_js(
             "CodingAIEvalXBlockStudio",
             self._build_view_payload(

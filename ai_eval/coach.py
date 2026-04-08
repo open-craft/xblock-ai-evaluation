@@ -371,7 +371,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
         fragment.add_css(self.resource_string("static/css/coach_studio.css"))
-        fragment.add_javascript(self.resource_string("static/bundles/coaching.studio.js"))
+        fragment.add_javascript_url(self._static_url("static/bundles/coaching.studio.js"))
         fragment.initialize_js(
             "CoachAIEvalXBlockStudio",
             self._build_view_payload(
@@ -960,7 +960,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
         frag.add_css_url(self._static_url("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
-        frag.add_javascript(self.resource_string("static/bundles/coaching.js"))
+        frag.add_javascript_url(self._static_url("static/bundles/coaching.js"))
         js_data = self._build_view_payload(
             view="student",
             handler_urls={

@@ -510,7 +510,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         fragment = super().studio_view(context)
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
-        fragment.add_javascript(self.resource_string("static/js/src/studio_api_key_lock.js"))
+        fragment.add_javascript_url(self._static_url("static/js/src/studio_api_key_lock.js"))
         fragment.initialize_js("AIEvalStudioEditor", self._studio_lock_metadata())
         return fragment
 

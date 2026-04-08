@@ -183,7 +183,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         frag.add_css_url(self._static_url("static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
-        frag.add_javascript(self.resource_string("static/bundles/shortanswer.js"))
+        frag.add_javascript_url(self._static_url("static/bundles/shortanswer.js"))
 
         js_data = self._build_view_payload(
             view="student",
@@ -212,7 +212,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         fragment.add_css_url(self._static_url("static/bundles/shared.css"))
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
-        fragment.add_javascript(self.resource_string("static/bundles/shortanswer.studio.js"))
+        fragment.add_javascript_url(self._static_url("static/bundles/shortanswer.studio.js"))
         fragment.initialize_js(
             "ShortAnswerAIEvalXBlockStudio",
             self._build_view_payload(
