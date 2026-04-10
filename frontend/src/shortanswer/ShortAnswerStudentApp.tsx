@@ -28,15 +28,14 @@ function normalizeMessages(messages: unknown): ShortAnswerMessage[] {
     return [];
   }
 
-  return messages
-    .filter((message) => message && typeof message === "object")
-    .map((message) => {
-      const rawMessage = message as ShortAnswerMessage;
-      return {
-        source: rawMessage.source || "",
-        content: typeof rawMessage.content === "string" ? rawMessage.content : "",
-      };
-    });
+  return messages.flatMap((message) => {
+    if (!message || typeof message !== "object") return [];
+    const rawMessage = message as ShortAnswerMessage;
+    return [{
+      source: rawMessage.source || "",
+      content: typeof rawMessage.content === "string" ? rawMessage.content : "",
+    }];
+  });
 }
 
 function countUserMessages(messages: ShortAnswerMessage[]) {

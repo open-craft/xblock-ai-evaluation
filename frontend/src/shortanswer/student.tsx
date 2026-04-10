@@ -28,10 +28,10 @@ function normalizePayload(
       messages: payloadData.messages as ShortAnswerMessage[] | undefined,
     },
     meta: payloadData.meta || {
-      allow_reset: payloadData.allow_reset,
-      character_image: payloadData.character_image,
-      question: payloadData.question,
-      max_responses: payloadData.max_responses,
+      allow_reset: Boolean(payloadData.allow_reset),
+      character_image: payloadData.character_image || "",
+      question: payloadData.question || "",
+      max_responses: payloadData.max_responses || 0,
     },
   };
 }

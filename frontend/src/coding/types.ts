@@ -8,8 +8,8 @@ export interface CodingStudentHandlerUrls {
 }
 
 export interface CodingExecutionResult {
-  stderr?: string;
-  stdout?: string;
+  stderr: string;
+  stdout: string;
 }
 
 export interface CodingStudentInitialState {
@@ -19,9 +19,9 @@ export interface CodingStudentInitialState {
 }
 
 export interface CodingStudentMeta {
-  language?: string;
-  monaco_html?: string;
-  question?: string;
+  language: string;
+  monaco_html: string;
+  question: string;
 }
 
 export type CodingStudentPayload = SharedPayload<
@@ -39,14 +39,14 @@ export interface CodingStudioLockMetadata {
 }
 
 export interface CodingStudioState {
-  display_name?: string;
-  evaluation_prompt?: string;
-  judge0_api_key?: string;
-  language?: string;
-  model?: string;
-  model_api_key?: string;
-  model_api_url?: string;
-  question?: string;
+  display_name: string;
+  evaluation_prompt: string;
+  judge0_api_key: string;
+  language: string;
+  model: string;
+  model_api_key: string;
+  model_api_url: string;
+  question: string;
 }
 
 export interface CodingStudioHandlerUrls {
@@ -60,6 +60,6 @@ export interface CodingStudioMeta {
 
 export type CodingStudioPayload = SharedPayload<
   CodingStudioHandlerUrls,
-  CodingStudioState,
+  Partial<CodingStudioState>,
   CodingStudioMeta
 >;

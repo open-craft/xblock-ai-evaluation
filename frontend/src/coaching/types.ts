@@ -1,33 +1,33 @@
 import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface CoachingCharacter {
-  avatar?: string;
-  name?: string;
-  pane?: string;
-  role?: string;
+  avatar: string;
+  name: string;
+  pane: string;
+  role: string;
 }
 
 export interface CoachingMessage {
-  character?: CoachingCharacter;
-  content?: string;
-  is_user?: boolean;
-  pane?: string;
+  character: CoachingCharacter;
+  content: string;
+  is_user: boolean;
+  pane: string;
 }
 
 export interface CoachingAttemptState {
-  attempts_remaining?: number | null;
-  attempts_used?: number;
-  can_retry?: boolean;
-  max_attempts?: number;
+  attempts_remaining: number | null;
+  attempts_used: number;
+  can_retry: boolean;
+  max_attempts: number;
 }
 
 export interface CoachingFinalReport {
-  attempts?: CoachingAttemptState;
-  evaluation_markdown?: string;
-  final_submission?: string;
-  finished?: boolean;
-  report_html?: string;
-  show_report_card?: boolean;
+  attempts: CoachingAttemptState;
+  evaluation_markdown: string;
+  final_submission: string;
+  finished: boolean;
+  report_html: string;
+  show_report_card: boolean;
 }
 
 export interface CoachingStudentHandlerUrls {
@@ -73,34 +73,34 @@ export interface EvaluationCriterion {
 }
 
 export interface ScenarioData {
-  case_details?: string;
-  evaluation_criteria?: EvaluationCriterion[];
-  learning_objectives?: string[];
+  case_details: string;
+  evaluation_criteria: EvaluationCriterion[];
+  learning_objectives: string[];
 }
 
 export interface CoachingStudioState {
-  allow_reset?: boolean;
-  blacklist?: string[];
-  character_1_avatar?: string;
-  character_1_name?: string;
-  character_1_prompt?: string;
-  character_1_role?: string;
-  character_2_avatar?: string;
-  character_2_name?: string;
-  character_2_prompt?: string;
-  character_2_role?: string;
-  coach_initial_message?: string;
-  coach_title?: string;
-  display_name?: string;
-  evaluator_prompt?: string;
-  initial_message?: string;
-  intro_text?: string;
-  max_attempts?: number | string | null;
-  model?: string;
-  model_api_key?: string;
-  model_api_url?: string;
-  scenario_data?: ScenarioData;
-  workspace_title?: string;
+  allow_reset: boolean;
+  blacklist: string[];
+  character_1_avatar: string;
+  character_1_name: string;
+  character_1_prompt: string;
+  character_1_role: string;
+  character_2_avatar: string;
+  character_2_name: string;
+  character_2_prompt: string;
+  character_2_role: string;
+  coach_initial_message: string;
+  coach_title: string;
+  display_name: string;
+  evaluator_prompt: string;
+  initial_message: string;
+  intro_text: string;
+  max_attempts: number | string | null;
+  model: string;
+  model_api_key: string;
+  model_api_url: string;
+  scenario_data: ScenarioData;
+  workspace_title: string;
 }
 
 export interface CoachingStudioHandlerUrls {
@@ -114,6 +114,6 @@ export interface CoachingStudioMeta {
 
 export type CoachingStudioPayload = SharedPayload<
   CoachingStudioHandlerUrls,
-  CoachingStudioState,
+  Partial<CoachingStudioState>,
   CoachingStudioMeta
 >;

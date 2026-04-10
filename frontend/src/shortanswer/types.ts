@@ -1,8 +1,8 @@
 import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface ShortAnswerMessage {
-  source?: string;
-  content?: string;
+  source: string;
+  content: string;
 }
 
 export interface ShortAnswerStudentHandlerUrls {
@@ -15,10 +15,10 @@ export interface ShortAnswerStudentInitialState {
 }
 
 export interface ShortAnswerStudentMeta {
-  allow_reset?: boolean;
-  character_image?: string;
-  max_responses?: number;
-  question?: string;
+  allow_reset: boolean;
+  character_image: string;
+  max_responses: number;
+  question: string;
 }
 
 export type ShortAnswerStudentPayload = SharedPayload<
@@ -35,16 +35,16 @@ export interface StudioLockMetadata {
 }
 
 export interface ShortAnswerStudioState {
-  allow_reset?: boolean;
-  attachment_urls?: string[];
-  character_image?: string;
-  display_name?: string;
-  evaluation_prompt?: string;
-  max_responses?: number | string | null;
-  model?: string;
-  model_api_key?: string;
-  model_api_url?: string;
-  question?: string;
+  allow_reset: boolean;
+  attachment_urls: string[];
+  character_image: string;
+  display_name: string;
+  evaluation_prompt: string;
+  max_responses: number | string | null;
+  model: string;
+  model_api_key: string;
+  model_api_url: string;
+  question: string;
 }
 
 export interface ShortAnswerStudioHandlerUrls {
@@ -58,6 +58,6 @@ export interface ShortAnswerStudioMeta {
 
 export type ShortAnswerStudioPayload = SharedPayload<
   ShortAnswerStudioHandlerUrls,
-  ShortAnswerStudioState,
+  Partial<ShortAnswerStudioState>,
   ShortAnswerStudioMeta
 >;

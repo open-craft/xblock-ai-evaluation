@@ -17,6 +17,7 @@ import {
 import { XBlockRuntime } from "../shared/types";
 import {
   CoachingListItem,
+  emptyScenarioData,
   getBlacklistItems,
   getScenarioEditorModel,
   getScenarioListItems,
@@ -48,7 +49,7 @@ function normalizeScenarioData(value: unknown): ScenarioData {
     return value as ScenarioData;
   }
 
-  return {};
+  return emptyScenarioData;
 }
 
 function normalizeBlacklist(value: unknown): string[] {
@@ -59,7 +60,7 @@ function normalizeBlacklist(value: unknown): string[] {
   return [];
 }
 
-function normalizeInitialState(initialState: CoachingStudioState): CoachingStudioState {
+function normalizeInitialState(initialState: Partial<CoachingStudioState>): CoachingStudioState {
   return {
     allow_reset: Boolean(initialState.allow_reset),
     blacklist: normalizeBlacklist(initialState.blacklist),
@@ -1290,7 +1291,7 @@ export default function CoachingStudioApp({
     }
   }
 
-  function saveStudioSettings() {
+  async function saveStudioSettings() {
     if (!payload.handler_urls.studio_submit || isSaving) {
       return;
     }
@@ -1336,60 +1337,63 @@ export default function CoachingStudioApp({
       message: savingMessage,
     });
 
-    submitStudioPayload(payload.handler_urls.studio_submit, buildSubmitPayload(sanitizedValues))
-      .then((response: StudioSaveResponse) => {
-        const nextValidationErrors = normalizeValidationErrors(response.validation_errors);
-        setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
-        handleValidationResponse(nextValidationErrors, activeSection);
-        setIsSaving(false);
+    try {
+      const response = await submitStudioPayload(
+        payload.handler_urls.studio_submit,
+        buildSubmitPayload(sanitizedValues),
+      );
 
-        if (response.success) {
-          notifyRuntime(runtime, "save", { state: "end" });
-        } else {
-          setRequestError(validationMessage);
-          notifyRuntime(runtime, "error", {
-            title: intl.formatMessage({
-              id: "coaching.studio.saveFailed",
-              defaultMessage: "Unable to update settings",
-            }),
-            message: validationMessage,
-          });
-        }
-      })
-      .catch((error: unknown) => {
-        let inlineRequestError = "";
+      const nextValidationErrors = normalizeValidationErrors(response.validation_errors);
+      setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
+      handleValidationResponse(nextValidationErrors, activeSection);
+      setIsSaving(false);
 
-        if (error instanceof RequestError && error.payload) {
-          const normalizedResponse = normalizeStudioSaveResponse(error.payload);
-          const nextValidationErrors = normalizeValidationErrors(normalizedResponse.validation_errors);
-          handleValidationResponse(nextValidationErrors, activeSection);
-          setValidationWarnings(normalizeValidationWarnings(normalizedResponse.validation_warnings));
-          if (Object.keys(normalizedResponse.validation_errors).length > 0) {
-            inlineRequestError = validationMessage;
-          }
-        }
-
-        if (!inlineRequestError) {
-          inlineRequestError = getSaveErrorMessage(
-            error,
-            intl.formatMessage({
-              id: "coaching.studio.genericError",
-              defaultMessage:
-                "This may be happening because of an error with our server or your internet connection. Try refreshing the page or making sure you are online.",
-            }),
-          );
-        }
-
-        setRequestError(inlineRequestError);
-        setIsSaving(false);
+      if (response.success) {
+        notifyRuntime(runtime, "save", { state: "end" });
+      } else {
+        setRequestError(validationMessage);
         notifyRuntime(runtime, "error", {
           title: intl.formatMessage({
             id: "coaching.studio.saveFailed",
             defaultMessage: "Unable to update settings",
           }),
-          message: inlineRequestError,
+          message: validationMessage,
         });
+      }
+    } catch (error: unknown) {
+      let inlineRequestError = "";
+
+      if (error instanceof RequestError && error.payload) {
+        const normalizedResponse = normalizeStudioSaveResponse(error.payload);
+        const nextValidationErrors = normalizeValidationErrors(normalizedResponse.validation_errors);
+        handleValidationResponse(nextValidationErrors, activeSection);
+        setValidationWarnings(normalizeValidationWarnings(normalizedResponse.validation_warnings));
+        if (Object.keys(normalizedResponse.validation_errors).length > 0) {
+          inlineRequestError = validationMessage;
+        }
+      }
+
+      if (!inlineRequestError) {
+        inlineRequestError = getSaveErrorMessage(
+          error,
+          intl.formatMessage({
+            id: "coaching.studio.genericError",
+            defaultMessage:
+              "This may be happening because of an error with our server or your internet connection. Try refreshing the page or making sure you are online.",
+          }),
+        );
+      }
+
+      setRequestError(inlineRequestError);
+      setIsSaving(false);
+      notifyRuntime(runtime, "error", {
+        title: intl.formatMessage({
+          id: "coaching.studio.saveFailed",
+          defaultMessage: "Unable to update settings",
+        }),
+        message: inlineRequestError,
       });
+    }
   }
 
   function handleCancel(event?: Event | React.SyntheticEvent<HTMLElement>) {

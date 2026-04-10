@@ -108,12 +108,14 @@ export function getScenarioListItems(
   return getEvaluationCriteriaItems(scenarioData?.evaluation_criteria);
 }
 
+export const emptyScenarioData: ScenarioData = { case_details: "", evaluation_criteria: [], learning_objectives: [] };
+
 export function updateScenarioDataValue(
   scenarioData: ScenarioData | undefined,
   fieldName: "case_details",
   nextValue: string,
 ): ScenarioData {
-  return { ...scenarioData, case_details: nextValue };
+  return { ...(scenarioData || emptyScenarioData), case_details: nextValue };
 }
 
 export function updateScenarioListItems(
@@ -123,7 +125,7 @@ export function updateScenarioListItems(
 ): ScenarioData {
   if (fieldName === "learning_objectives") {
     return {
-      ...scenarioData,
+      ...(scenarioData || emptyScenarioData),
       learning_objectives: nextItems.map((item) => {
         return (item.preserveRawValue ? item.rawValue : item.value) as string;
       }),
@@ -131,7 +133,7 @@ export function updateScenarioListItems(
   }
 
   return {
-    ...scenarioData,
+    ...(scenarioData || emptyScenarioData),
     evaluation_criteria: nextItems.map((item) => {
       if (item.preserveRawValue) {
         return item.rawValue as EvaluationCriterion;

@@ -72,7 +72,7 @@ function stripScriptTags(html: string) {
 
 function normalizeExecutionResult(value: unknown): CodingExecutionResult {
   if (!value || typeof value !== "object") {
-    return {};
+    return { stderr: "", stdout: "" };
   }
 
   const rawResult = value as CodingExecutionResult;

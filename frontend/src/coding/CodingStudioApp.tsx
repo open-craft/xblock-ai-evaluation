@@ -24,7 +24,7 @@ import {
   CodingStudioState,
 } from "./types";
 
-function normalizeInitialState(initialState: CodingStudioState): CodingStudioState {
+function normalizeInitialState(initialState: Partial<CodingStudioState>): CodingStudioState {
   return {
     display_name: typeof initialState.display_name === "string" ? initialState.display_name : "",
     model: typeof initialState.model === "string" ? initialState.model : "",
@@ -241,7 +241,7 @@ export default function CodingStudioApp({
     setValues(initialValues);
   }, [initialValues]);
 
-  const handleSave = useCallback(function handleSave() {
+  const handleSave = useCallback(async function handleSave() {
     if (!payload.handler_urls.studio_submit || isSaving) {
       return;
     }
@@ -260,63 +260,66 @@ export default function CodingStudioApp({
       message: savingMessage,
     });
 
-    submitStudioPayload(payload.handler_urls.studio_submit, buildSubmitPayload(values))
-      .then((response: StudioSaveResponse) => {
-        setValidationErrors(normalizeValidationErrors(response.validation_errors));
-        setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
-        setIsSaving(false);
+    try {
+      const response = await submitStudioPayload(
+        payload.handler_urls.studio_submit,
+        buildSubmitPayload(values),
+      );
 
-        if (response.success) {
-          notifyRuntime(runtime, "save", { state: "end" });
-        } else {
-          notifyRuntime(runtime, "error", {
-            title: intl.formatMessage({
-              id: "coding.studio.saveFailed",
-              defaultMessage: "Unable to update settings",
-            }),
-            message: intl.formatMessage({
-              id: "coding.studio.validationError",
-              defaultMessage: "Please fix the validation issues and try again.",
-            }),
-          });
-        }
-      })
-      .catch((error: unknown) => {
-        let inlineRequestError = "";
+      setValidationErrors(normalizeValidationErrors(response.validation_errors));
+      setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
+      setIsSaving(false);
 
-        if (error instanceof RequestError && error.payload) {
-          const normalizedResponse = normalizeStudioSaveResponse(error.payload);
-          setValidationErrors(normalizeValidationErrors(normalizedResponse.validation_errors));
-          setValidationWarnings(normalizeValidationWarnings(normalizedResponse.validation_warnings));
-          if (Object.keys(normalizedResponse.validation_errors).length > 0) {
-            inlineRequestError = intl.formatMessage({
-              id: "coding.studio.validationError",
-              defaultMessage: "Please fix the validation issues and try again.",
-            });
-          }
-        }
-
-        if (!inlineRequestError) {
-          inlineRequestError = getSaveErrorMessage(
-            error,
-            intl.formatMessage({
-              id: "coding.studio.genericError",
-              defaultMessage:
-                "This may be happening because of an error with our server or your internet connection. Try refreshing the page or making sure you are online.",
-            }),
-          );
-        }
-
-        setRequestError(inlineRequestError);
-        setIsSaving(false);
+      if (response.success) {
+        notifyRuntime(runtime, "save", { state: "end" });
+      } else {
         notifyRuntime(runtime, "error", {
           title: intl.formatMessage({
             id: "coding.studio.saveFailed",
             defaultMessage: "Unable to update settings",
           }),
-          message: inlineRequestError,
+          message: intl.formatMessage({
+            id: "coding.studio.validationError",
+            defaultMessage: "Please fix the validation issues and try again.",
+          }),
         });
+      }
+    } catch (error: unknown) {
+      let inlineRequestError = "";
+
+      if (error instanceof RequestError && error.payload) {
+        const normalizedResponse = normalizeStudioSaveResponse(error.payload);
+        setValidationErrors(normalizeValidationErrors(normalizedResponse.validation_errors));
+        setValidationWarnings(normalizeValidationWarnings(normalizedResponse.validation_warnings));
+        if (Object.keys(normalizedResponse.validation_errors).length > 0) {
+          inlineRequestError = intl.formatMessage({
+            id: "coding.studio.validationError",
+            defaultMessage: "Please fix the validation issues and try again.",
+          });
+        }
+      }
+
+      if (!inlineRequestError) {
+        inlineRequestError = getSaveErrorMessage(
+          error,
+          intl.formatMessage({
+            id: "coding.studio.genericError",
+            defaultMessage:
+              "This may be happening because of an error with our server or your internet connection. Try refreshing the page or making sure you are online.",
+          }),
+        );
+      }
+
+      setRequestError(inlineRequestError);
+      setIsSaving(false);
+      notifyRuntime(runtime, "error", {
+        title: intl.formatMessage({
+          id: "coding.studio.saveFailed",
+          defaultMessage: "Unable to update settings",
+        }),
+        message: inlineRequestError,
       });
+    }
   }, [intl, isSaving, payload.handler_urls.studio_submit, runtime, values]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;

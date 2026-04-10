@@ -37,9 +37,9 @@ function normalizePayload(
     },
     initial_state: payloadData.initial_state || fallbackInitialState,
     meta: payloadData.meta || {
-      question: payloadData.question,
-      language: payloadData.language,
-      monaco_html: payloadData.monaco_html,
+      question: payloadData.question || "",
+      language: payloadData.language || "",
+      monaco_html: payloadData.monaco_html || "",
     },
   };
 }
