@@ -1,23 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useIntl } from "react-intl";
+import { Formik, useFormikContext } from "formik";
+import * as Yup from "yup";
 import { Alert, Button, Form } from "@openedx/paragon";
 
 import { RequestError } from "../shared/request";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
+  collectYupErrors,
   getSaveErrorMessage,
   isModelApiKeyLocked,
   normalizeStudioSaveResponse,
   normalizeValidationErrors,
   normalizeValidationWarnings,
   notifyRuntime,
-  StudioSaveResponse,
   submitStudioPayload,
 } from "../shared/studio";
 import { XBlockRuntime } from "../shared/types";
 import {
   CoachingListItem,
-  emptyScenarioData,
   getBlacklistItems,
   getScenarioEditorModel,
   getScenarioListItems,
@@ -41,70 +42,56 @@ import {
   CoachingStudioMeta,
   CoachingStudioPayload,
   CoachingStudioState,
-  ScenarioData,
 } from "./types";
 
-function normalizeScenarioData(value: unknown): ScenarioData {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as ScenarioData;
-  }
-
-  return emptyScenarioData;
-}
-
-function normalizeBlacklist(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value as string[];
-  }
-
-  return [];
-}
-
-function normalizeInitialState(initialState: Partial<CoachingStudioState>): CoachingStudioState {
-  return {
-    allow_reset: Boolean(initialState.allow_reset),
-    blacklist: normalizeBlacklist(initialState.blacklist),
-    character_1_avatar:
-      typeof initialState.character_1_avatar === "string" ? initialState.character_1_avatar : "",
-    character_1_name:
-      typeof initialState.character_1_name === "string" ? initialState.character_1_name : "",
-    character_1_prompt:
-      typeof initialState.character_1_prompt === "string" ? initialState.character_1_prompt : "",
-    character_1_role:
-      typeof initialState.character_1_role === "string" ? initialState.character_1_role : "",
-    character_2_avatar:
-      typeof initialState.character_2_avatar === "string" ? initialState.character_2_avatar : "",
-    character_2_name:
-      typeof initialState.character_2_name === "string" ? initialState.character_2_name : "",
-    character_2_prompt:
-      typeof initialState.character_2_prompt === "string" ? initialState.character_2_prompt : "",
-    character_2_role:
-      typeof initialState.character_2_role === "string" ? initialState.character_2_role : "",
-    coach_initial_message:
-      typeof initialState.coach_initial_message === "string"
-        ? initialState.coach_initial_message
-        : "",
-    coach_title: typeof initialState.coach_title === "string" ? initialState.coach_title : "",
-    display_name: typeof initialState.display_name === "string" ? initialState.display_name : "",
-    evaluator_prompt:
-      typeof initialState.evaluator_prompt === "string" ? initialState.evaluator_prompt : "",
-    initial_message:
-      typeof initialState.initial_message === "string" ? initialState.initial_message : "",
-    intro_text: typeof initialState.intro_text === "string" ? initialState.intro_text : "",
-    max_attempts:
-      initialState.max_attempts === null || typeof initialState.max_attempts === "undefined"
-        ? ""
-        : initialState.max_attempts,
-    model: typeof initialState.model === "string" ? initialState.model : "",
-    model_api_key:
-      typeof initialState.model_api_key === "string" ? initialState.model_api_key : "",
-    model_api_url:
-      typeof initialState.model_api_url === "string" ? initialState.model_api_url : "",
-    scenario_data: normalizeScenarioData(initialState.scenario_data),
-    workspace_title:
-      typeof initialState.workspace_title === "string" ? initialState.workspace_title : "",
-  };
-}
+const coachingSchema = Yup.object({
+  allow_reset: Yup.boolean()
+    .transform((_value: unknown, original: unknown) => Boolean(original))
+    .default(false),
+  blacklist: Yup.mixed()
+    .transform((value: unknown) => (Array.isArray(value) ? value : []))
+    .default(() => []),
+  character_1_avatar: Yup.string().ensure(),
+  character_1_name: Yup.string().ensure(),
+  character_1_prompt: Yup.string().ensure(),
+  character_1_role: Yup.string().ensure(),
+  character_2_avatar: Yup.string().ensure(),
+  character_2_name: Yup.string().ensure(),
+  character_2_prompt: Yup.string().ensure(),
+  character_2_role: Yup.string().ensure(),
+  coach_initial_message: Yup.string().ensure(),
+  coach_title: Yup.string().ensure(),
+  display_name: Yup.string().ensure(),
+  evaluator_prompt: Yup.string().ensure(),
+  initial_message: Yup.string().ensure(),
+  intro_text: Yup.string().ensure(),
+  max_attempts: Yup.mixed()
+    .transform((value: unknown) => (value === null || value === undefined ? "" : value))
+    .default(""),
+  model: Yup.string().ensure()
+    .required("Model field is mandatory - please select one from the dropdown."),
+  model_api_key: Yup.string().ensure(),
+  model_api_url: Yup.string().ensure(),
+  scenario_data: Yup.mixed()
+    .transform((value: unknown) => {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return value;
+      }
+      return { case_details: "", evaluation_criteria: [], learning_objectives: [] };
+    })
+    .default(() => ({ case_details: "", evaluation_criteria: [], learning_objectives: [] }))
+    .test("case-details-length", "", function testCaseDetailsLength(value) {
+      const caseDetails = (value as Record<string, unknown>)?.case_details;
+      if (typeof caseDetails === "string" && caseDetails.length > 1000) {
+        return this.createError({
+          path: "scenario_case_details",
+          message: "Scenario text must be 1000 characters or fewer.",
+        });
+      }
+      return true;
+    }),
+  workspace_title: Yup.string().ensure(),
+});
 
 function updateListItemAtIndex(items: CoachingListItem[], index: number, nextValue: string) {
   return items.map((item, itemIndex) => {
@@ -776,7 +763,8 @@ function TaskContextSection({
           metadata={{
             display_name: "Scenario",
           }}
-          counter={`${scenario.caseDetails.length}/300`}
+          counter={`${scenario.caseDetails.length}/1000`}
+          errors={validationErrors.scenario_case_details}
           value={scenario.caseDetails}
           rows={4}
           showLabel={false}
@@ -1250,18 +1238,15 @@ function SectionPanel({
   );
 }
 
-export default function CoachingStudioApp({
+function CoachingStudioFormContent({
   payload,
   runtime,
 }: {
   payload: CoachingStudioPayload;
   runtime?: XBlockRuntime;
 }) {
+  const formik = useFormikContext<CoachingStudioState>();
   const intl = useIntl();
-  const initialValues = useMemo(() => {
-    return normalizeInitialState(payload.initial_state);
-  }, [payload.initial_state]);
-  const [values, setValues] = useState(initialValues);
   const [activeSection, setActiveSection] = useState<CoachingStudioSectionId>("general");
   const [validationErrors, setValidationErrors] = useState<CoachingStudioValidationErrors>({});
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
@@ -1272,12 +1257,11 @@ export default function CoachingStudioApp({
   const lockMetadata = meta.lock_metadata;
 
   useEffect(() => {
-    setValues(initialValues);
     setActiveSection("general");
     setValidationErrors({});
     setValidationWarnings([]);
     setRequestError("");
-  }, [initialValues]);
+  }, [payload.initial_state]);
 
   function handleValidationResponse(
     nextValidationErrors: CoachingStudioValidationErrors,
@@ -1304,15 +1288,28 @@ export default function CoachingStudioApp({
       id: "coaching.studio.validationError",
       defaultMessage: "Please fix the validation issues and try again.",
     });
-    const sanitizedBlacklist = sanitizeBlacklistValue(values.blacklist);
+    const sanitizedBlacklist = sanitizeBlacklistValue(formik.values.blacklist);
     const sanitizedValues = {
-      ...values,
+      ...formik.values,
       blacklist: sanitizedBlacklist,
     };
-    if (sanitizedBlacklist.length !== values.blacklist?.length) {
-      setValues(sanitizedValues);
+    if (sanitizedBlacklist.length !== formik.values.blacklist?.length) {
+      formik.setFieldValue("blacklist", sanitizedBlacklist);
     }
-    const frontendValidationErrors = buildFrontendValidationErrors(sanitizedValues);
+
+    let yupErrors: CoachingStudioValidationErrors = {};
+    try {
+      await coachingSchema.validate(sanitizedValues, { abortEarly: false });
+    } catch (error: unknown) {
+      if (error instanceof Yup.ValidationError) {
+        yupErrors = collectYupErrors(error);
+      }
+    }
+
+    const frontendValidationErrors = {
+      ...yupErrors,
+      ...buildFrontendValidationErrors(sanitizedValues),
+    };
 
     if (Object.keys(frontendValidationErrors).length > 0) {
       setRequestError(validationMessage);
@@ -1480,19 +1477,40 @@ export default function CoachingStudioApp({
               fieldMetadata={fieldMetadata}
               lockMetadata={lockMetadata}
               onChange={(fieldName, nextValue) => {
-                setValues((currentValues) => {
-                  return {
-                    ...currentValues,
-                    [fieldName]: nextValue,
-                  };
-                });
+                formik.setFieldValue(fieldName, nextValue);
               }}
               validationErrors={validationErrors}
-              values={values}
+              values={formik.values}
             />
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CoachingStudioApp({
+  payload,
+  runtime,
+}: {
+  payload: CoachingStudioPayload;
+  runtime?: XBlockRuntime;
+}) {
+  const initialValues = useMemo(
+    () =>
+      coachingSchema.cast(payload.initial_state, {
+        stripUnknown: true,
+      }) as CoachingStudioState,
+    [payload.initial_state],
+  );
+
+  return (
+    <Formik<CoachingStudioState>
+      initialValues={initialValues}
+      enableReinitialize
+      onSubmit={() => {}}
+    >
+      <CoachingStudioFormContent payload={payload} runtime={runtime} />
+    </Formik>
   );
 }

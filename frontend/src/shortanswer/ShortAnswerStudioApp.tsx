@@ -1,18 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
+import { Formik, useFormikContext } from "formik";
+import * as Yup from "yup";
 import { Button, Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import { useStudioModalActions } from "../shared/useStudioModalActions";
 import {
+  collectYupErrors,
   getSaveErrorMessage,
   isModelApiKeyLocked,
   normalizeStudioSaveResponse,
   normalizeValidationErrors,
   normalizeValidationWarnings,
   notifyRuntime,
-  StudioSaveResponse,
   submitStudioPayload,
   ValidationErrors,
 } from "../shared/studio";
@@ -23,6 +25,34 @@ import {
   StudioLockMetadata,
 } from "./types";
 
+const shortAnswerSchema = Yup.object({
+  allow_reset: Yup.boolean()
+    .transform((_value: unknown, original: unknown) => Boolean(original))
+    .default(false),
+  attachment_urls: Yup.array(Yup.string().ensure()).ensure(),
+  character_image: Yup.string().ensure(),
+  display_name: Yup.string().ensure(),
+  evaluation_prompt: Yup.string().ensure(),
+  max_responses: Yup.mixed()
+    .transform((value: unknown) => (value === null || value === undefined ? "" : value))
+    .default("")
+    .test(
+      "valid-max-responses",
+      "max responses must be an integer between 1 and 30",
+      (value) => {
+        if (value === "" || value === null || value === undefined) return false;
+        const num = Number(value);
+        return Number.isInteger(num) && num >= 1 && num <= 30;
+      },
+    ),
+  model: Yup.string().ensure()
+    .required("Model field is mandatory - please select one from the dropdown."),
+  model_api_key: Yup.string().ensure(),
+  model_api_url: Yup.string().ensure(),
+  question: Yup.string().ensure()
+    .required("Question field is mandatory"),
+});
+
 function normalizeAttachmentUrls(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -31,30 +61,6 @@ function normalizeAttachmentUrls(value: unknown) {
   return value.map((entry) => {
     return typeof entry === "string" ? entry : "";
   });
-}
-
-function normalizeInitialState(initialState: Partial<ShortAnswerStudioState>): ShortAnswerStudioState {
-  return {
-    display_name: typeof initialState.display_name === "string" ? initialState.display_name : "",
-    model: typeof initialState.model === "string" ? initialState.model : "",
-    model_api_key:
-      typeof initialState.model_api_key === "string" ? initialState.model_api_key : "",
-    model_api_url:
-      typeof initialState.model_api_url === "string" ? initialState.model_api_url : "",
-    question: typeof initialState.question === "string" ? initialState.question : "",
-    evaluation_prompt:
-      typeof initialState.evaluation_prompt === "string"
-        ? initialState.evaluation_prompt
-        : "",
-    max_responses:
-      initialState.max_responses === null || typeof initialState.max_responses === "undefined"
-        ? ""
-        : initialState.max_responses,
-    allow_reset: Boolean(initialState.allow_reset),
-    character_image:
-      typeof initialState.character_image === "string" ? initialState.character_image : "",
-    attachment_urls: normalizeAttachmentUrls(initialState.attachment_urls),
-  };
 }
 
 function buildSubmitPayload(values: ShortAnswerStudioState) {
@@ -258,7 +264,7 @@ function ShortAnswerSettingsForm({
         <Form.Control
           type="number"
           min={1}
-          max={15}
+          max={30}
           step={1}
           value={values.max_responses === null || typeof values.max_responses === "undefined" ? "" : values.max_responses}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
@@ -307,18 +313,17 @@ function ShortAnswerSettingsForm({
   );
 }
 
-export default function ShortAnswerStudioApp({
+function ShortAnswerStudioFormContent({
   payload,
   runtime,
 }: {
   payload: ShortAnswerStudioPayload;
   runtime?: XBlockRuntime;
 }) {
+  const formik = useFormikContext<ShortAnswerStudioState>();
+  const valuesRef = useRef(formik.values);
+  valuesRef.current = formik.values;
   const intl = useIntl();
-  const initialValues = useMemo(() => {
-    return normalizeInitialState(payload.initial_state);
-  }, [payload.initial_state]);
-  const [values, setValues] = useState(initialValues);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
@@ -326,13 +331,32 @@ export default function ShortAnswerStudioApp({
   const fieldMetadata = payload.meta.field_metadata || {};
   const lockMetadata = payload.meta.lock_metadata;
 
-  useEffect(() => {
-    setValues(initialValues);
-  }, [initialValues]);
-
   const handleSave = useCallback(async function handleSave() {
     if (!payload.handler_urls.studio_submit || isSaving) {
       return;
+    }
+
+    const validationMessage = intl.formatMessage({
+      id: "shortanswer.studio.validationError",
+      defaultMessage: "Please fix the validation issues and try again.",
+    });
+
+    try {
+      await shortAnswerSchema.validate(valuesRef.current, { abortEarly: false });
+    } catch (error: unknown) {
+      if (error instanceof Yup.ValidationError) {
+        setValidationErrors(collectYupErrors(error));
+        setValidationWarnings([]);
+        setRequestError(validationMessage);
+        notifyRuntime(runtime, "error", {
+          title: intl.formatMessage({
+            id: "shortanswer.studio.saveFailed",
+            defaultMessage: "Unable to update settings",
+          }),
+          message: validationMessage,
+        });
+        return;
+      }
     }
 
     const savingMessage = intl.formatMessage({
@@ -352,7 +376,7 @@ export default function ShortAnswerStudioApp({
     try {
       const response = await submitStudioPayload(
         payload.handler_urls.studio_submit,
-        buildSubmitPayload(values),
+        buildSubmitPayload(valuesRef.current),
       );
 
       setValidationErrors(normalizeValidationErrors(response.validation_errors));
@@ -409,7 +433,7 @@ export default function ShortAnswerStudioApp({
         message: inlineRequestError,
       });
     }
-  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime, values]);
+  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
@@ -435,20 +459,41 @@ export default function ShortAnswerStudioApp({
           validationWarnings={validationWarnings}
         />
         <ShortAnswerSettingsForm
-          values={values}
+          values={formik.values}
           validationErrors={validationErrors}
           lockMetadata={lockMetadata}
           fieldMetadata={fieldMetadata}
           onChange={(fieldName, nextValue) => {
-            setValues((currentValues) => {
-              return {
-                ...currentValues,
-                [fieldName]: nextValue,
-              };
-            });
+            formik.setFieldValue(fieldName, nextValue);
           }}
         />
       </div>
     </div>
+  );
+}
+
+export default function ShortAnswerStudioApp({
+  payload,
+  runtime,
+}: {
+  payload: ShortAnswerStudioPayload;
+  runtime?: XBlockRuntime;
+}) {
+  const initialValues = useMemo(
+    () =>
+      shortAnswerSchema.cast(payload.initial_state, {
+        stripUnknown: true,
+      }) as ShortAnswerStudioState,
+    [payload.initial_state],
+  );
+
+  return (
+    <Formik<ShortAnswerStudioState>
+      initialValues={initialValues}
+      enableReinitialize
+      onSubmit={() => {}}
+    >
+      <ShortAnswerStudioFormContent payload={payload} runtime={runtime} />
+    </Formik>
   );
 }

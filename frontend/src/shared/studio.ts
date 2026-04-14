@@ -76,6 +76,21 @@ export function normalizeValidationErrors(rawErrors: unknown): ValidationErrors 
   }, {});
 }
 
+export function collectYupErrors(
+  error: { inner: Array<{ path?: string; message: string }> },
+): ValidationErrors {
+  const errors: ValidationErrors = {};
+  for (const err of error.inner) {
+    if (err.path) {
+      if (!errors[err.path]) {
+        errors[err.path] = [];
+      }
+      errors[err.path].push(err.message);
+    }
+  }
+  return errors;
+}
+
 export function getSaveErrorMessage(error: unknown, fallbackMessage: string) {
   if (error instanceof RequestError && error.payload) {
     if (hasStudioValidationIssues(error.payload)) {

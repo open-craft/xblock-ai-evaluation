@@ -1,18 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
+import { Formik, useFormikContext } from "formik";
+import * as Yup from "yup";
 import { Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import { useStudioModalActions } from "../shared/useStudioModalActions";
 import {
+  collectYupErrors,
   getSaveErrorMessage,
   isModelApiKeyLocked,
   normalizeStudioSaveResponse,
   normalizeValidationErrors,
   normalizeValidationWarnings,
   notifyRuntime,
-  StudioSaveResponse,
   submitStudioPayload,
   ValidationErrors,
 } from "../shared/studio";
@@ -24,24 +26,18 @@ import {
   CodingStudioState,
 } from "./types";
 
-function normalizeInitialState(initialState: Partial<CodingStudioState>): CodingStudioState {
-  return {
-    display_name: typeof initialState.display_name === "string" ? initialState.display_name : "",
-    model: typeof initialState.model === "string" ? initialState.model : "",
-    model_api_key:
-      typeof initialState.model_api_key === "string" ? initialState.model_api_key : "",
-    model_api_url:
-      typeof initialState.model_api_url === "string" ? initialState.model_api_url : "",
-    question: typeof initialState.question === "string" ? initialState.question : "",
-    evaluation_prompt:
-      typeof initialState.evaluation_prompt === "string"
-        ? initialState.evaluation_prompt
-        : "",
-    judge0_api_key:
-      typeof initialState.judge0_api_key === "string" ? initialState.judge0_api_key : "",
-    language: typeof initialState.language === "string" ? initialState.language : "",
-  };
-}
+const codingSchema = Yup.object({
+  display_name: Yup.string().ensure(),
+  evaluation_prompt: Yup.string().ensure(),
+  judge0_api_key: Yup.string().ensure(),
+  language: Yup.string().ensure(),
+  model: Yup.string().ensure()
+    .required("Model field is mandatory - please select one from the dropdown."),
+  model_api_key: Yup.string().ensure(),
+  model_api_url: Yup.string().ensure(),
+  question: Yup.string().ensure()
+    .required("Question field is mandatory"),
+});
 
 function buildSubmitPayload(values: CodingStudioState) {
   return {
@@ -217,18 +213,17 @@ function CodingSettingsForm({
   );
 }
 
-export default function CodingStudioApp({
+function CodingStudioFormContent({
   payload,
   runtime,
 }: {
   payload: CodingStudioPayload;
   runtime?: XBlockRuntime;
 }) {
+  const formik = useFormikContext<CodingStudioState>();
+  const valuesRef = useRef(formik.values);
+  valuesRef.current = formik.values;
   const intl = useIntl();
-  const initialValues = useMemo(() => {
-    return normalizeInitialState(payload.initial_state);
-  }, [payload.initial_state]);
-  const [values, setValues] = useState(initialValues);
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
@@ -237,13 +232,32 @@ export default function CodingStudioApp({
   const fieldMetadata = meta.field_metadata || {};
   const lockMetadata = meta.lock_metadata;
 
-  useEffect(() => {
-    setValues(initialValues);
-  }, [initialValues]);
-
   const handleSave = useCallback(async function handleSave() {
     if (!payload.handler_urls.studio_submit || isSaving) {
       return;
+    }
+
+    const validationMessage = intl.formatMessage({
+      id: "coding.studio.validationError",
+      defaultMessage: "Please fix the validation issues and try again.",
+    });
+
+    try {
+      await codingSchema.validate(valuesRef.current, { abortEarly: false });
+    } catch (error: unknown) {
+      if (error instanceof Yup.ValidationError) {
+        setValidationErrors(collectYupErrors(error));
+        setValidationWarnings([]);
+        setRequestError(validationMessage);
+        notifyRuntime(runtime, "error", {
+          title: intl.formatMessage({
+            id: "coding.studio.saveFailed",
+            defaultMessage: "Unable to update settings",
+          }),
+          message: validationMessage,
+        });
+        return;
+      }
     }
 
     const savingMessage = intl.formatMessage({
@@ -263,7 +277,7 @@ export default function CodingStudioApp({
     try {
       const response = await submitStudioPayload(
         payload.handler_urls.studio_submit,
-        buildSubmitPayload(values),
+        buildSubmitPayload(valuesRef.current),
       );
 
       setValidationErrors(normalizeValidationErrors(response.validation_errors));
@@ -320,7 +334,7 @@ export default function CodingStudioApp({
         message: inlineRequestError,
       });
     }
-  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime, values]);
+  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
@@ -352,17 +366,38 @@ export default function CodingStudioApp({
           fieldMetadata={fieldMetadata}
           lockMetadata={lockMetadata}
           validationErrors={validationErrors}
-          values={values}
+          values={formik.values}
           onChange={(fieldName, nextValue) => {
-            setValues((currentValues) => {
-              return {
-                ...currentValues,
-                [fieldName]: nextValue,
-              };
-            });
+            formik.setFieldValue(fieldName, nextValue);
           }}
         />
       </div>
     </div>
+  );
+}
+
+export default function CodingStudioApp({
+  payload,
+  runtime,
+}: {
+  payload: CodingStudioPayload;
+  runtime?: XBlockRuntime;
+}) {
+  const initialValues = useMemo(
+    () =>
+      codingSchema.cast(payload.initial_state, {
+        stripUnknown: true,
+      }) as CodingStudioState,
+    [payload.initial_state],
+  );
+
+  return (
+    <Formik<CodingStudioState>
+      initialValues={initialValues}
+      enableReinitialize
+      onSubmit={() => {}}
+    >
+      <CodingStudioFormContent payload={payload} runtime={runtime} />
+    </Formik>
   );
 }

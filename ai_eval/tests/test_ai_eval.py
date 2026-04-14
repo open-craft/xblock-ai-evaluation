@@ -998,7 +998,7 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
     assert response["success"] is False
     assert response["validation_errors"] == {
         "question": ["Question field is mandatory"],
-        "max_responses": ["max responses must be an integer between 1 and 15"],
+        "max_responses": ["max responses must be an integer between 1 and 30"],
         "attachment_urls": ["Error downloading attachments"],
     }
     assert response["validation_warnings"] == []

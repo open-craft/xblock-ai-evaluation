@@ -156,11 +156,11 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 _("Question field is mandatory"),
             )
 
-        if not data.max_responses or data.max_responses <= 0 or data.max_responses > 15:
+        if not data.max_responses or data.max_responses <= 0 or data.max_responses > 30:
             self._add_studio_validation_error(
                 validation_errors,
                 "max_responses",
-                _("max responses must be an integer between 1 and 15"),
+                _("max responses must be an integer between 1 and 30"),
             )
 
         try:
