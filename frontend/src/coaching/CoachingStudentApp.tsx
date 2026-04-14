@@ -146,6 +146,66 @@ function normalizeFinalReport(report: unknown): CoachingFinalReport | null {
   };
 }
 
+function ConfirmDialog({
+  body,
+  cancelLabel,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+  title,
+}: {
+  body: React.ReactNode;
+  cancelLabel: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  title: string;
+}) {
+  return (
+    <div
+      className="coach-confirm-overlay"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
+      }}
+    >
+      <div
+        className="coach-confirm-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="coach-confirm-title"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            onCancel();
+          }
+        }}
+      >
+        <h3 className="coach-confirm-dialog__title" id="coach-confirm-title">
+          {title}
+        </h3>
+        <p className="coach-confirm-dialog__body">{body}</p>
+        <div className="coach-confirm-dialog__actions">
+          <button
+            type="button"
+            className="coach-button coach-button--secondary"
+            onClick={onCancel}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className="coach-button coach-button--primary"
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
   if (!textarea) {
     return;
@@ -308,6 +368,7 @@ export default function CoachingStudentApp({
     workspace: false,
   });
   const [evaluationPending, setEvaluationPending] = useState(false);
+  const [confirmType, setConfirmType] = useState<"reset" | "submit" | null>(null);
   const [statusByPane, setStatusByPane] = useState({
     coach: "",
     workspace: "",
@@ -988,7 +1049,7 @@ export default function CoachingStudentApp({
             type="button"
             className="coach-button coach-button--secondary coach-reset-all"
             disabled={busyByPane.workspace || busyByPane.coach}
-            onClick={resetAllConversations}
+            onClick={() => setConfirmType("reset")}
           >
             {intl.formatMessage({
               id: "coaching.student.reset",
@@ -996,7 +1057,7 @@ export default function CoachingStudentApp({
             })}
           </button>
         ) : null}
-        {!reviewMode ? (
+        {!reviewMode && !reportMode ? (
           <div className="coach-attempts">
             <span
               className={
@@ -1031,12 +1092,12 @@ export default function CoachingStudentApp({
             })}
           </button>
         ) : null}
-        {!reviewMode ? (
+        {!reviewMode && !reportMode ? (
           <button
             type="button"
             className="coach-button coach-button--primary coach-submit-evaluation"
             disabled={!canSubmitForEvaluation}
-            onClick={submitForEvaluation}
+            onClick={() => setConfirmType("submit")}
           >
             {intl.formatMessage({
               id: "coaching.student.submitForEvaluation",
@@ -1045,6 +1106,71 @@ export default function CoachingStudentApp({
           </button>
         ) : null}
       </div>
+
+      {confirmType === "reset" ? (
+        <ConfirmDialog
+          title={intl.formatMessage({
+            id: "coaching.student.resetConfirm.title",
+            defaultMessage: "Start again?",
+          })}
+          body={intl.formatMessage({
+            id: "coaching.student.resetConfirm.body",
+            defaultMessage:
+              "Your work will be cleared, and the activity will start again.",
+          })}
+          cancelLabel={intl.formatMessage({
+            id: "coaching.student.resetConfirm.cancel",
+            defaultMessage: "Cancel",
+          })}
+          confirmLabel={intl.formatMessage({
+            id: "coaching.student.resetConfirm.confirm",
+            defaultMessage: "Start over",
+          })}
+          onCancel={() => setConfirmType(null)}
+          onConfirm={() => {
+            setConfirmType(null);
+            resetAllConversations();
+          }}
+        />
+      ) : null}
+
+      {confirmType === "submit" ? (
+        <ConfirmDialog
+          title={intl.formatMessage({
+            id: "coaching.student.submitConfirm.title",
+            defaultMessage: "Submit your work?",
+          })}
+          body={intl.formatMessage(
+            {
+              id: "coaching.student.submitConfirm.body",
+              defaultMessage:
+                "You still have {count} responses left. If you submit now, your current response will be scored.",
+            },
+            {
+              count:
+                typeof attemptsRemaining === "number"
+                  ? attemptsRemaining
+                  : intl.formatMessage({
+                      id: "coaching.student.submitConfirm.unlimited",
+                      defaultMessage: "unlimited",
+                    }),
+            },
+          )}
+          cancelLabel={intl.formatMessage({
+            id: "coaching.student.submitConfirm.cancel",
+            defaultMessage: "Cancel",
+          })}
+          confirmLabel={intl.formatMessage({
+            id: "coaching.student.submitConfirm.confirm",
+            defaultMessage: "Submit for evaluation",
+          })}
+          onCancel={() => setConfirmType(null)}
+          onConfirm={() => {
+            setConfirmType(null);
+            submitForEvaluation();
+          }}
+        />
+      ) : null}
     </section>
   );
 }
