@@ -4,7 +4,7 @@ import CodingStudentApp from "./CodingStudentApp";
 import { CodingExecutionResult, CodingStudentPayload } from "./types";
 
 type CodingPayloadInput = Partial<CodingStudentPayload> & {
-  ai_evaluation?: unknown;
+  ai_evaluation?: string;
   code?: string;
   code_exec_result?: unknown;
   language?: string;

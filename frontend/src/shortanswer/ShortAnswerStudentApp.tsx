@@ -23,21 +23,6 @@ function useStableId(prefix: string) {
   return idRef.current;
 }
 
-function normalizeMessages(messages: unknown): ShortAnswerMessage[] {
-  if (!Array.isArray(messages)) {
-    return [];
-  }
-
-  return messages.flatMap((message) => {
-    if (!message || typeof message !== "object") return [];
-    const rawMessage = message as ShortAnswerMessage;
-    return [{
-      source: rawMessage.source || "",
-      content: typeof rawMessage.content === "string" ? rawMessage.content : "",
-    }];
-  });
-}
-
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
     return count + (message.source === "user" ? 1 : 0);
@@ -240,9 +225,10 @@ export default function ShortAnswerStudentApp({
   payload: ShortAnswerStudentPayload;
 }) {
   const intl = useIntl();
-  const initialMessages = useMemo(() => {
-    return normalizeMessages(payload.initial_state.messages);
-  }, [payload.initial_state.messages]);
+  const initialMessages = useMemo(
+    () => payload.initial_state.messages || [],
+    [payload.initial_state.messages],
+  );
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);

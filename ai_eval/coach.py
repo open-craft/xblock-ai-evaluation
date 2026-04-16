@@ -96,6 +96,42 @@ class CoachScenarioData(pydantic.BaseModel):
         return data
 
 
+class CoachingSession(pydantic.BaseModel):
+    """Normalized shape of a single Coaching learner session."""
+
+    workspace_history: list = pydantic.Field(default_factory=list)
+    coach_history: list = pydantic.Field(default_factory=list)
+    evaluation_fragments: list = pydantic.Field(default_factory=list)
+    attempts_used: int = pydantic.Field(default=0, ge=0)
+    finished: bool = False
+    final_submission: str = ""
+    final_evaluation_markdown: str = ""
+
+    @pydantic.field_validator("workspace_history", "coach_history", "evaluation_fragments", mode="before")
+    @classmethod
+    def ensure_list(cls, v):
+        """Accept only lists; replace anything else with an empty list."""
+        return list(v) if isinstance(v, list) else []
+
+    @pydantic.field_validator("attempts_used", mode="before")
+    @classmethod
+    def ensure_non_negative_int(cls, v):
+        """Parse to a non-negative integer; default to 0 on failure."""
+        try:
+            return max(int(v or 0), 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @pydantic.field_validator("final_submission", "final_evaluation_markdown", mode="before")
+    @classmethod
+    def ensure_str(cls, v):
+        """Accept truthy values as strings; default to empty string."""
+        return str(v) if v else ""
+
+
+_EMPTY_SESSION = CoachingSession().model_dump()
+
+
 class CoachAIEvalXBlock(AIEvalXBlock):
     """
 
@@ -610,52 +646,17 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         ]
         return characters[character_index]
 
-    @staticmethod
-    def _empty_session():
-        """Return a blank Coaching session payload."""
-        return {
-            "workspace_history": [],
-            "coach_history": [],
-            "evaluation_fragments": [],
-            "attempts_used": 0,
-            "finished": False,
-            "final_submission": "",
-            "final_evaluation_markdown": "",
-        }
-
-    def _normalize_session(self, session):
-        """Normalize persisted learner session data into the expected shape."""
-        session = dict(session or {})
-        normalized = self._empty_session()
-
-        for field_name in ("workspace_history", "coach_history", "evaluation_fragments"):
-            value = session.get(field_name)
-            normalized[field_name] = list(value) if isinstance(value, list) else []
-
-        attempts_used = session.get("attempts_used", 0)
-        try:
-            attempts_used = int(attempts_used or 0)
-        except (TypeError, ValueError):
-            attempts_used = 0
-        normalized["attempts_used"] = max(attempts_used, 0)
-        normalized["finished"] = bool(session.get("finished", False))
-        normalized["final_submission"] = str(session.get("final_submission") or "")
-        normalized["final_evaluation_markdown"] = str(
-            session.get("final_evaluation_markdown") or ""
-        )
-        return normalized
-
     def _build_session_from_older_state(self):
         """Build a session snapshot from older learner-state fields."""
-        return self._normalize_session({
-            "workspace_history": self.workspace_history,
-            "coach_history": self.coach_history,
-            "evaluation_fragments": self.evaluation_fragments,
-            "attempts_used": self.attempts_used,
-            "finished": self.finished,
-            "final_submission": self.final_submission,
-            "final_evaluation_markdown": self.final_evaluation_markdown,
-        })
+        return CoachingSession(
+            workspace_history=self.workspace_history,
+            coach_history=self.coach_history,
+            evaluation_fragments=self.evaluation_fragments,
+            attempts_used=self.attempts_used,
+            finished=self.finished,
+            final_submission=self.final_submission,
+            final_evaluation_markdown=self.final_evaluation_markdown,
+        ).model_dump()
 
     def _clear_older_state_runtime_fields(self):
         """Reset older learner-state fields after migration."""
@@ -669,66 +670,53 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def _ensure_sessions_initialized(self):
         """Ensure Coaching learner state has a normalized active session."""
-        current_sessions = self.sessions if isinstance(self.sessions, list) else []
-        normalized_sessions = []
-        sessions_changed = not isinstance(self.sessions, list)
+        raw = self.sessions if isinstance(self.sessions, list) else []
+        normalized_dicts = []
+        for item in raw:
+            try:
+                normalized_dicts.append(CoachingSession.model_validate(item).model_dump())
+            except pydantic.ValidationError:
+                continue
+        sessions_changed = normalized_dicts != raw
 
-        for session in current_sessions:
-            normalized_session = self._normalize_session(session)
-            normalized_sessions.append(normalized_session)
-            if normalized_session != session:
-                sessions_changed = True
-
-        migrate_from_older_state = not normalized_sessions
+        migrate_from_older_state = not normalized_dicts
         if migrate_from_older_state:
-            normalized_sessions = [self._build_session_from_older_state()]
+            normalized_dicts = [self._build_session_from_older_state()]
             sessions_changed = True
 
         if sessions_changed:
-            self.sessions = normalized_sessions
+            self.sessions = normalized_dicts
 
         if migrate_from_older_state:
             self._clear_older_state_runtime_fields()
             self.save()
 
     def _get_active_session(self):
-        """Return the normalized active learner session."""
+        """Return the active learner session."""
         self._ensure_sessions_initialized()
-        sessions = list(self.sessions or [])
-        active_session = self._normalize_session(sessions[-1])
-        if active_session != sessions[-1]:
-            self._set_active_session(active_session)
-        return active_session
+        return list(self.sessions)[-1]
 
     def _set_active_session(self, session):
-        """Replace the active learner session for reliable persistence."""
-        normalized_session = self._normalize_session(session)
+        """Replace the active learner session, validating at write time."""
+        validated = CoachingSession(**(session or {})).model_dump()
         sessions = list(self.sessions or [])
         if sessions:
-            sessions[-1] = normalized_session
+            sessions[-1] = validated
         else:
-            sessions = [normalized_session]
+            sessions = [validated]
         self.sessions = sessions
-        return normalized_session
+        return validated
 
     def _start_new_session(self):
         """Append and return a fresh active learner session."""
         sessions = list(self.sessions or [])
-        sessions.append(self._empty_session())
+        sessions.append(_EMPTY_SESSION.copy())
         self.sessions = sessions
         return sessions[-1]
 
     def _session_has_meaningful_data(self, session):
         """Return whether a session contains learner progress worth preserving."""
-        session = self._normalize_session(session)
-        return any([
-            bool(session["workspace_history"]),
-            bool(session["coach_history"]),
-            bool(session["evaluation_fragments"]),
-            bool(session["final_submission"]),
-            bool(session["final_evaluation_markdown"]),
-            session["attempts_used"] > 0,
-        ])
+        return session != _EMPTY_SESSION
 
     def _ensure_histories(self):
         """
@@ -740,7 +728,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Persist a conversation fragment into the appropriate history list.
         """
-        session = self._normalize_session(session or self._ensure_histories())
+        session = session or self._ensure_histories()
         fragment = {
             "character_index": character_index,
             "user_message": user_message,
@@ -1168,7 +1156,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         if self._session_has_meaningful_data(session):
             self._start_new_session()
         else:
-            self._set_active_session(self._empty_session())
+            self._set_active_session(_EMPTY_SESSION.copy())
         self._clear_thread_contexts(["character0", "character1", "evaluator"])
         return {
             "chat_histories": self._get_chat_histories(),

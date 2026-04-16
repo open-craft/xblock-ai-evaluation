@@ -16,133 +16,55 @@ import {
 type PaneKey = "workspace" | "coach";
 type CoachMode = "chat" | "report" | "review";
 
+const DEFAULT_ATTEMPTS: CoachingAttemptState = {
+  attempts_remaining: null,
+  attempts_used: 0,
+  can_retry: true,
+  max_attempts: 0,
+};
+
 interface PendingCoachingMessage extends CoachingMessage {
   pending?: boolean;
 }
 
 interface CharacterResponse {
-  attempts?: unknown;
-  chat_histories?: unknown;
+  attempts?: CoachingAttemptState;
+  chat_histories?: CoachingMessage[][];
   finished?: boolean;
-  message?: unknown;
+  message?: CoachingMessage;
   report_html?: string;
   evaluation_markdown?: string;
   final_submission?: string;
+  show_report_card?: boolean;
   [key: string]: unknown;
 }
 
-function normalizeCharacter(character: unknown, fallbackPane: PaneKey): CoachingCharacter {
-  if (!character || typeof character !== "object") {
-    return {
-      avatar: "",
-      name: "",
-      pane: fallbackPane,
-      role: "",
-    };
-  }
-
-  const rawCharacter = character as CoachingCharacter;
-  const pane = rawCharacter.pane === "coach" ? "coach" : fallbackPane;
-
-  return {
-    avatar: typeof rawCharacter.avatar === "string" ? rawCharacter.avatar : "",
-    name: typeof rawCharacter.name === "string" ? rawCharacter.name : "",
-    pane,
-    role: typeof rawCharacter.role === "string" ? rawCharacter.role : "",
-  };
-}
-
-function normalizeMessage(message: unknown, fallbackPane: PaneKey): PendingCoachingMessage {
-  if (!message || typeof message !== "object") {
-    return {
-      character: normalizeCharacter({}, fallbackPane),
-      content: "",
-      is_user: false,
-      pane: fallbackPane,
-    };
-  }
-
-  const rawMessage = message as CoachingMessage;
-  const pane = rawMessage.pane === "coach" ? "coach" : fallbackPane;
-
-  return {
-    character: normalizeCharacter(rawMessage.character, pane),
-    content: typeof rawMessage.content === "string" ? rawMessage.content : "",
-    is_user: Boolean(rawMessage.is_user),
-    pane,
-  };
-}
-
-function normalizeHistory(messages: unknown, fallbackPane: PaneKey): PendingCoachingMessage[] {
-  if (!Array.isArray(messages)) {
-    return [];
-  }
-
-  return messages.map((message) => normalizeMessage(message, fallbackPane));
-}
-
-function normalizeHistories(chatHistories: unknown) {
+function splitHistories(chatHistories?: CoachingMessage[][]) {
   if (!Array.isArray(chatHistories)) {
     return {
-      coach: [] as PendingCoachingMessage[],
       workspace: [] as PendingCoachingMessage[],
+      coach: [] as PendingCoachingMessage[],
     };
   }
 
   return {
-    workspace: normalizeHistory(chatHistories[0], "workspace"),
-    coach: normalizeHistory(chatHistories[1], "coach"),
+    workspace: (chatHistories[0] || []) as PendingCoachingMessage[],
+    coach: (chatHistories[1] || []) as PendingCoachingMessage[],
   };
 }
 
-function normalizeAttempts(attempts: unknown): CoachingAttemptState {
-  if (!attempts || typeof attempts !== "object") {
-    return {
-      attempts_remaining: null,
-      attempts_used: 0,
-      can_retry: true,
-      max_attempts: 0,
-    };
-  }
-
-  const rawAttempts = attempts as CoachingAttemptState;
-  const attemptsRemaining =
-    typeof rawAttempts.attempts_remaining === "number"
-      ? rawAttempts.attempts_remaining
-      : rawAttempts.attempts_remaining === null
-        ? null
-        : null;
-
-  return {
-    attempts_remaining: attemptsRemaining,
-    attempts_used:
-      typeof rawAttempts.attempts_used === "number" ? rawAttempts.attempts_used : 0,
-    can_retry:
-      typeof rawAttempts.can_retry === "boolean" ? rawAttempts.can_retry : true,
-    max_attempts:
-      typeof rawAttempts.max_attempts === "number" ? rawAttempts.max_attempts : 0,
-  };
-}
-
-function normalizeFinalReport(report: unknown): CoachingFinalReport | null {
-  if (!report || typeof report !== "object") {
-    return null;
-  }
-
-  const rawReport = report as CoachingFinalReport;
-  if (typeof rawReport.report_html !== "string" || !rawReport.report_html) {
+function toFinalReport(response: CharacterResponse): CoachingFinalReport | null {
+  if (!response.report_html) {
     return null;
   }
 
   return {
-    attempts: normalizeAttempts(rawReport.attempts),
-    evaluation_markdown:
-      typeof rawReport.evaluation_markdown === "string" ? rawReport.evaluation_markdown : "",
-    final_submission:
-      typeof rawReport.final_submission === "string" ? rawReport.final_submission : "",
-    finished: Boolean(rawReport.finished),
-    report_html: rawReport.report_html,
-    show_report_card: Boolean(rawReport.show_report_card),
+    attempts: response.attempts || DEFAULT_ATTEMPTS,
+    evaluation_markdown: response.evaluation_markdown || "",
+    final_submission: response.final_submission || "",
+    finished: Boolean(response.finished),
+    report_html: response.report_html,
+    show_report_card: Boolean(response.show_report_card),
   };
 }
 
@@ -267,7 +189,7 @@ function MessageAvatar({
 const ChatMessage = React.memo(function ChatMessage({ message }: { message: PendingCoachingMessage }) {
   const pane = message.pane === "coach" ? "coach" : "workspace";
   const isUser = Boolean(message.is_user);
-  const character = normalizeCharacter(message.character, pane);
+  const character = message.character;
   const className = `coach-message coach-message--pane-${pane} ${isUser ? "coach-message--user" : "coach-message--ai"}${message.pending ? " coach-message--pending" : ""}`;
 
   return (
@@ -346,14 +268,13 @@ export default function CoachingStudentApp({
 }) {
   const intl = useIntl();
   const initialHistories = useMemo(() => {
-    return normalizeHistories(payload.initial_state.chat_histories);
+    return splitHistories(payload.initial_state.chat_histories);
   }, [payload.initial_state.chat_histories]);
-  const initialAttempts = useMemo(() => {
-    return normalizeAttempts(payload.initial_state.attempts);
-  }, [payload.initial_state.attempts]);
-  const initialFinalReport = useMemo(() => {
-    return normalizeFinalReport(payload.initial_state.final_report);
-  }, [payload.initial_state.final_report]);
+  const initialAttempts = useMemo(
+    () => payload.initial_state.attempts || DEFAULT_ATTEMPTS,
+    [payload.initial_state.attempts],
+  );
+  const initialFinalReport = payload.initial_state.final_report || null;
   const [histories, setHistories] = useState(initialHistories);
   const [attempts, setAttempts] = useState(
     initialFinalReport?.attempts ? initialFinalReport.attempts : initialAttempts,
@@ -382,16 +303,12 @@ export default function CoachingStudentApp({
   const titles = meta.titles || {};
   const allowReset = Boolean(meta.allow_reset);
   const initialWorkspaceMessage =
-    meta.initial_message &&
-    typeof meta.initial_message.content === "string" &&
-    meta.initial_message.content
-      ? normalizeMessage(meta.initial_message, "workspace")
+    meta.initial_message && meta.initial_message.content
+      ? meta.initial_message
       : null;
   const initialCoachMessage =
-    meta.coach_initial_message &&
-    typeof meta.coach_initial_message.content === "string" &&
-    meta.coach_initial_message.content
-      ? normalizeMessage(meta.coach_initial_message, "coach")
+    meta.coach_initial_message && meta.coach_initial_message.content
+      ? meta.coach_initial_message
       : null;
   const displayedWorkspaceMessages = initialWorkspaceMessage
     ? [initialWorkspaceMessage].concat(histories.workspace)
@@ -532,12 +449,11 @@ export default function CoachingStudentApp({
     });
   }
 
-  function appendMessage(pane: PaneKey, message: unknown) {
-    const normalizedMessage = normalizeMessage(message, pane);
+  function appendMessage(pane: PaneKey, message: CoachingMessage) {
     setHistories((currentHistories) => {
       return {
         ...currentHistories,
-        [pane]: currentHistories[pane].concat(normalizedMessage),
+        [pane]: currentHistories[pane].concat(message),
       };
     });
   }
@@ -554,7 +470,7 @@ export default function CoachingStudentApp({
 
   function applyResponseState(response: CharacterResponse) {
     if (response.attempts) {
-      setAttempts(normalizeAttempts(response.attempts));
+      setAttempts(response.attempts);
     }
 
     if (typeof response.finished !== "undefined") {
@@ -567,8 +483,8 @@ export default function CoachingStudentApp({
     setPaneBusy(pane, false);
     applyResponseState(response);
 
-    if (typeof response.report_html === "string" && response.report_html) {
-      const nextReport = normalizeFinalReport(response);
+    if (response.report_html) {
+      const nextReport = toFinalReport(response);
       setReport(nextReport);
       setMode("report");
       setPaneStatus(
@@ -582,17 +498,16 @@ export default function CoachingStudentApp({
     }
 
     if (response.message) {
-      const normalizedMessage = normalizeMessage(response.message, pane);
-      appendMessage(pane, normalizedMessage);
+      appendMessage(pane, response.message);
       setPaneStatus(
         pane,
-        normalizedMessage.character?.name
+        response.message.character?.name
           ? intl.formatMessage(
               {
                 id: "coaching.student.newMessageFromName",
                 defaultMessage: "New message from {name}",
               },
-              { name: normalizedMessage.character?.name || "" },
+              { name: response.message.character?.name || "" },
             )
           : intl.formatMessage({
               id: "coaching.student.newMessage",
@@ -696,7 +611,7 @@ export default function CoachingStudentApp({
       setEvaluationPending(false);
       setPaneBusy("workspace", false);
       applyResponseState(response);
-      const nextReport = normalizeFinalReport(response);
+      const nextReport = toFinalReport(response);
       if (nextReport) {
         setReport(nextReport);
         setMode("report");
@@ -746,9 +661,9 @@ export default function CoachingStudentApp({
 
     try {
       const response = await postJson<CharacterResponse>(payload.handler_urls.reset_all, {});
-      const nextHistories = normalizeHistories(response.chat_histories);
+      const nextHistories = splitHistories(response.chat_histories);
       setHistories(nextHistories);
-      setAttempts(normalizeAttempts(response.attempts));
+      setAttempts(response.attempts || initialAttempts);
       setFinished(Boolean(response.finished));
       setMode("chat");
       setReport(null);
@@ -937,7 +852,7 @@ export default function CoachingStudentApp({
           ) : null}
         </section>
 
-        <aside
+        {!reportMode ? <aside
           className="coach-pane coach-pane--coach"
           aria-label={intl.formatMessage({
             id: "coaching.student.coachLabel",
@@ -1033,7 +948,7 @@ export default function CoachingStudentApp({
               <Icon src={PlayCircleFilled} className="coach-send-icon" />
             </button>
           </div>
-        </aside>
+        </aside> : null}
       </div>
 
       <div className="coach-actions">

@@ -4,10 +4,7 @@ import { Spinner, useArrowKeyNavigation } from "@openedx/paragon";
 
 import { postJson, RequestError } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
-import {
-  CodingExecutionResult,
-  CodingStudentPayload,
-} from "./types";
+import { CodingStudentPayload } from "./types";
 
 const HTML_CSS = "HTML/CSS";
 const HTML_PLACEHOLDER =
@@ -68,18 +65,6 @@ function stripScriptTags(html: string) {
   }
 
   return container.innerHTML;
-}
-
-function normalizeExecutionResult(value: unknown): CodingExecutionResult {
-  if (!value || typeof value !== "object") {
-    return { stderr: "", stdout: "" };
-  }
-
-  const rawResult = value as CodingExecutionResult;
-  return {
-    stdout: typeof rawResult.stdout === "string" ? rawResult.stdout : "",
-    stderr: typeof rawResult.stderr === "string" ? rawResult.stderr : "",
-  };
 }
 
 function getRequestErrorMessage(error: unknown, fallbackMessage: string) {
@@ -397,12 +382,9 @@ export default function CodingStudentApp({
   const editorRef = useRef<MonacoEditorAdapter | null>(null);
   const editorPreviewCleanupRef = useRef<(() => void) | null>(null);
   const initializedEditorRef = useRef(false);
-  const initialCode = typeof payload.initial_state.code === "string" ? payload.initial_state.code : "";
-  const initialFeedback =
-    typeof payload.initial_state.ai_evaluation === "string"
-      ? payload.initial_state.ai_evaluation
-      : "";
-  const initialExecutionResult = normalizeExecutionResult(payload.initial_state.code_exec_result);
+  const initialCode = payload.initial_state.code || "";
+  const initialFeedback = payload.initial_state.ai_evaluation || "";
+  const initialExecutionResult = payload.initial_state.code_exec_result || { stderr: "", stdout: "" };
   const questionHtml = useMemo(() => renderMarkdown(payload.meta.question), [payload.meta.question]);
   const [feedbackMarkdown, setFeedbackMarkdown] = useState(initialFeedback);
   const feedbackHtml = useMemo(() => renderMarkdown(feedbackMarkdown), [feedbackMarkdown]);
@@ -420,7 +402,7 @@ export default function CodingStudentApp({
   const outputPanelId = "coding-output-panel-" + usageId;
   const instructionsId = "coding-instructions-" + usageId;
   const resultPanelId = "coding-results-" + usageId;
-  const language = typeof payload.meta.language === "string" ? payload.meta.language : "";
+  const language = payload.meta.language;
 
   useEffect(() => {
     return () => {
