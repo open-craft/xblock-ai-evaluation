@@ -304,8 +304,8 @@ export default function ShortAnswerStudentApp({
     };
   }, [payload.meta.character_image, questionHtml]);
 
-  function submitAnswer() {
-    if (!canSubmit || !payload.handler_urls.get_response) {
+  async function submitAnswer() {
+    if (!canSubmit) {
       return;
     }
 
@@ -325,50 +325,49 @@ export default function ShortAnswerStudentApp({
       }),
     );
 
-    postJson<ShortAnswerResponse>(payload.handler_urls.get_response, {
-      user_input: userInput,
-    })
-      .then((response) => {
-        setMessages(
-          nextMessages.concat({
-            source: "llm",
-            content: response.response || "",
-          }),
-        );
-        setPending(false);
-        setStatusMessage(
-          intl.formatMessage({
-            id: "shortanswer.student.responseReady",
-            defaultMessage: "Assistant response ready.",
-          }),
-        );
-
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-        }
-      })
-      .catch((error: unknown) => {
-        const fallbackError = intl.formatMessage({
-          id: "shortanswer.student.requestErrorAlert",
-          defaultMessage: "An error has occurred.",
-        });
-
-        setMessages(messages);
-        setDraft(userInput);
-        setPending(false);
-        setStatusMessage(
-          intl.formatMessage({
-            id: "shortanswer.student.requestErrorStatus",
-            defaultMessage: "Unable to process your message. Please try again.",
-          }),
-        );
-
-        window.alert(getErrorMessage(error, fallbackError));
+    try {
+      const response = await postJson<ShortAnswerResponse>(payload.handler_urls.get_response, {
+        user_input: userInput,
       });
+      setMessages(
+        nextMessages.concat({
+          source: "llm",
+          content: response.response || "",
+        }),
+      );
+      setPending(false);
+      setStatusMessage(
+        intl.formatMessage({
+          id: "shortanswer.student.responseReady",
+          defaultMessage: "Assistant response ready.",
+        }),
+      );
+
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    } catch (error: unknown) {
+      const fallbackError = intl.formatMessage({
+        id: "shortanswer.student.requestErrorAlert",
+        defaultMessage: "An error has occurred.",
+      });
+
+      setMessages(messages);
+      setDraft(userInput);
+      setPending(false);
+      setStatusMessage(
+        intl.formatMessage({
+          id: "shortanswer.student.requestErrorStatus",
+          defaultMessage: "Unable to process your message. Please try again.",
+        }),
+      );
+
+      window.alert(getErrorMessage(error, fallbackError));
+    }
   }
 
-  function resetConversation() {
-    if (!canReset || !payload.handler_urls.reset) {
+  async function resetConversation() {
+    if (!canReset) {
       return;
     }
 
@@ -380,37 +379,36 @@ export default function ShortAnswerStudentApp({
       }),
     );
 
-    postJson(payload.handler_urls.reset, {})
-      .then(() => {
-        setMessages([]);
-        setPending(false);
-        setStatusMessage(
-          intl.formatMessage({
-            id: "shortanswer.student.resetDone",
-            defaultMessage: "Chat reset. Start typing a new response.",
-          }),
-        );
+    try {
+      await postJson(payload.handler_urls.reset, {});
+      setMessages([]);
+      setPending(false);
+      setStatusMessage(
+        intl.formatMessage({
+          id: "shortanswer.student.resetDone",
+          defaultMessage: "Chat reset. Start typing a new response.",
+        }),
+      );
 
-        if (textareaRef.current) {
-          textareaRef.current.focus();
-        }
-      })
-      .catch((error: unknown) => {
-        const fallbackError = intl.formatMessage({
-          id: "shortanswer.student.requestErrorAlert",
-          defaultMessage: "An error has occurred.",
-        });
-
-        setPending(false);
-        setStatusMessage(
-          intl.formatMessage({
-            id: "shortanswer.student.resetErrorStatus",
-            defaultMessage: "Unable to reset the chat. Please try again.",
-          }),
-        );
-
-        window.alert(getErrorMessage(error, fallbackError));
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    } catch (error: unknown) {
+      const fallbackError = intl.formatMessage({
+        id: "shortanswer.student.requestErrorAlert",
+        defaultMessage: "An error has occurred.",
       });
+
+      setPending(false);
+      setStatusMessage(
+        intl.formatMessage({
+          id: "shortanswer.student.resetErrorStatus",
+          defaultMessage: "Unable to reset the chat. Please try again.",
+        }),
+      );
+
+      window.alert(getErrorMessage(error, fallbackError));
+    }
   }
 
   return (

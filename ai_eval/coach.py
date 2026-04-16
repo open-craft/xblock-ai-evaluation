@@ -367,17 +367,17 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def studio_view(self, context=None):
         """Render the React Studio editor for Coaching."""
         fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
-        fragment.add_css_url(self._static_url("static/bundles/shared.css"))
+        fragment.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
         fragment.add_css(self.resource_string("static/css/coach_studio.css"))
-        fragment.add_javascript_url(self._static_url("static/bundles/coaching.studio.js"))
+        fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.studio.js"))
         fragment.initialize_js(
             "CoachAIEvalXBlockStudio",
             self._build_view_payload(
                 view="studio",
                 handler_urls={
-                    "studio_submit": self._handler_url("studio_submit"),
+                    "studio_submit": self.runtime.handler_url(self, "studio_submit"),
                 },
                 initial_state=self._studio_initial_state(),
                 meta=self._studio_payload_meta(),
@@ -958,15 +958,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         active_session = self._get_active_session()
         characters = list(map(self._get_character_data, range(2)))
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
-        frag.add_css_url(self._static_url("static/bundles/shared.css"))
+        frag.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
-        frag.add_javascript_url(self._static_url("static/bundles/coaching.js"))
+        frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.js"))
         js_data = self._build_view_payload(
             view="student",
             handler_urls={
-                "get_character_response": self._handler_url("get_character_response"),
-                "get_evaluator_response": self._handler_url("get_evaluator_response"),
-                "reset_all": self._handler_url("reset_all"),
+                "get_character_response": self.runtime.handler_url(self, "get_character_response"),
+                "get_evaluator_response": self.runtime.handler_url(self, "get_evaluator_response"),
+                "reset_all": self.runtime.handler_url(self, "reset_all"),
             },
             initial_state={
                 "chat_histories": self._get_chat_histories(),

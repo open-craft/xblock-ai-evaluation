@@ -181,15 +181,15 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         """
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
 
-        frag.add_css_url(self._static_url("static/bundles/shared.css"))
+        frag.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
-        frag.add_javascript_url(self._static_url("static/bundles/shortanswer.js"))
+        frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.js"))
 
         js_data = self._build_view_payload(
             view="student",
             handler_urls={
-                "get_response": self._handler_url("get_response"),
-                "reset": self._handler_url("reset"),
+                "get_response": self.runtime.handler_url(self, "get_response"),
+                "reset": self.runtime.handler_url(self, "reset"),
             },
             initial_state={
                 "messages": list(self.sessions[-1]),
@@ -209,16 +209,16 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         Render the Studio editor for Short Answer.
         """
         fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
-        fragment.add_css_url(self._static_url("static/bundles/shared.css"))
+        fragment.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
         fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
-        fragment.add_javascript_url(self._static_url("static/bundles/shortanswer.studio.js"))
+        fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.studio.js"))
         fragment.initialize_js(
             "ShortAnswerAIEvalXBlockStudio",
             self._build_view_payload(
                 view="studio",
                 handler_urls={
-                    "studio_submit": self._handler_url("studio_submit"),
+                    "studio_submit": self.runtime.handler_url(self, "studio_submit"),
                 },
                 initial_state=self._studio_initial_state(),
                 meta=self._studio_payload_meta(),

@@ -20,18 +20,17 @@ export class RequestError extends Error {
   }
 }
 
-function parseResponseBody(response: Response): Promise<ResponsePayload> {
-  return response.text().then((text) => {
-    if (!text) {
-      return {};
-    }
+async function parseResponseBody(response: Response): Promise<ResponsePayload> {
+  const text = await response.text();
+  if (!text) {
+    return {};
+  }
 
-    try {
-      return JSON.parse(text) as UnknownRecord;
-    } catch (error) {
-      return { raw: text };
-    }
-  });
+  try {
+    return JSON.parse(text) as UnknownRecord;
+  } catch (error) {
+    return { raw: text };
+  }
 }
 
 function getErrorMessage(response: Response, payload: ResponsePayload) {
@@ -51,7 +50,7 @@ function getErrorMessage(response: Response, payload: ResponsePayload) {
 }
 
 function getCookie(name: string) {
-  if (typeof document === "undefined" || !document.cookie) {
+  if (!document.cookie) {
     return null;
   }
 
@@ -68,9 +67,9 @@ function getCookie(name: string) {
   return null;
 }
 
-export function postJson<TResponse extends UnknownRecord = UnknownRecord>(
+export async function postJson<TResponse extends UnknownRecord = UnknownRecord>(
   url: string,
-  payload?: unknown,
+  payload: unknown = {},
 ): Promise<TResponse> {
   const csrfToken = getCookie("csrftoken");
   const headers: Record<string, string> = {
@@ -81,18 +80,17 @@ export function postJson<TResponse extends UnknownRecord = UnknownRecord>(
     headers["X-CSRFToken"] = csrfToken;
   }
 
-  return fetch(url, {
+  const response = await fetch(url, {
     method: "POST",
     credentials: "same-origin",
     headers,
-    body: JSON.stringify(payload || {}),
-  }).then((response) => {
-    return parseResponseBody(response).then((body) => {
-      if (!response.ok) {
-        throw new RequestError(getErrorMessage(response, body), response.status, body);
-      }
-
-      return body as TResponse;
-    });
+    body: JSON.stringify(payload),
   });
+  const body = await parseResponseBody(response);
+
+  if (!response.ok) {
+    throw new RequestError(getErrorMessage(response, body), response.status, body);
+  }
+
+  return body as TResponse;
 }

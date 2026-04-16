@@ -13,7 +13,7 @@ function normalizePayload(
   const payloadData = (data || {}) as StudioPayloadInput;
 
   return {
-    view: payloadData.view || "studio",
+    view: "studio",
     handler_urls: payloadData.handler_urls || {
       studio_submit: runtime.handlerUrl(element, "studio_submit"),
     },

@@ -1,10 +1,10 @@
 import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface CodingStudentHandlerUrls {
-  get_response?: string;
-  get_submission_result_handler?: string;
-  reset_handler?: string;
-  submit_code_handler?: string;
+  get_response: string;
+  get_submission_result_handler: string;
+  reset_handler: string;
+  submit_code_handler: string;
 }
 
 export interface CodingExecutionResult {
@@ -15,7 +15,7 @@ export interface CodingExecutionResult {
 export interface CodingStudentInitialState {
   ai_evaluation?: unknown;
   code?: string;
-  code_exec_result?: CodingExecutionResult;
+  code_exec_result: CodingExecutionResult | null;
 }
 
 export interface CodingStudentMeta {
@@ -50,7 +50,7 @@ export interface CodingStudioState {
 }
 
 export interface CodingStudioHandlerUrls {
-  studio_submit?: string;
+  studio_submit: string;
 }
 
 export interface CodingStudioMeta {

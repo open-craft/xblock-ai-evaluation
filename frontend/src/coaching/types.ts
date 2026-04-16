@@ -31,9 +31,9 @@ export interface CoachingFinalReport {
 }
 
 export interface CoachingStudentHandlerUrls {
-  get_character_response?: string;
-  get_evaluator_response?: string;
-  reset_all?: string;
+  get_character_response: string;
+  get_evaluator_response: string;
+  reset_all: string;
 }
 
 export interface CoachingStudentInitialState {
@@ -104,7 +104,7 @@ export interface CoachingStudioState {
 }
 
 export interface CoachingStudioHandlerUrls {
-  studio_submit?: string;
+  studio_submit: string;
 }
 
 export interface CoachingStudioMeta {

@@ -19,13 +19,13 @@ function normalizePayload(
   const payloadData = (data || {}) as ShortAnswerPayloadInput;
 
   return {
-    view: payloadData.view || "student",
+    view: "student",
     handler_urls: payloadData.handler_urls || {
       get_response: runtime.handlerUrl(element, "get_response"),
       reset: runtime.handlerUrl(element, "reset"),
     },
     initial_state: payloadData.initial_state || {
-      messages: payloadData.messages as ShortAnswerMessage[] | undefined,
+      messages: (payloadData.messages as ShortAnswerMessage[]) || null,
     },
     meta: payloadData.meta || {
       allow_reset: Boolean(payloadData.allow_reset),

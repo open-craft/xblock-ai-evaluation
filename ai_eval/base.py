@@ -478,18 +478,6 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             "meta": meta,
         }
 
-    def _handler_url(self, handler_name: str) -> str:
-        """
-        Build a handler URL for view payloads.
-        """
-        return self.runtime.handler_url(self, handler_name)
-
-    def _static_url(self, path: str) -> str:
-        """
-        Return a cacheable URL for a static resource.
-        """
-        return self.runtime.local_resource_url(self, path)
-
     @staticmethod
     def _studio_submit_response(
         success: bool,
@@ -513,7 +501,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         fragment = super().studio_view(context)
         fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
-        fragment.add_javascript_url(self._static_url("static/js/src/studio_api_key_lock.js"))
+        fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/js/src/studio_api_key_lock.js"))
         fragment.initialize_js("AIEvalStudioEditor", self._studio_lock_metadata())
         return fragment
 

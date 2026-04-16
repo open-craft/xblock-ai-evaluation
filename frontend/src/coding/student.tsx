@@ -21,11 +21,11 @@ function normalizePayload(
   const fallbackInitialState: CodingStudentPayload["initial_state"] = {
     code: payloadData.code,
     ai_evaluation: payloadData.ai_evaluation,
-    code_exec_result: payloadData.code_exec_result as CodingExecutionResult | undefined,
+    code_exec_result: (payloadData.code_exec_result as CodingExecutionResult) || null,
   };
 
   return {
-    view: payloadData.view || "student",
+    view: "student",
     handler_urls: payloadData.handler_urls || {
       submit_code_handler: runtime.handlerUrl(element, "submit_code_handler"),
       get_submission_result_handler: runtime.handlerUrl(

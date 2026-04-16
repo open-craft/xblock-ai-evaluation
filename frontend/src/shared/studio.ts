@@ -31,10 +31,9 @@ export function normalizeStudioSaveResponse(response: unknown): StudioSaveRespon
   };
 }
 
-export function submitStudioPayload(url: string, payload: unknown) {
-  return postJson<PartialStudioSaveResponse>(url, payload).then((response) => {
-    return normalizeStudioSaveResponse(response);
-  });
+export async function submitStudioPayload(url: string, payload: unknown) {
+  const response = await postJson<PartialStudioSaveResponse>(url, payload);
+  return normalizeStudioSaveResponse(response);
 }
 
 export function hasStudioValidationIssues(response: unknown) {

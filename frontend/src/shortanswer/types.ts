@@ -6,12 +6,12 @@ export interface ShortAnswerMessage {
 }
 
 export interface ShortAnswerStudentHandlerUrls {
-  get_response?: string;
-  reset?: string;
+  get_response: string;
+  reset: string;
 }
 
 export interface ShortAnswerStudentInitialState {
-  messages?: ShortAnswerMessage[];
+  messages: ShortAnswerMessage[] | null;
 }
 
 export interface ShortAnswerStudentMeta {
@@ -48,7 +48,7 @@ export interface ShortAnswerStudioState {
 }
 
 export interface ShortAnswerStudioHandlerUrls {
-  studio_submit?: string;
+  studio_submit: string;
 }
 
 export interface ShortAnswerStudioMeta {

@@ -602,7 +602,7 @@ export default function CoachingStudentApp({
     }
   }
 
-  function sendMessage(pane: PaneKey) {
+  async function sendMessage(pane: PaneKey) {
     const handlerUrl = payload.handler_urls.get_character_response;
     const paneIndex = pane === "workspace" ? 0 : 1;
     const draft = pane === "workspace" ? workspaceDraft : coachDraft;
@@ -658,29 +658,26 @@ export default function CoachingStudentApp({
       }),
     );
 
-    postJson<CharacterResponse>(handlerUrl, {
-      character_index: paneIndex,
-      user_input: trimmedDraft,
-    })
-      .then((response) => {
-        handleChatResponse(pane, response, trimmedDraft);
-      })
-      .catch(() => {
-        removePendingMessage(pane, trimmedDraft);
-        setPaneBusy(pane, false);
-        if (pane === "workspace") {
-          setWorkspaceDraft(trimmedDraft);
-        } else {
-          setCoachDraft(trimmedDraft);
-        }
-        showGenericError(pane);
+    try {
+      const response = await postJson<CharacterResponse>(handlerUrl, {
+        character_index: paneIndex,
+        user_input: trimmedDraft,
       });
+      handleChatResponse(pane, response, trimmedDraft);
+    } catch {
+      removePendingMessage(pane, trimmedDraft);
+      setPaneBusy(pane, false);
+      if (pane === "workspace") {
+        setWorkspaceDraft(trimmedDraft);
+      } else {
+        setCoachDraft(trimmedDraft);
+      }
+      showGenericError(pane);
+    }
   }
 
-  function submitForEvaluation() {
-    const handlerUrl = payload.handler_urls.get_evaluator_response;
-
-    if (!handlerUrl || mode !== "chat" || finished || evaluationPending || busyByPane.workspace) {
+  async function submitForEvaluation() {
+    if (mode !== "chat" || finished || evaluationPending || busyByPane.workspace) {
       return;
     }
 
@@ -694,47 +691,44 @@ export default function CoachingStudentApp({
       }),
     );
 
-    postJson<CharacterResponse>(handlerUrl, {})
-      .then((response) => {
-        setEvaluationPending(false);
-        setPaneBusy("workspace", false);
-        applyResponseState(response);
-        const nextReport = normalizeFinalReport(response);
-        if (nextReport) {
-          setReport(nextReport);
-          setMode("report");
-          setPaneStatus(
-            "workspace",
-            intl.formatMessage({
-              id: "coaching.student.evaluationReady",
-              defaultMessage: "Evaluation ready.",
-            }),
-          );
-        }
-      })
-      .catch(() => {
-        setEvaluationPending(false);
-        setPaneBusy("workspace", false);
+    try {
+      const response = await postJson<CharacterResponse>(payload.handler_urls.get_evaluator_response, {});
+      setEvaluationPending(false);
+      setPaneBusy("workspace", false);
+      applyResponseState(response);
+      const nextReport = normalizeFinalReport(response);
+      if (nextReport) {
+        setReport(nextReport);
+        setMode("report");
         setPaneStatus(
           "workspace",
           intl.formatMessage({
-            id: "coaching.student.submitErrorStatus",
-            defaultMessage: "Unable to submit for evaluation.",
+            id: "coaching.student.evaluationReady",
+            defaultMessage: "Evaluation ready.",
           }),
         );
-        window.alert(
-          intl.formatMessage({
-            id: "coaching.student.genericError",
-            defaultMessage: "An error has occurred.",
-          }),
-        );
-      });
+      }
+    } catch {
+      setEvaluationPending(false);
+      setPaneBusy("workspace", false);
+      setPaneStatus(
+        "workspace",
+        intl.formatMessage({
+          id: "coaching.student.submitErrorStatus",
+          defaultMessage: "Unable to submit for evaluation.",
+        }),
+      );
+      window.alert(
+        intl.formatMessage({
+          id: "coaching.student.genericError",
+          defaultMessage: "An error has occurred.",
+        }),
+      );
+    }
   }
 
-  function resetAllConversations() {
-    const handlerUrl = payload.handler_urls.reset_all;
-
-    if (!handlerUrl || busyByPane.workspace || busyByPane.coach) {
+  async function resetAllConversations() {
+    if (busyByPane.workspace || busyByPane.coach) {
       return;
     }
 
@@ -750,47 +744,46 @@ export default function CoachingStudentApp({
       }),
     );
 
-    postJson<CharacterResponse>(handlerUrl, {})
-      .then((response) => {
-        const nextHistories = normalizeHistories(response.chat_histories);
-        setHistories(nextHistories);
-        setAttempts(normalizeAttempts(response.attempts));
-        setFinished(Boolean(response.finished));
-        setMode("chat");
-        setReport(null);
-        setWorkspaceDraft("");
-        setCoachDraft("");
-        setBusyByPane({
-          coach: false,
-          workspace: false,
-        });
-        setPaneStatus(
-          "workspace",
-          intl.formatMessage({
-            id: "coaching.student.resetDone",
-            defaultMessage: "Conversation reset.",
-          }),
-        );
-      })
-      .catch(() => {
-        setBusyByPane({
-          coach: false,
-          workspace: false,
-        });
-        setPaneStatus(
-          "workspace",
-          intl.formatMessage({
-            id: "coaching.student.resetErrorStatus",
-            defaultMessage: "Unable to reset conversation.",
-          }),
-        );
-        window.alert(
-          intl.formatMessage({
-            id: "coaching.student.genericError",
-            defaultMessage: "An error has occurred.",
-          }),
-        );
+    try {
+      const response = await postJson<CharacterResponse>(payload.handler_urls.reset_all, {});
+      const nextHistories = normalizeHistories(response.chat_histories);
+      setHistories(nextHistories);
+      setAttempts(normalizeAttempts(response.attempts));
+      setFinished(Boolean(response.finished));
+      setMode("chat");
+      setReport(null);
+      setWorkspaceDraft("");
+      setCoachDraft("");
+      setBusyByPane({
+        coach: false,
+        workspace: false,
       });
+      setPaneStatus(
+        "workspace",
+        intl.formatMessage({
+          id: "coaching.student.resetDone",
+          defaultMessage: "Conversation reset.",
+        }),
+      );
+    } catch {
+      setBusyByPane({
+        coach: false,
+        workspace: false,
+      });
+      setPaneStatus(
+        "workspace",
+        intl.formatMessage({
+          id: "coaching.student.resetErrorStatus",
+          defaultMessage: "Unable to reset conversation.",
+        }),
+      );
+      window.alert(
+        intl.formatMessage({
+          id: "coaching.student.genericError",
+          defaultMessage: "An error has occurred.",
+        }),
+      );
+    }
   }
 
   function renderAttemptsLabel() {

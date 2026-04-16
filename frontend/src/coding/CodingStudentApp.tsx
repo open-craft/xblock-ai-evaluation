@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
-import { Spinner } from "@openedx/paragon";
+import { Spinner, useArrowKeyNavigation } from "@openedx/paragon";
 
 import { postJson, RequestError } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
@@ -299,39 +299,14 @@ function ResultsPanel({
   stdout: string;
 }) {
   const intl = useIntl();
-  const tabOrder: Array<"output" | "feedback"> = ["output", "feedback"];
-
-  function moveFocus(currentTab: "output" | "feedback", key: string) {
-    const currentIndex = tabOrder.indexOf(currentTab);
-    let nextIndex = currentIndex;
-
-    switch (key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        nextIndex = (currentIndex + 1) % tabOrder.length;
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        nextIndex = (currentIndex - 1 + tabOrder.length) % tabOrder.length;
-        break;
-      case "Home":
-        nextIndex = 0;
-        break;
-      case "End":
-        nextIndex = tabOrder.length - 1;
-        break;
-      default:
-        return;
-    }
-
-    onActivateTab(tabOrder[nextIndex], true);
-  }
+  const tablistRef = useArrowKeyNavigation({ selectors: "button" });
 
   return (
     <div className="result" id={resultPanelId} aria-live="polite" aria-busy={pending ? "true" : undefined}>
       <div
         className="tab"
         role="tablist"
+        ref={tablistRef as React.Ref<HTMLDivElement>}
         aria-label={intl.formatMessage({
           id: "coding.student.tabListLabel",
           defaultMessage: "Code evaluation panels",
@@ -348,19 +323,6 @@ function ResultsPanel({
           tabIndex={activeTab === "output" ? 0 : -1}
           onClick={() => {
             onActivateTab("output", true);
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === "ArrowRight" ||
-              event.key === "ArrowDown" ||
-              event.key === "ArrowLeft" ||
-              event.key === "ArrowUp" ||
-              event.key === "Home" ||
-              event.key === "End"
-            ) {
-              event.preventDefault();
-            }
-            moveFocus("output", event.key);
           }}
         >
           {intl.formatMessage({
@@ -385,19 +347,6 @@ function ResultsPanel({
           tabIndex={activeTab === "feedback" ? 0 : -1}
           onClick={() => {
             onActivateTab("feedback", true);
-          }}
-          onKeyDown={(event) => {
-            if (
-              event.key === "ArrowRight" ||
-              event.key === "ArrowDown" ||
-              event.key === "ArrowLeft" ||
-              event.key === "ArrowUp" ||
-              event.key === "Home" ||
-              event.key === "End"
-            ) {
-              event.preventDefault();
-            }
-            moveFocus("feedback", event.key);
           }}
         >
           {intl.formatMessage({
@@ -538,15 +487,6 @@ export default function CodingStudentApp({
   }
 
   async function getSubmissionResult(submissionId: string) {
-    if (!payload.handler_urls.get_submission_result_handler) {
-      throw new Error(
-        intl.formatMessage({
-          id: "coding.student.missingSubmissionHandler",
-          defaultMessage: "Submission result handler is not available.",
-        }),
-      );
-    }
-
     let retries = 0;
 
     while (true) {
@@ -561,9 +501,7 @@ export default function CodingStudentApp({
       if (statusId === 1 || statusId === 2) {
         if (retries >= MAX_JUDGE0_RETRY_ITER) {
           throw new Error(
-            "Judge0 submission result fetch failed after " +
-              String(MAX_JUDGE0_RETRY_ITER) +
-              " attempts.",
+            `Judge0 submission result fetch failed after ${MAX_JUDGE0_RETRY_ITER} attempts.`,
           );
         }
         retries += 1;
@@ -579,15 +517,6 @@ export default function CodingStudentApp({
   }
 
   async function getAiFeedback(result: { stderr?: string; stdout?: string }) {
-    if (!payload.handler_urls.get_response) {
-      throw new Error(
-        intl.formatMessage({
-          id: "coding.student.missingFeedbackHandler",
-          defaultMessage: "AI feedback handler is not available.",
-        }),
-      );
-    }
-
     const response = await postJson<CodingFeedbackResponse>(payload.handler_urls.get_response, {
       code: editorRef.current?.getValue() || "",
       stdout: result.stdout || "",
@@ -647,15 +576,6 @@ export default function CodingStudentApp({
         );
         await getAiFeedback({ stdout: "", stderr: "" });
       } else {
-        if (!payload.handler_urls.submit_code_handler) {
-          throw new Error(
-            intl.formatMessage({
-              id: "coding.student.missingSubmitHandler",
-              defaultMessage: "Code submission handler is not available.",
-            }),
-          );
-        }
-
         const submission = await postJson<Judge0SubmissionResponse>(
           payload.handler_urls.submit_code_handler,
           {
@@ -703,7 +623,7 @@ export default function CodingStudentApp({
   }
 
   async function handleReset() {
-    if (pending || !payload.handler_urls.reset_handler) {
+    if (pending) {
       return;
     }
 

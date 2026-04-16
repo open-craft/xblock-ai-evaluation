@@ -40,7 +40,7 @@ function normalizePayload(
   };
 
   return {
-    view: payloadData.view || "student",
+    view: "student",
     handler_urls: payloadData.handler_urls || {
       get_character_response: runtime.handlerUrl(element, "get_character_response"),
       get_evaluator_response: runtime.handlerUrl(element, "get_evaluator_response"),

@@ -100,7 +100,7 @@ class DataExportXBlock(XBlock):
 
         html = loader.render_django_template('templates/export.html')
         frag = Fragment(html)
-        frag.add_javascript_url(self._static_url("static/js/src/export.js"))
+        frag.add_javascript_url(self.runtime.local_resource_url(self, "static/js/src/export.js"))
         frag.initialize_js('DataExportXBlock')
         return frag
 
