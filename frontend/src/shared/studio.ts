@@ -1,4 +1,4 @@
-import { postJson, RequestError } from "./request";
+import { getErrorMessage, postJson, RequestError } from "./request";
 import { UnknownRecord } from "./types";
 
 export type ValidationErrors = Record<string, string[]>;
@@ -97,15 +97,7 @@ export function getSaveErrorMessage(error: unknown, fallbackMessage: string) {
     }
   }
 
-  if (error instanceof RequestError && error.message) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallbackMessage;
+  return getErrorMessage(error, fallbackMessage);
 }
 
 export function isModelApiKeyLocked(

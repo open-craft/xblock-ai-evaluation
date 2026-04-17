@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 
-import { postJson, RequestError } from "../shared/request";
+import { getErrorMessage, postJson } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { UnknownRecord } from "../shared/types";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
@@ -36,18 +36,6 @@ function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
 
   textarea.style.height = "0px";
   textarea.style.height = String(textarea.scrollHeight) + "px";
-}
-
-function getErrorMessage(error: unknown, fallbackMessage: string) {
-  if (error instanceof RequestError && error.message) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallbackMessage;
 }
 
 function QuestionPanel({

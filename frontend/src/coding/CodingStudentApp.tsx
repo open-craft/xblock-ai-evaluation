@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Spinner, useArrowKeyNavigation } from "@openedx/paragon";
 
-import { postJson, RequestError } from "../shared/request";
+import { getErrorMessage, postJson } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { CodingStudentPayload } from "./types";
 
@@ -65,18 +65,6 @@ function stripScriptTags(html: string) {
   }
 
   return container.innerHTML;
-}
-
-function getRequestErrorMessage(error: unknown, fallbackMessage: string) {
-  if (error instanceof RequestError && error.message) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallbackMessage;
 }
 
 function StatusRegion({ message }: { message: string }) {
@@ -596,7 +584,7 @@ export default function CodingStudentApp({
         id: "coding.student.submitError",
         defaultMessage: "A problem occurred while submitting the code.",
       });
-      const message = getRequestErrorMessage(error, fallbackMessage);
+      const message = getErrorMessage(error, fallbackMessage);
       setStatusMessage(message);
       window.alert(message);
     } finally {
@@ -633,7 +621,7 @@ export default function CodingStudentApp({
         // ignore focus errors
       }
     } catch (error: unknown) {
-      const message = getRequestErrorMessage(
+      const message = getErrorMessage(
         error,
         intl.formatMessage({
           id: "coding.student.resetError",

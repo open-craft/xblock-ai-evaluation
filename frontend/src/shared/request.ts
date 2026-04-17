@@ -33,7 +33,7 @@ async function parseResponseBody(response: Response): Promise<ResponsePayload> {
   }
 }
 
-function getErrorMessage(response: Response, payload: ResponsePayload) {
+function extractResponseError(response: Response, payload: ResponsePayload) {
   if ("error" in payload && typeof payload.error === "string" && payload.error) {
     return payload.error;
   }
@@ -89,8 +89,20 @@ export async function postJson<TResponse extends UnknownRecord = UnknownRecord>(
   const body = await parseResponseBody(response);
 
   if (!response.ok) {
-    throw new RequestError(getErrorMessage(response, body), response.status, body);
+    throw new RequestError(extractResponseError(response, body), response.status, body);
   }
 
   return body as TResponse;
+}
+
+export function getErrorMessage(error: unknown, fallbackMessage: string): string {
+  if (error instanceof RequestError && error.message) {
+    return error.message;
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallbackMessage;
 }
