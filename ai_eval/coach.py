@@ -966,10 +966,14 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "initial_message": {
                     "character": self._get_character_data(0),
                     "content": self.initial_message,
+                    "pane": "workspace",
+                    "is_user": False,
                 },
                 "coach_initial_message": {
                     "character": self._get_character_data(1),
                     "content": self.coach_initial_message,
+                    "pane": "coach",
+                    "is_user": False,
                 },
                 "titles": {
                     "workspace": self.workspace_title,

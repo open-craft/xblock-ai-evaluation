@@ -1,14 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 
-import { getErrorMessage, postJson } from "../shared/request";
+import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
-import { UnknownRecord } from "../shared/types";
+import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
-
-interface ShortAnswerResponse extends UnknownRecord {
-  response?: string;
-}
 
 let nextStableId = 0;
 
@@ -300,13 +296,11 @@ export default function ShortAnswerStudentApp({
     );
 
     try {
-      const response = await postJson<ShortAnswerResponse>(payload.handler_urls.get_response, {
-        user_input: userInput,
-      });
+      const llmContent = await sendAnswer(payload.handler_urls.get_response, userInput);
       setMessages(
         nextMessages.concat({
           source: "llm",
-          content: response.response || "",
+          content: llmContent,
         }),
       );
       setPending(false);
@@ -354,7 +348,7 @@ export default function ShortAnswerStudentApp({
     );
 
     try {
-      await postJson(payload.handler_urls.reset, {});
+      await resetChat(payload.handler_urls.reset);
       setMessages([]);
       setPending(false);
       setStatusMessage(

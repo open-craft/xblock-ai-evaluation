@@ -2,38 +2,21 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Spinner, useArrowKeyNavigation } from "@openedx/paragon";
 
-import { getErrorMessage, postJson } from "../shared/request";
+import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
+import {
+  fetchAiFeedback,
+  pollSubmissionResult,
+  resetCodingSession,
+  submitCode,
+  wait,
+  WAIT_TIME_MS,
+} from "./api";
 import { CodingStudentPayload } from "./types";
 
 const HTML_CSS = "HTML/CSS";
 const HTML_PLACEHOLDER =
   "<!DOCTYPE html>\n<html>\n<head>\n<style>\nbody {background: linear-gradient(90deg, #ffecd2, #fcb69f);}\nh1   {font-style: italic;}\np    {border: 2px solid powderblue;}\n</style>\n</head>\n<body>\n<h1>This is a heading</h1>\n<p>This is a paragraph.</p>\n</body>\n</html>";
-const MAX_JUDGE0_RETRY_ITER = 5;
-const WAIT_TIME_MS = 1000;
-
-interface Judge0Status {
-  id?: number;
-  [key: string]: unknown;
-}
-
-interface Judge0SubmissionResponse {
-  submission_id?: string;
-  [key: string]: unknown;
-}
-
-interface Judge0ResultResponse {
-  compile_output?: string;
-  status?: Judge0Status;
-  stderr?: string;
-  stdout?: string;
-  [key: string]: unknown;
-}
-
-interface CodingFeedbackResponse {
-  response?: string;
-  [key: string]: unknown;
-}
 
 interface MonacoEditorInstance {
   focus: () => void;
@@ -47,12 +30,6 @@ interface MonacoEditorAdapter {
   getValue: () => string;
   onDidChangeModelContent: (listener: () => void) => (() => void) | void;
   setValue: (value: string) => void;
-}
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
 }
 
 function stripScriptTags(html: string) {
@@ -456,44 +433,13 @@ export default function CodingStudentApp({
     setActiveTab("output");
   }
 
-  async function getSubmissionResult(submissionId: string) {
-    let retries = 0;
-
-    while (true) {
-      const result = await postJson<Judge0ResultResponse>(
-        payload.handler_urls.get_submission_result_handler,
-        {
-          submission_id: submissionId,
-        },
-      );
-      const statusId = Number(result.status?.id || 0);
-
-      if (statusId === 1 || statusId === 2) {
-        if (retries >= MAX_JUDGE0_RETRY_ITER) {
-          throw new Error(
-            `Judge0 submission result fetch failed after ${MAX_JUDGE0_RETRY_ITER} attempts.`,
-          );
-        }
-        retries += 1;
-        await wait(WAIT_TIME_MS);
-        continue;
-      }
-
-      const output = [result.compile_output, result.stdout].join("\n").trim();
-      setStdout(output);
-      setStderr(result.stderr || "");
-      return result;
-    }
-  }
-
-  async function getAiFeedback(result: { stderr?: string; stdout?: string }) {
-    const response = await postJson<CodingFeedbackResponse>(payload.handler_urls.get_response, {
-      code: editorRef.current?.getValue() || "",
-      stdout: result.stdout || "",
-      stderr: result.stderr || "",
-    });
-
-    const nextFeedback = response.response || "";
+  async function getAiFeedback(stdout: string, stderr: string) {
+    const nextFeedback = await fetchAiFeedback(
+      payload.handler_urls.get_response,
+      editorRef.current?.getValue() || "",
+      stdout,
+      stderr,
+    );
     setFeedbackMarkdown(nextFeedback);
     if (activeTab !== "feedback") {
       setHasFeedbackNotification(Boolean(nextFeedback));
@@ -544,14 +490,9 @@ export default function CodingStudentApp({
             defaultMessage: "Generating AI feedback...",
           }),
         );
-        await getAiFeedback({ stdout: "", stderr: "" });
+        await getAiFeedback("", "");
       } else {
-        const submission = await postJson<Judge0SubmissionResponse>(
-          payload.handler_urls.submit_code_handler,
-          {
-            user_code: code,
-          },
-        );
+        const submission = await submitCode(payload.handler_urls.submit_code_handler, code);
         if (!submission.submission_id) {
           throw new Error(
             intl.formatMessage({
@@ -567,17 +508,20 @@ export default function CodingStudentApp({
           }),
         );
         await wait(WAIT_TIME_MS * 2);
-        const result = await getSubmissionResult(submission.submission_id);
+        const result = await pollSubmissionResult(
+          payload.handler_urls.get_submission_result_handler,
+          submission.submission_id,
+        );
+        const output = [result.compile_output, result.stdout].join("\n").trim();
+        setStdout(output);
+        setStderr(result.stderr || "");
         setStatusMessage(
           intl.formatMessage({
             id: "coding.student.executionComplete",
             defaultMessage: "Execution complete. Output tab updated.",
           }),
         );
-        await getAiFeedback({
-          stdout: result.stdout || "",
-          stderr: result.stderr || "",
-        });
+        await getAiFeedback(output, result.stderr || "");
       }
     } catch (error: unknown) {
       const fallbackMessage = intl.formatMessage({
@@ -606,7 +550,7 @@ export default function CodingStudentApp({
     );
 
     try {
-      await postJson(payload.handler_urls.reset_handler, {});
+      await resetCodingSession(payload.handler_urls.reset_handler);
       editorRef.current?.setValue("");
       resetVisualState();
       setStatusMessage(

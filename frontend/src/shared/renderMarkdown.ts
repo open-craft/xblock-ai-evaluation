@@ -1,7 +1,7 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
-export function renderMarkdown(markdown?: string): string {
+export function renderMarkdown(markdown: string): string {
   if (!markdown) {
     return "";
   }

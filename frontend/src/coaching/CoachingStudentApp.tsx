@@ -3,8 +3,8 @@ import { Icon } from "@openedx/paragon";
 import { PlayCircleFilled } from "@openedx/paragon/icons";
 import { useIntl } from "react-intl";
 
-import { postJson } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
+import { CharacterResponse, requestEvaluation, resetAll, sendChatMessage } from "./api";
 import {
   CoachingAttemptState,
   CoachingCharacter,
@@ -25,18 +25,6 @@ const DEFAULT_ATTEMPTS: CoachingAttemptState = {
 
 interface PendingCoachingMessage extends CoachingMessage {
   pending?: boolean;
-}
-
-interface CharacterResponse {
-  attempts?: CoachingAttemptState;
-  chat_histories?: CoachingMessage[][];
-  finished?: boolean;
-  message?: CoachingMessage;
-  report_html?: string;
-  evaluation_markdown?: string;
-  final_submission?: string;
-  show_report_card?: boolean;
-  [key: string]: unknown;
 }
 
 function splitHistories(chatHistories?: CoachingMessage[][]) {
@@ -333,7 +321,7 @@ export default function CoachingStudentApp({
   const reviewMode = mode === "review";
   const reportMode = mode === "report";
   const evaluationHtml = useMemo(
-    () => renderMarkdown(report?.evaluation_markdown),
+    () => renderMarkdown(report?.evaluation_markdown || ""),
     [report?.evaluation_markdown],
   );
 
@@ -574,10 +562,7 @@ export default function CoachingStudentApp({
     );
 
     try {
-      const response = await postJson<CharacterResponse>(handlerUrl, {
-        character_index: paneIndex,
-        user_input: trimmedDraft,
-      });
+      const response = await sendChatMessage(handlerUrl, paneIndex, trimmedDraft);
       handleChatResponse(pane, response, trimmedDraft);
     } catch {
       removePendingMessage(pane, trimmedDraft);
@@ -607,7 +592,7 @@ export default function CoachingStudentApp({
     );
 
     try {
-      const response = await postJson<CharacterResponse>(payload.handler_urls.get_evaluator_response, {});
+      const response = await requestEvaluation(payload.handler_urls.get_evaluator_response);
       setEvaluationPending(false);
       setPaneBusy("workspace", false);
       applyResponseState(response);
@@ -660,7 +645,7 @@ export default function CoachingStudentApp({
     );
 
     try {
-      const response = await postJson<CharacterResponse>(payload.handler_urls.reset_all, {});
+      const response = await resetAll(payload.handler_urls.reset_all);
       const nextHistories = splitHistories(response.chat_histories);
       setHistories(nextHistories);
       setAttempts(response.attempts || initialAttempts);
