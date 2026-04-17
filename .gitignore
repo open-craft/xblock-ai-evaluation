@@ -61,3 +61,4 @@ target/
 
 # Frontend workspace
 frontend/node_modules/
+frontend/coverage/

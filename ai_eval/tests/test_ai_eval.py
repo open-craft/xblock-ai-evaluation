@@ -340,6 +340,8 @@ def test_coach_block_student_view(coach_block_data):
                     "pane": "workspace",
                 },
                 "content": "",
+                "pane": "workspace",
+                "is_user": False,
             },
             "coach_initial_message": {
                 "character": {
@@ -349,6 +351,8 @@ def test_coach_block_student_view(coach_block_data):
                     "pane": "coach",
                 },
                 "content": "",
+                "pane": "coach",
+                "is_user": False,
             },
             "titles": {
                 "workspace": "Add your answer",
