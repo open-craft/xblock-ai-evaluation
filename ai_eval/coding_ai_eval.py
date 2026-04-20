@@ -5,6 +5,9 @@ from importlib.resources import files
 
 from django.conf import settings
 from django.utils.translation import gettext_noop as _
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name
 from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
@@ -18,6 +21,7 @@ from .utils import (
     LanguageLabels,
 )
 from .backends.factory import BackendFactory
+from .pdf_generator import CodingData, CodingCode
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +143,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                     ),
                     "get_response": self.runtime.handler_url(self, "get_response"),
                     "reset_handler": self.runtime.handler_url(self, "reset_handler"),
+                    "download_pdf": self.runtime.handler_url(self, "download_pdf"),
                 },
                 initial_state={
                     "code": current_session[USER_RESPONSE],
@@ -149,6 +154,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                     "question": self.question,
                     "language": self.language,
                     "monaco_html": monaco_html,
+                    "pdf_download_allowed": self.pdf_download_allowed,
+                    "pdf_download_title": self.pdf_download_title,
+                    "pdf_download_description": self.pdf_download_description,
                 },
             ),
         )
@@ -443,3 +451,38 @@ class CodingAIEvalXBlock(AIEvalXBlock):
              """,
             ),
         ]
+
+    @XBlock.handler
+    def download_pdf(self, data, suffix=""):
+        """Generate and download the pdf summary of the exercise."""
+        if not self.pdf_download_allowed:
+            raise JsonHandlerError(400, "PDF download is disabled.")
+
+        session = self.sessions[-1]
+
+        code = session[USER_RESPONSE]
+        language_id = SUPPORTED_LANGUAGE_MAP[self.language].monaco_id
+        lexer = get_lexer_by_name(language_id)
+        # https://pygments.org/docs/formatters/#HtmlFormatter
+        formatter = HtmlFormatter(
+            linenos=False,  # line numbers are difficult here - 'inline' breaks code copy/paste, and 'table' doesn't line up properly. None play well with line wrapping.
+            style='xcode',  # https://pygments.org/styles/
+            noclasses=True, # inline styles so we don't need to mess with external stylesheets
+            wrapcode=True,  # use html5 semantic code elements
+            nobackground=True,  # don't add a background; we want to control the background with our own css
+            prestyles='line-height: 1.5em !important;',  # override default inline styling; it sets it to 125% line-height automatically
+        )
+
+        # TODO: handle output for html/css problems (the output doesn't come from judge0; it's simply the rendered code.
+        # This will require some extra security/privacy considerations.
+
+        content = CodingData(
+            code=CodingCode(
+                language=self.language,
+                highlighted_code=highlight(code, lexer, formatter),
+                stdout=session[CODE_EXEC_RESULT]['stdout'],
+                stderr=session[CODE_EXEC_RESULT]['stderr'],
+            ),
+            feedback=session[AI_EVALUATION],
+        )
+        return self.build_pdf_response(content)

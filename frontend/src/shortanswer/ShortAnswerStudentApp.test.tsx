@@ -16,6 +16,7 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
     handler_urls: {
       get_response: "/handler/get_response",
       reset: "/handler/reset",
+      download_pdf: "/handler/download_pdf",
     },
     initial_state: {
       messages: null,
@@ -25,6 +26,9 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
       character_image: "",
       max_responses: 10,
       question: "What is 2+2?",
+      pdf_download_allowed: false,
+      pdf_download_title: "",
+      pdf_download_description: ""
     },
     ...overrides,
   };
@@ -147,6 +151,9 @@ describe("ShortAnswerStudentApp", () => {
           character_image: "",
           max_responses: 10,
           question: "test",
+          pdf_download_allowed: false,
+          pdf_download_title: "",
+          pdf_download_description: ""
         },
       });
 

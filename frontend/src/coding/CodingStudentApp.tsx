@@ -13,6 +13,7 @@ import {
   WAIT_TIME_MS,
 } from "./api";
 import { CodingStudentPayload } from "./types";
+import { DownloadPDFSection } from "../shared/DownloadPDFSection";
 
 const HTML_CSS = "HTML/CSS";
 const HTML_PLACEHOLDER =
@@ -625,6 +626,8 @@ export default function CodingStudentApp({
           stdout={stdout}
         />
       </div>
+
+      {payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
     </section>
   );
 }

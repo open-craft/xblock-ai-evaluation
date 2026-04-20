@@ -7,3 +7,7 @@ XBlock[django]
 litellm==1.77.5
 Jinja2
 pydantic==2.11.7
+weasyprint
+mistune  # markdown -> html library (see also mistletoe or markdown-it-py if this isn't suitable in the end)
+nh3  # HTML sanitisation library
+Pygments

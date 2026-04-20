@@ -1,5 +1,6 @@
 """Multi-agent AI XBlock."""
 
+from datetime import datetime, UTC
 import hashlib
 import json
 import re
@@ -8,6 +9,7 @@ import typing
 
 import jinja2
 import pydantic
+from django.utils.text import slugify
 from django.utils.translation import gettext_noop as _
 from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
@@ -20,6 +22,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
+from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
 
 
 SAMPLE_CHARACTER_PROMPT = textwrap.dedent("""
@@ -733,6 +736,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "character_index": character_index,
             "user_message": user_message,
             "character_message": character_message,
+            "time": datetime.now(UTC).isoformat(),
         }
         fragment.update(extra)
         if fragment.get("is_evaluation"):
@@ -955,6 +959,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "get_character_response": self.runtime.handler_url(self, "get_character_response"),
                 "get_evaluator_response": self.runtime.handler_url(self, "get_evaluator_response"),
                 "reset_all": self.runtime.handler_url(self, "reset_all"),
+                "download_pdf": self.runtime.handler_url(self, "download_pdf"),
             },
             initial_state={
                 "chat_histories": self._get_chat_histories(),
@@ -981,6 +986,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 },
                 "allow_reset": self.allow_reset,
                 "intro_text": self.intro_text,
+                "pdf_download_allowed": self.pdf_download_allowed,
+                "pdf_download_title": self.pdf_download_title,
+                "pdf_download_description": self.pdf_download_description,
             },
         )
         final_report = self._build_final_report_payload()
@@ -1237,3 +1245,190 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "attempts": self._get_attempt_state(),
             "finished": session["finished"],
         }
+
+    @XBlock.handler
+    def download_pdf(self, data, suffix=""):
+        """
+        Generate and download the pdf summary of the exercise.
+        """
+        if not self.pdf_download_allowed:
+            raise JsonHandlerError(400, "PDF download is disabled.")
+
+        if not self.sessions:
+            raise JsonHandlerError(400, "No data to build PDF.")
+
+        session = self.sessions[-1]
+
+        if not session["finished"]:
+            raise JsonHandlerError(
+                400, "PDF can only be generated when the answer has been submitted."
+            )
+
+        user = self.runtime.service(self, "user").get_current_user()
+        # Fallbacks because these user attributes are not guaranteed to be set.
+        user_name = (
+            user.full_name
+            or user.opt_attrs.get("edx-platform.username")
+            or (user.emails and user.emails[-1])
+            or "Student"
+        )
+
+        # Follow a simplified method of ordering the chats if timestamps are not available:
+        # simply show the coach chat first, then show the workspace chat (no interleaving by time order).
+        # TODO: is this necessary? If this block is not being used in production yet,
+        #       we can simply make the breaking changes, and let any test users know they need to reset the components.
+        no_timestamps = (
+            session["workspace_history"] and not session["workspace_history"][0].get("time")
+        ) or (session["coach_history"] and not session["coach_history"][0].get("time"))
+        if no_timestamps:
+            sections = []
+
+            coach_messages = []
+            if self.coach_initial_message:
+                coach_messages.append(
+                    CoachedMessage(
+                        kind="coach",
+                        avatar_url=self.character_2_avatar,
+                        name=self.character_2_name,
+                        time=None,
+                        content=self.coach_initial_message,
+                    )
+                )
+            if session["coach_history"]:
+                for entry in session["coach_history"]:
+                    coach_messages.append(
+                        CoachedMessage(
+                            kind="student",
+                            avatar_url="",
+                            name=user_name,
+                            time=None,
+                            content=entry["user_message"],
+                        )
+                    )
+                    coach_messages.append(
+                        CoachedMessage(
+                            kind="coach",
+                            avatar_url=self.character_2_avatar,
+                            name=self.character_2_name,
+                            time=None,
+                            content=entry["character_message"],
+                        )
+                    )
+            if coach_messages:
+                sections.append(
+                    CoachedSection(
+                        kind="coach",
+                        messages=coach_messages,
+                    )
+                )
+
+            workspace_messages = []
+            if self.initial_message:
+                workspace_messages.append(
+                    CoachedMessage(
+                        kind="workspace",
+                        avatar_url=self.character_1_avatar,
+                        name=self.character_1_name,
+                        time=None,
+                        content=self.initial_message,
+                    )
+                )
+            if session["workspace_history"]:
+                for entry in session["workspace_history"]:
+                    workspace_messages.append(
+                        CoachedMessage(
+                            kind="student",
+                            avatar_url="",
+                            name=user_name,
+                            time=None,
+                            content=entry["user_message"],
+                        )
+                    )
+                    workspace_messages.append(
+                        CoachedMessage(
+                            kind="workspace",
+                            avatar_url=self.character_1_avatar,
+                            name=self.character_1_name,
+                            time=None,
+                            content=entry["character_message"],
+                        )
+                    )
+            if workspace_messages:
+                sections.append(
+                    CoachedSection(
+                        kind="workspace",
+                        messages=workspace_messages,
+                    )
+                )
+
+        else:
+            # Here we have timestamps, so interleave the individual chats, sorted by message timestamp.
+            # A `session` looks like [{'character_message': str, 'user_message': str, 'character_index': 0, 'time': 'isotimestring'}]
+            entries = sorted(
+                session["workspace_history"] + session["coach_history"],
+                key=lambda x: x["time"],
+            )
+            sections = []
+            used_coach_initial_message = False
+            used_workspace_initial_message = False
+            for entry in entries:
+                character_info = self._get_character_data(entry["character_index"])
+                kind = character_info["pane"]
+                if not sections or sections[-1].kind != kind:
+                    sections.append(CoachedSection(kind=kind, messages=[]))
+                    if (
+                        kind == "coach"
+                        and self.coach_initial_message
+                        and not used_coach_initial_message
+                    ):
+                        sections[-1].messages.append(
+                            CoachedMessage(
+                                kind="coach",
+                                avatar_url=character_info["avatar"],
+                                name=character_info["name"],
+                                time=None,
+                                content=self.coach_initial_message,
+                            )
+                        )
+                        used_coach_initial_message = True
+                    if (
+                        kind == "workspace"
+                        and self.initial_message
+                        and not used_workspace_initial_message
+                    ):
+                        sections[-1].messages.append(
+                            CoachedMessage(
+                                kind="workspace",
+                                avatar_url=character_info["avatar"],
+                                name=character_info["name"],
+                                time=None,
+                                content=self.initial_message,
+                            )
+                        )
+                        used_workspace_initial_message = True
+                sections[-1].messages.append(
+                    CoachedMessage(
+                        kind="student",
+                        avatar_url="",
+                        name=user_name,
+                        time=entry["time"],
+                        content=entry["user_message"],
+                    )
+                )
+                sections[-1].messages.append(
+                    CoachedMessage(
+                        kind=kind,
+                        avatar_url=character_info["avatar"],
+                        name=character_info["name"],
+                        time=entry["time"],
+                        content=entry["character_message"],
+                    )
+                )
+
+        content = CoachedData(
+            final_submission=session["final_submission"],
+            final_evaluation=session["final_evaluation_markdown"],
+            evaluator_name=self.character_1_name,
+            sections=sections,
+        )
+        return self.build_pdf_response(content)

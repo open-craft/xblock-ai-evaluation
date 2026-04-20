@@ -5,6 +5,7 @@ export interface CodingStudentHandlerUrls {
   get_submission_result_handler: string;
   reset_handler: string;
   submit_code_handler: string;
+  download_pdf: string;
 }
 
 export interface CodingExecutionResult {
@@ -22,6 +23,9 @@ export interface CodingStudentMeta {
   language: string;
   monaco_html: string;
   question: string;
+  pdf_download_allowed: boolean;
+  pdf_download_title: string;
+  pdf_download_description: string;
 }
 
 export type CodingStudentPayload = SharedPayload<
@@ -47,6 +51,9 @@ export interface CodingStudioState {
   model_api_key: string;
   model_api_url: string;
   question: string;
+  pdf_download_allowed: boolean;
+  pdf_download_title: string;
+  pdf_download_description: string;
 }
 
 export interface CodingStudioHandlerUrls {

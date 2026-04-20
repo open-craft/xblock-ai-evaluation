@@ -1,5 +1,6 @@
 """Short answers Xblock with AI evaluation."""
 
+from datetime import datetime, UTC
 import logging
 import hashlib
 import urllib.parse
@@ -19,6 +20,7 @@ from xblock.utils.studio_editable import FutureFields
 from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
+from .pdf_generator import ShortAnswerData, ShortAnswerMessage
 
 
 logger = logging.getLogger(__name__)
@@ -190,6 +192,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             handler_urls={
                 "get_response": self.runtime.handler_url(self, "get_response"),
                 "reset": self.runtime.handler_url(self, "reset"),
+                "download_pdf": self.runtime.handler_url(self, "download_pdf"),
             },
             initial_state={
                 "messages": list(self.sessions[-1]),
@@ -199,6 +202,9 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 "max_responses": self.max_responses,
                 "allow_reset": self.allow_reset,
                 "character_image": self.character_image,
+                "pdf_download_allowed": self.pdf_download_allowed,
+                "pdf_download_title": self.pdf_download_title,
+                "pdf_download_description": self.pdf_download_description,
             },
         )
         frag.initialize_js("ShortAnswerAIEvalXBlock", js_data)
@@ -295,6 +301,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
+        user_submission_time = datetime.now(UTC).isoformat()
 
         attachments = []
         attachment_hash_inputs = []
@@ -362,10 +369,12 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 raise JsonHandlerError(500, str(e)) from e
             raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
+        llm_response_time = datetime.now(UTC).isoformat()
+
         if response:
             self._replace_current_session(self.sessions[-1] + [
-                {"source": "user", "content": user_submission},
-                {"source": "llm", "content": response},
+                {"source": "user", "content": user_submission, "time": user_submission_time},
+                {"source": "llm", "content": response, "time": llm_response_time},
             ])
             return {"response": response}
 
@@ -400,3 +409,38 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
              """,
             ),
         ]
+
+    @XBlock.handler
+    def download_pdf(self, data, suffix=""):
+        """Generate and download the pdf summary of the exercise."""
+        if not self.pdf_download_allowed:
+            raise JsonHandlerError(400, "PDF download is disabled.")
+
+        user = self.runtime.service(self, "user").get_current_user()
+        # Fallbacks because these user attributes are not guaranteed to be set.
+        user_name = user.full_name or user.opt_attrs.get('edx-platform.username') or (user.emails and user.emails[-1]) or "Student"
+
+        content = ShortAnswerData(
+            messages=[
+                (
+                    ShortAnswerMessage(
+                        avatar_url=self.character_image,
+                        name="LLM",
+                        content=data["content"],
+                        time=data.get("time"),  # NOTE: time field was added in 2026-04, so some existing instances may not have this field
+                        kind="llm",
+                    )
+                    if data["source"] == "llm"
+                    else ShortAnswerMessage(
+                        avatar_url="",
+                        name=user_name,
+                        content=data["content"],
+                        time=data.get("time"),  # NOTE: time field was added in 2026-04, so some existing instances may not have this field
+                        kind="student",
+                    )
+                )
+                for data in self.sessions[-1]
+            ]
+        )
+
+        return self.build_pdf_response(content)

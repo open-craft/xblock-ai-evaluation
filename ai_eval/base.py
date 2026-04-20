@@ -3,18 +3,23 @@ from typing import Any, Self
 
 import logging
 from importlib.resources import files
-from django.core.cache import cache
 
+from django.conf import settings
+from django.core.cache import cache
+from django.utils.text import slugify
 from django.utils.translation import gettext_noop as _
+from django.urls import reverse
 from xblock.core import XBlock
-from xblock.fields import String, Scope, Dict
+from xblock.fields import Boolean, String, Scope, Dict
 from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
+from webob import Response
 
 from .compat import get_site_configuration_value
 from .supported_models import SupportedModels
 from .llm import get_llm_response, get_llm_service
+from .pdf_generator import generate_pdf, Metadata, CoachedData, CodingData, ShortAnswerData, Branding, Location, Student, Info
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +71,7 @@ def _get_model_choices(block):
     return [PLACEHOLDER] + [{"display_name": m, "value": m} for m in available_models]
 
 
-@XBlock.wants("settings")
+@XBlock.wants("settings", "user")
 class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     """
     Base class for Xblocks with AI evaluation
@@ -106,11 +111,35 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         scope=Scope.user_state,
     )
 
+    pdf_download_allowed = Boolean(
+        display_name=_("Allow PDF Download"),
+        help=_(
+            "If enabled, learners can download a PDF transcript of the problem."
+        ),
+        default=False,
+        scope=Scope.settings,
+    )
+    pdf_download_title = String(
+        display_name=_("Download Section Title"),
+        help=_("Title of the section that contains the PDF transcript download button."),
+        default="Download transcript",
+        scope=Scope.settings,
+    )
+    pdf_download_description = String(
+        display_name=_("Download Section Description"),
+        help=_("Description of the section that contains the PDF transcript download button."),
+        default="",
+        scope=Scope.settings,
+    )
+
     editable_fields = (
         "display_name",
         "model",
         "model_api_key",
         "model_api_url",
+        "pdf_download_allowed",
+        "pdf_download_title",
+        "pdf_download_description",
     )
 
     block_settings_key = "ai_eval"
@@ -553,3 +582,75 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             tm[tag] = new_thread_id
             self.thread_map = tm
         return text
+
+    def get_pdf_location_nav(self) -> Location | None:
+        """
+        Build and return the structured hierarchy of location information for this xblock.
+
+        Return None if an error is encountered that indicates the current runtime doesn't support this
+        or the xblock isn't in a standard course hierarchy (eg. a content library).
+        """
+        try:
+            from openedx.core.djangoapps.xblock.apps import get_xblock_app_config
+            unit = self.get_parent()
+            subsection = unit.get_parent()
+            section = subsection.get_parent()
+            course = section.get_parent()
+        except:
+            logger.warning(
+                "Failed to retrieve location hierarchy information, "
+                "possibly not running in openedx-platform runtime or from within a course. Skipping."
+            )
+            return None
+
+        url_base = get_xblock_app_config().get_site_root_url()
+
+        # XXX: this doesn't work from the CMS, so generating pdfs currently fail from studio (ie. if you interact with the student view in the studio interface).
+        unit_url = url_base + reverse('jump_to', kwargs={'course_id': str(course.id), 'location': str(unit.location)})
+        subsection_url = url_base + reverse('jump_to', kwargs={'course_id': str(course.id), 'location': str(subsection.location)})
+        section_url = url_base + reverse('jump_to', kwargs={'course_id': str(course.id), 'location': str(section.location)})
+        course_url = url_base + reverse('course_root', kwargs={'course_id': str(course.id)})
+
+        return Location(
+            course_name=course.display_name,
+            course_url=course_url,
+            section_name=section.display_name,
+            section_url=section_url,
+            subsection_name=subsection.display_name,
+            subsection_url=subsection_url,
+            unit_name=unit.display_name,
+            unit_url=unit_url,
+        )
+
+    def get_pdf_logo(self) -> str:
+        """
+        Return a logo for display in the header of generated PDFs.
+        """
+        configured_header_logo = get_site_configuration_value(self.block_settings_key, "PDF_HEADER_LOGO")
+        footer_logo = getattr(settings, "FOOTER_OPENEDX_LOGO_IMAGE", "")
+        return configured_header_logo or footer_logo or ""
+
+    def build_pdf_response(self, content: CoachedData | CodingData | ShortAnswerData) -> Response:
+        """
+        Helper function to be called by the download pdf handlers in the child xblocks.
+        """
+        # https://openedx.atlassian.net/wiki/spaces/PLAT/pages/113607155/How+do+I+access+student+data+from+within+an+XBlock
+        user = self.runtime.service(self, "user").get_current_user()
+        user_email = user.emails[0] if user.emails else ""
+        # Fallbacks because these user attributes are not guaranteed to be set.
+        user_name = user.full_name or user.opt_attrs.get('edx-platform.username') or "Student"
+
+        metadata = Metadata(
+            info=Info(
+                title=self.display_name,
+            ),
+            student=Student(email=user_email, name=user_name),
+            branding=Branding(
+                logo=self.get_pdf_logo(),
+            ),
+            location=self.get_pdf_location_nav(),
+        )
+        pdf_data: bytes = generate_pdf(metadata, content)
+
+        filename = slugify(f"{self.display_name}-{user_name}-transcript")
+        return Response(pdf_data, content_type='application/pdf', content_disposition=f'attachment; filename="{filename}.pdf"')

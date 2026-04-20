@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>Transcript</h1>
+
+    <section class="code-window">
+        <div class="code-pane">
+            <div class="header">
+                <div class="language">{{ data.code.language }}</div>
+            </div>
+            {{ data.code.highlighted_code | safe }}
+        </div>
+        <div class="output-pane">
+            <div class="title">Output</div>
+            <div class="content">
+                {% if data.code.stdout %}
+                    <pre class="stdout">{{ data.code.stdout }}</pre>
+                {% endif %}
+                {% if data.code.stderr %}
+                    <pre class="stderr">{{ data.code.stderr }}</pre>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>AI Feedback</h2>
+
+        {{ data.feedback | safe }}
+    </section>
+{% endblock %}

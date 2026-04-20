@@ -42,9 +42,50 @@ The `ai_eval_export` XBlock is a preconfigured, staff-only tool for exporting le
 - Clicking “Start export” generates a CSV and provides a download link when ready.
 - The CSV includes a `Course Name` column (human-readable course title) and includes `Location` to identify the specific XBlock usage within the course.
 
+### PDF transcript downloads
+
+#### Configuration
+
+Admins can optionally provide settings. Settings available:
+
+- `PDF_HEADER_LOGO`: a url to a logo image to use in the header of the PDF transcripts. Defaults to `settings.FOOTER_OPENEDX_LOGO_IMAGE` if available.
+
+Configure this in Django SiteConfiguration site values under the key `ai_eval`. For example:
+
+```json
+{
+  "ai_eval": {
+    "PDF_HEADER_LOGO": "https://picsum.photos/300/70"
+  }
+}
+```
+
+#### Fonts
+
+For emoji support in PDFs, the LMS and CMS backend needs a system font that supports emoji. We suggest `fonts-noto-color-emoji`.
+
+Also, the PDFs are designed to use the "Inter" font. If this font is not available, it will fall back to similar available fonts. However, for the full experience, `fonts-inter` can be installed on the LMS and CMS machines.
+
+An example Tutor plugin to make the above fonts available:
+
+```python
+from tutor import hooks
+
+hooks.Filters.ENV_PATCHES.add_item(
+    (
+        "openedx-dockerfile-minimal",
+"""
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt update && apt install -y fonts-inter fonts-noto-color-emoji
+"""
+    )
+)
+```
+
 ### API Configuration
 
-The XBlocks support multiple ways to configure API keys and URLs for language models.  
+The XBlocks support multiple ways to configure API keys and URLs for language models.
 The system will check for these configurations in the following order:
 1. **XBlock-level configuration**: API keys and URLs can be set directly in each XBlock instance through the Studio UI.
 2. **Site configuration**: Values can be set globally for all XBlocks using Open edX's Site Configuration.
@@ -57,7 +98,7 @@ The system will check for these configurations in the following order:
         }
     }
     ```
-3. **Django settings**: Values can be defined in the Django settings. 
+3. **Django settings**: Values can be defined in the Django settings.
    To configure in Django settings (e.g., in Tutor), add the following to your configuration:
    ```python
    XBLOCK_SETTINGS = {
@@ -74,7 +115,7 @@ API URLs are only required and used with the LLAMA model (`ollama/llama2`). Othe
 
 #### Security Considerations
 
-For better security, we recommend using site configuration or Django settings instead of configuring API keys at the 
+For better security, we recommend using site configuration or Django settings instead of configuring API keys at the
 XBlock level. This prevents API keys from being exposed in course exports.
 
 Studio behavior:

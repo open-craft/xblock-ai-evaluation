@@ -8,6 +8,7 @@ export interface ShortAnswerMessage {
 export interface ShortAnswerStudentHandlerUrls {
   get_response: string;
   reset: string;
+  download_pdf: string;
 }
 
 export interface ShortAnswerStudentInitialState {
@@ -19,6 +20,9 @@ export interface ShortAnswerStudentMeta {
   character_image: string;
   max_responses: number;
   question: string;
+  pdf_download_allowed: boolean;
+  pdf_download_title: string;
+  pdf_download_description: string;
 }
 
 export type ShortAnswerStudentPayload = SharedPayload<
@@ -45,6 +49,9 @@ export interface ShortAnswerStudioState {
   model_api_key: string;
   model_api_url: string;
   question: string;
+  pdf_download_allowed: boolean;
+  pdf_download_title: string;
+  pdf_download_description: string;
 }
 
 export interface ShortAnswerStudioHandlerUrls {

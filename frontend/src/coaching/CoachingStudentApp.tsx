@@ -12,6 +12,7 @@ import {
   CoachingMessage,
   CoachingStudentPayload,
 } from "./types";
+import { DownloadPDFSection } from "../shared/DownloadPDFSection";
 
 type PaneKey = "workspace" | "coach";
 type CoachMode = "chat" | "report" | "review";
@@ -989,6 +990,8 @@ export default function CoachingStudentApp({
           </button>
         ) : null}
       </div>
+
+      {(reportMode || reviewMode) && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
 
       {confirmType === "reset" ? (
         <ConfirmDialog
