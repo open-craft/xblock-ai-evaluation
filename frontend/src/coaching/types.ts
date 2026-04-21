@@ -37,21 +37,21 @@ export interface CoachingStudentHandlerUrls {
 }
 
 export interface CoachingStudentInitialState {
-  attempts?: CoachingAttemptState;
-  chat_histories?: CoachingMessage[][];
+  attempts: CoachingAttemptState;
+  chat_histories: CoachingMessage[][];
   final_report?: CoachingFinalReport;
-  finished?: boolean;
+  finished: boolean;
 }
 
 export interface CoachingStudentMeta {
-  allow_reset?: boolean;
-  characters?: CoachingCharacter[];
-  coach_initial_message?: CoachingMessage;
-  initial_message?: CoachingMessage;
-  intro_text?: string;
-  titles?: {
-    coach?: string;
-    workspace?: string;
+  allow_reset: boolean;
+  characters: CoachingCharacter[];
+  coach_initial_message: CoachingMessage;
+  initial_message: CoachingMessage;
+  intro_text: string;
+  titles: {
+    coach: string;
+    workspace: string;
   };
 }
 

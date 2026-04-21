@@ -1,48 +1,7 @@
 import { makeXBlockInitializer } from "../shared/mountApp";
-import { XBlockElementLike, XBlockRuntime } from "../shared/types";
+import { XBlockElementLike } from "../shared/types";
 import CodingStudentApp from "./CodingStudentApp";
-import { CodingExecutionResult, CodingStudentPayload } from "./types";
-
-type CodingPayloadInput = Partial<CodingStudentPayload> & {
-  ai_evaluation?: string;
-  code?: string;
-  code_exec_result?: unknown;
-  language?: string;
-  monaco_html?: string;
-  question?: string;
-};
-
-function normalizePayload(
-  runtime: XBlockRuntime,
-  element: XBlockElementLike,
-  data: unknown,
-): CodingStudentPayload {
-  const payloadData = (data || {}) as CodingPayloadInput;
-  const fallbackInitialState: CodingStudentPayload["initial_state"] = {
-    code: payloadData.code,
-    ai_evaluation: payloadData.ai_evaluation,
-    code_exec_result: (payloadData.code_exec_result as CodingExecutionResult) || null,
-  };
-
-  return {
-    view: "student",
-    handler_urls: payloadData.handler_urls || {
-      submit_code_handler: runtime.handlerUrl(element, "submit_code_handler"),
-      get_submission_result_handler: runtime.handlerUrl(
-        element,
-        "get_submission_result_handler",
-      ),
-      get_response: runtime.handlerUrl(element, "get_response"),
-      reset_handler: runtime.handlerUrl(element, "reset_handler"),
-    },
-    initial_state: payloadData.initial_state || fallbackInitialState,
-    meta: payloadData.meta || {
-      question: payloadData.question || "",
-      language: payloadData.language || "",
-      monaco_html: payloadData.monaco_html || "",
-    },
-  };
-}
+import { CodingStudentPayload } from "./types";
 
 function resolveUsageId(element: XBlockElementLike) {
   if (element instanceof Element) {
@@ -61,7 +20,7 @@ function resolveUsageId(element: XBlockElementLike) {
 
 const initializer = makeXBlockInitializer(
   CodingStudentApp,
-  (runtime, element, data) => {
+  (_runtime, element, data) => {
     const usageId = resolveUsageId(element);
 
     if (!usageId) {
@@ -69,7 +28,7 @@ const initializer = makeXBlockInitializer(
     }
 
     return {
-      payload: normalizePayload(runtime, element, data),
+      payload: data as CodingStudentPayload,
       usageId,
     };
   },

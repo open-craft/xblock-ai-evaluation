@@ -13,8 +13,8 @@ export interface CodingExecutionResult {
 }
 
 export interface CodingStudentInitialState {
-  ai_evaluation?: string;
-  code?: string;
+  ai_evaluation: string;
+  code: string;
   code_exec_result: CodingExecutionResult | null;
 }
 

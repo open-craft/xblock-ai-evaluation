@@ -27,17 +27,10 @@ interface PendingCoachingMessage extends CoachingMessage {
   pending?: boolean;
 }
 
-function splitHistories(chatHistories?: CoachingMessage[][]) {
-  if (!Array.isArray(chatHistories)) {
-    return {
-      workspace: [] as PendingCoachingMessage[],
-      coach: [] as PendingCoachingMessage[],
-    };
-  }
-
+function splitHistories(chatHistories: CoachingMessage[][]) {
   return {
-    workspace: (chatHistories[0] || []) as PendingCoachingMessage[],
-    coach: (chatHistories[1] || []) as PendingCoachingMessage[],
+    workspace: chatHistories[0] as PendingCoachingMessage[],
+    coach: chatHistories[1] as PendingCoachingMessage[],
   };
 }
 
@@ -258,10 +251,7 @@ export default function CoachingStudentApp({
   const initialHistories = useMemo(() => {
     return splitHistories(payload.initial_state.chat_histories);
   }, [payload.initial_state.chat_histories]);
-  const initialAttempts = useMemo(
-    () => payload.initial_state.attempts || DEFAULT_ATTEMPTS,
-    [payload.initial_state.attempts],
-  );
+  const initialAttempts = payload.initial_state.attempts;
   const initialFinalReport = payload.initial_state.final_report || null;
   const [histories, setHistories] = useState(initialHistories);
   const [attempts, setAttempts] = useState(
@@ -287,9 +277,9 @@ export default function CoachingStudentApp({
   const workspaceTextareaRef = useRef<HTMLTextAreaElement>(null);
   const coachTextareaRef = useRef<HTMLTextAreaElement>(null);
   const backToReportRef = useRef<HTMLButtonElement>(null);
-  const meta = payload.meta || {};
-  const titles = meta.titles || {};
-  const allowReset = Boolean(meta.allow_reset);
+  const meta = payload.meta;
+  const titles = meta.titles;
+  const allowReset = meta.allow_reset;
   const initialWorkspaceMessage =
     meta.initial_message && meta.initial_message.content
       ? meta.initial_message
@@ -646,9 +636,9 @@ export default function CoachingStudentApp({
 
     try {
       const response = await resetAll(payload.handler_urls.reset_all);
-      const nextHistories = splitHistories(response.chat_histories);
+      const nextHistories = splitHistories(response.chat_histories!);
       setHistories(nextHistories);
-      setAttempts(response.attempts || initialAttempts);
+      setAttempts(response.attempts!);
       setFinished(Boolean(response.finished));
       setMode("chat");
       setReport(null);
