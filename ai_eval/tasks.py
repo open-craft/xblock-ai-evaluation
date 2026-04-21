@@ -181,14 +181,18 @@ def _get_user_state_value(field_data_cache, block, user, field_name, default=Non
         return default
 
 
-def _iter_coach_messages(block, workspace_history, coach_history, evaluation_fragments):
+def _iter_coach_messages(block, session):
     """
-    Yield (source, content) tuples for CoachAIEvalXBlock user state.
+    Yield (source, content) tuples for one CoachAIEvalXBlock session.
 
     Ordering is best-effort: workspace first, then coach, then evaluation fragments.
     """
     main_role = block.character_1_role or "Main character"
     coach_role = block.character_2_role or "Coach"
+    session = session or {}
+    workspace_history = session.get("workspace_history") or []
+    coach_history = session.get("coach_history") or []
+    evaluation_fragments = session.get("evaluation_fragments") or []
 
     def _iter_fragments(fragments, assistant_role):
         for fragment in fragments or []:
@@ -209,6 +213,49 @@ def _iter_coach_messages(block, workspace_history, coach_history, evaluation_fra
             yield ("llm (Evaluator)", character_message)
 
 
+def _get_coach_export_sessions(field_data_cache, block, user):
+    """Return Coaching sessions for export, with older-state fallback only when needed."""
+    sessions = _get_user_state_value(
+        field_data_cache,
+        block,
+        user,
+        "sessions",
+        default=None,
+    )
+    if sessions is not None:
+        return list(sessions or [])
+
+    workspace_history = _get_user_state_value(
+        field_data_cache,
+        block,
+        user,
+        "workspace_history",
+        default=[],
+    )
+    coach_history = _get_user_state_value(
+        field_data_cache,
+        block,
+        user,
+        "coach_history",
+        default=[],
+    )
+    evaluation_fragments = _get_user_state_value(
+        field_data_cache,
+        block,
+        user,
+        "evaluation_fragments",
+        default=[],
+    )
+    if not workspace_history and not coach_history and not evaluation_fragments:
+        return []
+
+    return [{
+        "workspace_history": workspace_history,
+        "coach_history": coach_history,
+        "evaluation_fragments": evaluation_fragments,
+    }]
+
+
 def _extract_data(block):
     """Extract data for one XBlock."""
     # pylint: disable=import-error,import-outside-toplevel
@@ -225,32 +272,23 @@ def _extract_data(block):
         data.add_blocks_to_cache([block])
 
         if isinstance(block, CoachAIEvalXBlock):
-            workspace_history = _get_user_state_value(
-                data, block, user, "workspace_history", default=[]
-            )
-            coach_history = _get_user_state_value(
-                data, block, user, "coach_history", default=[]
-            )
-            evaluation_fragments = _get_user_state_value(
-                data, block, user, "evaluation_fragments", default=[]
-            )
-            if not workspace_history and not coach_history and not evaluation_fragments:
-                continue
-            for source, content in _iter_coach_messages(
-                block, workspace_history, coach_history, evaluation_fragments
+            for idx, session in enumerate(
+                _get_coach_export_sessions(data, block, user),
+                start=1,
             ):
-                yield (
-                    section_name,
-                    subsection_name,
-                    unit_name,
-                    str(block.location),
-                    block.display_name,
-                    user.username,
-                    user.email or "",
-                    None,
-                    source,
-                    content,
-                )
+                for source, content in _iter_coach_messages(block, session):
+                    yield (
+                        section_name,
+                        subsection_name,
+                        unit_name,
+                        str(block.location),
+                        block.display_name,
+                        user.username,
+                        user.email or "",
+                        idx,
+                        source,
+                        content,
+                    )
         else:
             try:
                 sessions = data.get(DjangoKeyValueStore.Key(

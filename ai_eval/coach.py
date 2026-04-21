@@ -1,6 +1,7 @@
 """Multi-agent AI XBlock."""
 
 import hashlib
+import json
 import re
 import textwrap
 import typing
@@ -12,7 +13,7 @@ from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
-from xblock.validation import ValidationMessage
+from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
 
 from .base import AIEvalXBlock
@@ -78,9 +79,57 @@ class EvaluationCriterion(pydantic.BaseModel):
 
 
 class CoachScenarioData(pydantic.BaseModel):
+    """Schema for the scenario_data XBlock field."""
+
     case_details: pydantic.StrictStr
     learning_objectives: typing.List[pydantic.StrictStr]
     evaluation_criteria: typing.List[EvaluationCriterion]
+
+    @pydantic.model_validator(mode="before")
+    @classmethod
+    def check_is_dict(cls, data: typing.Any) -> typing.Any:
+        """Reject non-dict input before field validation runs."""
+        if not isinstance(data, dict):
+            raise ValueError(
+                "Scenario data must be a JSON object (dictionary)."
+            )
+        return data
+
+
+class CoachingSession(pydantic.BaseModel):
+    """Normalized shape of a single Coaching learner session."""
+
+    workspace_history: list = pydantic.Field(default_factory=list)
+    coach_history: list = pydantic.Field(default_factory=list)
+    evaluation_fragments: list = pydantic.Field(default_factory=list)
+    attempts_used: int = pydantic.Field(default=0, ge=0)
+    finished: bool = False
+    final_submission: str = ""
+    final_evaluation_markdown: str = ""
+
+    @pydantic.field_validator("workspace_history", "coach_history", "evaluation_fragments", mode="before")
+    @classmethod
+    def ensure_list(cls, v):
+        """Accept only lists; replace anything else with an empty list."""
+        return list(v) if isinstance(v, list) else []
+
+    @pydantic.field_validator("attempts_used", mode="before")
+    @classmethod
+    def ensure_non_negative_int(cls, v):
+        """Parse to a non-negative integer; default to 0 on failure."""
+        try:
+            return max(int(v or 0), 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @pydantic.field_validator("final_submission", "final_evaluation_markdown", mode="before")
+    @classmethod
+    def ensure_str(cls, v):
+        """Accept truthy values as strings; default to empty string."""
+        return str(v) if v else ""
+
+
+_EMPTY_SESSION = CoachingSession().model_dump()
 
 
 class CoachAIEvalXBlock(AIEvalXBlock):
@@ -106,11 +155,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     evaluator_prompt = String(
         display_name=_("Evaluator prompt"),
-        help=_(
-            "Prompt used to instructs the model how to evaluate learners. "
-            "You can use Jinja variables (e.g. scenario_data.evaluation_criteria). "
-            "Learn more: https://jinja.palletsprojects.com/en/stable/templates/"
-        ),
+        help=_(""),
         multiline_editor=True,
         default=DEFAULT_EVALUATOR_PROMPT,
         scope=Scope.settings,
@@ -178,7 +223,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     intro_text = String(
         display_name=_("Introductory text"),
-        help=_("Optional introductory paragraph shown above the chat panes. HTML is allowed here."),
+        help=_(""),
         default="",
         scope=Scope.settings,
         multiline_editor=True,
@@ -303,11 +348,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         default=0,
     )
 
-    input_open = Boolean(
-        scope=Scope.user_state,
-        default=True,
-    )
-
     final_submission = String(
         scope=Scope.user_state,
         default="",
@@ -316,6 +356,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     final_evaluation_markdown = String(
         scope=Scope.user_state,
         default="",
+    )
+
+    sessions = List(
+        scope=Scope.user_state,
+        default=[],
     )
 
     max_attempts = Integer(
@@ -355,13 +400,25 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "allow_reset",
     )
 
-    def studio_view(self, context):
-        """Render Studio edit view with styling only (no extra wrapper)."""
-        fragment = super().studio_view(context)
-        try:
-            fragment.add_css(self.resource_string("static/css/coach_studio.css"))
-        except Exception:  # pylint: disable=broad-exception-caught
-            pass
+    def studio_view(self, context=None):
+        """Render the React Studio editor for Coaching."""
+        fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
+        fragment.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
+        fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
+        fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
+        fragment.add_css(self.resource_string("static/css/coach_studio.css"))
+        fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.studio.js"))
+        fragment.initialize_js(
+            "CoachAIEvalXBlockStudio",
+            self._build_view_payload(
+                view="studio",
+                handler_urls={
+                    "studio_submit": self.runtime.handler_url(self, "studio_submit"),
+                },
+                initial_state=self._studio_initial_state(),
+                meta=self._studio_payload_meta(),
+            ),
+        )
         return fragment
 
     def _render_template(self, template, **context):
@@ -370,37 +427,148 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def _get_field_display_name(self, field_name):
         return self.fields[field_name].display_name
 
-    def validate_field_data(self, validation, data):
-        """Validate field data."""
-        super().validate_field_data(validation, data)
+    def _map_scenario_data_validation_error_field(
+        self,
+        location: tuple[typing.Any, ...],
+    ) -> str:
+        """Translate `scenario_data` schema errors into Studio field keys."""
+        if not location:
+            return "scenario_data"
 
-        scenario_data = data.scenario_data
-        if not isinstance(scenario_data, dict):
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    (
-                        f"{self._get_field_display_name('scenario_data')}: "
-                        "must be a JSON object (dictionary)."
-                    ),
-                )
+        field_name = location[0]
+        if field_name == "case_details":
+            return "scenario_case_details"
+        if field_name == "learning_objectives":
+            return "scenario_learning_objectives"
+        if field_name == "evaluation_criteria":
+            return "scenario_evaluation_criteria"
+        return "scenario_data"
+
+    def _format_scenario_data_validation_error(
+        self,
+        error: dict[str, typing.Any],
+    ) -> tuple[str, str]:
+        """Return a Studio field key and author-facing validation message."""
+        location = tuple(error.get("loc", ()))
+        mapped_field = self._map_scenario_data_validation_error_field(location)
+
+        # model_validator errors (e.g. "not a dict") carry their own message.
+        if error.get("type") == "value_error" and not location:
+            msg = str(error.get("ctx", {}).get("error", ""))
+            if msg:
+                return mapped_field, msg
+            return mapped_field, _(
+                "Scenario data must be a JSON object (dictionary)."
             )
-            scenario_data = {}
+
+        if mapped_field == "scenario_case_details":
+            return mapped_field, _("Scenario must be a valid string.")
+
+        if mapped_field == "scenario_learning_objectives":
+            if len(location) > 1 and isinstance(location[1], int):
+                return mapped_field, _(
+                    "Learning objective {index} must be text."
+                ).format(index=location[1] + 1)
+            return mapped_field, _("Learning objectives must be a list of text items.")
+
+        if mapped_field == "scenario_evaluation_criteria":
+            if len(location) > 2 and location[2] == "name" and isinstance(location[1], int):
+                return mapped_field, _(
+                    "Evaluation criterion {index} must include a name."
+                ).format(index=location[1] + 1)
+            if len(location) > 1 and isinstance(location[1], int):
+                return mapped_field, _(
+                    "Evaluation criterion {index} must be a valid criterion."
+                ).format(index=location[1] + 1)
+            return mapped_field, _(
+                "Evaluation criteria must be a list of criteria with names."
+            )
+
+        return mapped_field, _(
+            "Scenario data structure is invalid. Expected keys: "
+            "case_details (str), learning_objectives (list[str]), "
+            "evaluation_criteria (list[{name: str}])."
+        )
+
+    def _get_template_validation_scenario_data(
+        self,
+        scenario_data: dict[str, typing.Any],
+        has_schema_errors: bool,
+    ) -> dict[str, typing.Any]:
+        """Provide stable scenario data for template validation."""
+        if not has_schema_errors:
+            return scenario_data
+
+        existing_scenario_data = getattr(self, "scenario_data", None)
+        if isinstance(existing_scenario_data, dict):
+            return existing_scenario_data
+
+        return {
+            "case_details": "",
+            "learning_objectives": [],
+            "evaluation_criteria": [],
+        }
+
+    @staticmethod
+    def _sanitize_blacklist_values(values):
+        """Drop empty blacklist entries while preserving meaningful terms."""
+        if not isinstance(values, list):
+            return values
+
+        return [
+            value
+            for value in values
+            if not (isinstance(value, str) and value.strip() == "")
+        ]
+
+    def _get_blacklist_terms(self):
+        """Return normalized blacklist terms suitable for prompts and runtime checks."""
+        values = self._sanitize_blacklist_values(self.blacklist)
+        if not isinstance(values, list):
+            return []
+        return [value for value in values if isinstance(value, str)]
+
+    def _build_blacklist_instruction(self):
+        """Return a prompt instruction that steers the model away from blocked terms."""
+        blacklist_terms = self._get_blacklist_terms()
+        if not blacklist_terms:
+            return ""
+
+        joined_terms = ", ".join(f'"{term}"' for term in blacklist_terms)
+        return (
+            "Do not use any of these words or phrases in your response: "
+            f"{joined_terms}."
+        )
+
+    def _collect_studio_validation_issues(
+        self,
+        data,
+    ) -> tuple[dict[str, list[str]], list[str]]:
+        """
+        Extend base Studio validation issues with Coaching-specific rules.
+        """
+        validation_errors, validation_warnings = super()._collect_studio_validation_issues(data)
+        scenario_data = data.scenario_data
+        has_scenario_schema_errors = False
 
         try:
-            CoachScenarioData(**scenario_data)
-        except pydantic.ValidationError as e:  # pylint: disable=unused-variable
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    (
-                        f"{self._get_field_display_name('scenario_data')}: "
-                        "structure is invalid. Expected keys: "
-                        "case_details (str), learning_objectives (list[str]), "
-                        "evaluation_criteria (list[{name: str}])."
-                    ),
+            CoachScenarioData.model_validate(scenario_data)
+        except pydantic.ValidationError as e:
+            has_scenario_schema_errors = True
+            for error in e.errors():
+                field_name, message = self._format_scenario_data_validation_error(error)
+                self._add_studio_validation_error(
+                    validation_errors,
+                    field_name,
+                    message,
                 )
-            )
+
+        if not isinstance(scenario_data, dict):
+            scenario_data = {}
+        template_scenario_data = self._get_template_validation_scenario_data(
+            scenario_data,
+            has_scenario_schema_errors,
+        )
 
         # Validate templates early (StrictUndefined): catches missing keys/typos.
         try:
@@ -409,11 +577,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 messages=[{"character": {"name": "", "role": ""}, "content": ""}],
             )
         except jinja2.TemplateError as e:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    f"{self._get_field_display_name('conversation_format')}: {e}",
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "conversation_format",
+                str(e),
             )
 
         for prompt_field, pane in [
@@ -429,25 +596,37 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                         "avatar": "",
                         "pane": pane,
                     },
-                    scenario_data=scenario_data,
+                    scenario_data=template_scenario_data,
                 )
             except jinja2.TemplateError as e:
-                validation.add(
-                    ValidationMessage(
-                        ValidationMessage.ERROR,
-                        f"{self._get_field_display_name(prompt_field)}: {e}",
-                    )
+                self._add_studio_validation_error(
+                    validation_errors,
+                    prompt_field,
+                    str(e),
                 )
 
         try:
-            self._render_template(data.evaluator_prompt, scenario_data=scenario_data)
+            self._render_template(data.evaluator_prompt, scenario_data=template_scenario_data)
         except jinja2.TemplateError as e:
-            validation.add(
-                ValidationMessage(
-                    ValidationMessage.ERROR,
-                    f"{self._get_field_display_name('evaluator_prompt')}: {e}",
-                )
+            self._add_studio_validation_error(
+                validation_errors,
+                "evaluator_prompt",
+                str(e),
             )
+
+        return validation_errors, validation_warnings
+
+    def validate_field_data(self, validation, data):
+        """Validate field data."""
+        validation_errors, validation_warnings = self._collect_studio_validation_issues(data)
+
+        self._apply_studio_issues(
+            validation,
+            validation_errors,
+            validation_warnings,
+        )
+
+        self._clear_cached_studio_warnings()
 
     def _get_character_data(self, character_index):  # pylint: disable=missing-function-docstring
         # Hardcoded at 2 characters but extensible.
@@ -467,25 +646,89 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         ]
         return characters[character_index]
 
+    def _build_session_from_older_state(self):
+        """Build a session snapshot from older learner-state fields."""
+        return CoachingSession(
+            workspace_history=self.workspace_history,
+            coach_history=self.coach_history,
+            evaluation_fragments=self.evaluation_fragments,
+            attempts_used=self.attempts_used,
+            finished=self.finished,
+            final_submission=self.final_submission,
+            final_evaluation_markdown=self.final_evaluation_markdown,
+        ).model_dump()
+
+    def _clear_older_state_runtime_fields(self):
+        """Reset older learner-state fields after migration."""
+        self.workspace_history = []
+        self.coach_history = []
+        self.evaluation_fragments = []
+        self.attempts_used = 0
+        self.finished = False
+        self.final_submission = ""
+        self.final_evaluation_markdown = ""
+
+    def _ensure_sessions_initialized(self):
+        """Ensure Coaching learner state has a normalized active session."""
+        raw = self.sessions if isinstance(self.sessions, list) else []
+        normalized_dicts = []
+        for item in raw:
+            try:
+                normalized_dicts.append(CoachingSession.model_validate(item).model_dump())
+            except pydantic.ValidationError:
+                continue
+        sessions_changed = normalized_dicts != raw
+
+        migrate_from_older_state = not normalized_dicts
+        if migrate_from_older_state:
+            normalized_dicts = [self._build_session_from_older_state()]
+            sessions_changed = True
+
+        if sessions_changed:
+            self.sessions = normalized_dicts
+
+        if migrate_from_older_state:
+            self._clear_older_state_runtime_fields()
+            self.save()
+
+    def _get_active_session(self):
+        """Return the active learner session."""
+        self._ensure_sessions_initialized()
+        return list(self.sessions)[-1]
+
+    def _set_active_session(self, session):
+        """Replace the active learner session, validating at write time."""
+        validated = CoachingSession(**(session or {})).model_dump()
+        sessions = list(self.sessions or [])
+        if sessions:
+            sessions[-1] = validated
+        else:
+            sessions = [validated]
+        self.sessions = sessions
+        return validated
+
+    def _start_new_session(self):
+        """Append and return a fresh active learner session."""
+        sessions = list(self.sessions or [])
+        sessions.append(_EMPTY_SESSION.copy())
+        self.sessions = sessions
+        return sessions[-1]
+
+    def _session_has_meaningful_data(self, session):
+        """Return whether a session contains learner progress worth preserving."""
+        return session != _EMPTY_SESSION
+
     def _ensure_histories(self):
         """
         Initialize chat histories.
         """
-        if getattr(self, "_histories_ready", False):
-            return
-        if not isinstance(self.workspace_history, list):
-            self.workspace_history = []
-        if not isinstance(self.coach_history, list):
-            self.coach_history = []
-        if not isinstance(self.evaluation_fragments, list):
-            self.evaluation_fragments = []
-        self._histories_ready = True  # pylint: disable=attribute-defined-outside-init
+        return self._get_active_session()
 
-    def _record_fragment(self, character_index, user_message, character_message, **extra):
+    def _record_fragment(self, character_index, user_message, character_message, session=None, **extra):
         """
         Persist a conversation fragment into the appropriate history list.
         """
-        self._ensure_histories()
+        session = session or self._ensure_histories()
         fragment = {
             "character_index": character_index,
             "user_message": user_message,
@@ -493,18 +736,19 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         }
         fragment.update(extra)
         if fragment.get("is_evaluation"):
-            evaluations = list(self.evaluation_fragments or [])
+            evaluations = list(session["evaluation_fragments"])
             evaluations.append(fragment)
-            self.evaluation_fragments = evaluations
-            return
+            session["evaluation_fragments"] = evaluations
+            return self._set_active_session(session)
         if character_index == 1:
-            coach = list(self.coach_history or [])
+            coach = list(session["coach_history"])
             coach.append(fragment)
-            self.coach_history = coach
+            session["coach_history"] = coach
         else:
-            workspace = list(self.workspace_history or [])
+            workspace = list(session["workspace_history"])
             workspace.append(fragment)
-            self.workspace_history = workspace
+            session["workspace_history"] = workspace
+        return self._set_active_session(session)
 
     def _is_evaluation_fragment(self, fragment):  # pylint: disable=missing-function-docstring
         if fragment.get("is_evaluation"):
@@ -513,7 +757,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             return False
         if fragment.get("user_message"):
             return False
-        evaluation = self.final_evaluation_markdown or ""
+        evaluation = self._get_active_session()["final_evaluation_markdown"]
         if not evaluation:
             return False
         return fragment.get("character_message") == evaluation
@@ -549,11 +793,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Get chat histories separated by character.
         """
-        self._ensure_histories()
+        session = self._ensure_histories()
         chat_histories = [[], []]
-        for fragment in self.workspace_history or []:
+        for fragment in session["workspace_history"]:
             chat_histories[0].extend(self._get_chat_fragment_messages(fragment))
-        for fragment in self.coach_history or []:
+        for fragment in session["coach_history"]:
             chat_histories[1].extend(self._get_chat_fragment_messages(fragment))
         return chat_histories
 
@@ -568,10 +812,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         )
 
     def _build_final_report_payload(self):  # pylint: disable=missing-function-docstring
-        if not self.finished:
+        session = self._get_active_session()
+        if not session["finished"]:
             return None
-        final_submission = self.final_submission or ""
-        evaluation_markdown = self.final_evaluation_markdown or ""
+        final_submission = session["final_submission"]
+        evaluation_markdown = session["final_evaluation_markdown"]
         if not final_submission or not evaluation_markdown:
             return None
         report_html = self._render_final_report(final_submission)
@@ -581,17 +826,17 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "report_html": report_html,
             "show_report_card": True,
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": session["finished"],
         }
 
     def _messages_for_character(self, character_index, user_input=None):
         """
         Build LLM message payload for the requested character.
         """
-        self._ensure_histories()
+        session = self._ensure_histories()
         history_fragments = (
-            self.workspace_history if character_index == 0 else self.coach_history
-        ) or []
+            session["workspace_history"] if character_index == 0 else session["coach_history"]
+        )
         chat_history = []
         if character_index == 0 and self.initial_message:
             chat_history.append({
@@ -619,6 +864,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             scenario_data=self.scenario_data,
             character_data=self._get_character_data(character_index),
         )
+        blacklist_instruction = self._build_blacklist_instruction()
+        if blacklist_instruction:
+            prompt += "\n\n" + blacklist_instruction
         prompt += "\n\n" + self._render_template(
             self.conversation_format,
             messages=chat_history,
@@ -636,23 +884,20 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Return attempt usage details for the frontend.
         """
+        session = self._get_active_session()
         max_attempts = self.max_attempts or 0
-        attempts_used = self.attempts_used or 0
+        attempts_used = session["attempts_used"]
         max_attempts = max(max_attempts, 0)
         attempts_used = max(attempts_used, 0)
         attempts_remaining = max_attempts - attempts_used if max_attempts else None
         if attempts_remaining is not None:
             attempts_remaining = max(attempts_remaining, 0)
         can_retry = True if not max_attempts else (attempts_used < max_attempts)
-        input_open = self.input_open
-        if input_open is None:
-            input_open = True
         return {
             "max_attempts": max_attempts,
             "attempts_used": attempts_used,
             "attempts_remaining": attempts_remaining,
             "can_retry": can_retry,
-            "input_open": bool(input_open),
         }
 
     def _get_thread_tag(self, context="workspace"):
@@ -672,6 +917,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         _update_hash(self.character_1_prompt)
         _update_hash(self.character_2_prompt)
         _update_hash(self.evaluator_prompt)
+        _update_hash(json.dumps(self._get_blacklist_terms(), ensure_ascii=True))
 
         prompt_hash = prompt_hasher.hexdigest()
         context = context or "workspace"
@@ -694,59 +940,150 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def student_view(self, context=None):
         """
-        The primary view of the MultiAgentAIEvalXBlock, shown to students
+        The primary view of the CoachAIEvalXBlock, shown to students
         when viewing courses.
         """
-
+        active_session = self._get_active_session()
         characters = list(map(self._get_character_data, range(2)))
-
-        frag = Fragment()
-        frag.add_content(
-            self.loader.render_django_template(
-                "/templates/coach_layout.html",
-                {
-                    "self": self,
-                    "intro_text": self.intro_text,
-                    "characters": characters,
-                },
-            )
-        )
+        frag = Fragment('<div data-ai-eval-react-root="true"></div>')
+        frag.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
         frag.add_css(self.resource_string("static/css/chatbox.css"))
-        frag.add_javascript(self.resource_string("static/js/src/utils.js"))
-        marked_html = self.resource_string("static/html/marked-iframe.html")
-        js_data = {
-            "chat_histories": self._get_chat_histories(),
-            "initial_message": {
-                "character": self._get_character_data(0),
-                "content": self.initial_message,
+        frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.js"))
+        js_data = self._build_view_payload(
+            view="student",
+            handler_urls={
+                "get_character_response": self.runtime.handler_url(self, "get_character_response"),
+                "get_evaluator_response": self.runtime.handler_url(self, "get_evaluator_response"),
+                "reset_all": self.runtime.handler_url(self, "reset_all"),
             },
-            "coach_initial_message": {
-                "character": self._get_character_data(1),
-                "content": getattr(self, 'coach_initial_message', ""),
+            initial_state={
+                "chat_histories": self._get_chat_histories(),
+                "finished": active_session["finished"],
+                "attempts": self._get_attempt_state(),
             },
-            "characters": characters,
-            "finished": self.finished,
-            "attempts": self._get_attempt_state(),
-            "max_attempts": self.max_attempts,
-            "titles": {
-                "workspace": self.workspace_title,
-                "coach": self.coach_title,
+            meta={
+                "characters": characters,
+                "initial_message": {
+                    "character": self._get_character_data(0),
+                    "content": self.initial_message,
+                    "pane": "workspace",
+                    "is_user": False,
+                },
+                "coach_initial_message": {
+                    "character": self._get_character_data(1),
+                    "content": self.coach_initial_message,
+                    "pane": "coach",
+                    "is_user": False,
+                },
+                "titles": {
+                    "workspace": self.workspace_title,
+                    "coach": self.coach_title,
+                },
+                "allow_reset": self.allow_reset,
+                "intro_text": self.intro_text,
             },
-            "marked_html": marked_html,
-        }
+        )
         final_report = self._build_final_report_payload()
         if final_report:
-            js_data["final_report"] = final_report
-        frag.add_javascript(self.resource_string("static/js/src/coach.js"))
+            js_data["initial_state"]["final_report"] = final_report
         frag.initialize_js("CoachAIEvalXBlock", js_data)
         return frag
+
+    def _studio_parse_json_field(self, field_name, raw_value):
+        """Parse Studio JSON textarea values for Coaching-specific fields."""
+        if field_name not in {"scenario_data", "blacklist"}:
+            return raw_value, None
+
+        if not isinstance(raw_value, str):
+            return raw_value, None
+
+        try:
+            parsed_value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            label = self._get_field_display_name(field_name)
+            return None, _("{label} must be valid JSON.").format(label=label)
+
+        if field_name == "scenario_data" and not isinstance(parsed_value, dict):
+            return None, _("Scenario data must be a JSON object (dictionary).")
+
+        if field_name == "blacklist" and not isinstance(parsed_value, list):
+            return None, _("Output blacklist must be a JSON array.")
+
+        if field_name == "blacklist":
+            parsed_value = self._sanitize_blacklist_values(parsed_value)
+
+        return parsed_value, None
+
+    @XBlock.json_handler
+    def studio_submit(self, data, suffix=""):  # pylint: disable=unused-argument
+        """
+        Save the Studio editor payload using the existing field validation rules.
+        """
+        values = {}
+        missing_fields = []
+        validation_errors = {}
+
+        for field_name in self.editable_fields:
+            if field_name not in data:
+                missing_fields.append(field_name)
+                continue
+
+            parsed_value, parse_error = self._studio_parse_json_field(
+                field_name,
+                data[field_name],
+            )
+            if parse_error:
+                validation_errors[field_name] = [parse_error]
+                continue
+
+            field = self.fields[field_name]
+            values[field_name] = field.from_json(parsed_value)
+
+        if missing_fields:
+            validation_errors.update({
+                field_name: [_("Missing field in Studio payload.")]
+                for field_name in missing_fields
+            })
+
+        if validation_errors:
+            return self._studio_submit_response(
+                success=False,
+                validation_errors=validation_errors,
+                validation_warnings=[],
+                meta=self._studio_payload_meta(),
+            )
+
+        self.clean_studio_edits(values)
+
+        preview_data = FutureFields(
+            new_fields_dict=values,
+            newly_removed_fields=[],
+            fallback_obj=self,
+        )
+        validation_errors, validation_warnings = self._collect_studio_validation_issues(
+            preview_data,
+        )
+        self._clear_cached_studio_warnings()
+        has_validation_errors = bool(validation_errors)
+
+        if not has_validation_errors:
+            for field_name, value in values.items():
+                setattr(self, field_name, value)
+
+        return self._studio_submit_response(
+            success=not has_validation_errors,
+            validation_errors=validation_errors,
+            validation_warnings=validation_warnings,
+            meta=self._studio_payload_meta(),
+        )
 
     @XBlock.json_handler
     def get_character_response(self, data, suffix=""):
         """
         Generate the next message in the interaction.
         """
-        if self.finished:
+        session = self._get_active_session()
+        if session["finished"]:
             raise JsonHandlerError(403, "The session has ended.")
 
         if not isinstance(data, dict):
@@ -774,20 +1111,18 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             max_attempts = self.max_attempts or 0
             if not trimmed_input:
                 raise JsonHandlerError(400, "Input cannot be empty.")
-            if max_attempts and self.attempts_used >= max_attempts:
+            if max_attempts and session["attempts_used"] >= max_attempts:
                 raise JsonHandlerError(403, "No attempts remaining.")
-            self.attempts_used = (self.attempts_used or 0) + 1
-            if max_attempts and self.attempts_used >= max_attempts:
-                self.input_open = False
+            session["attempts_used"] += 1
 
-        self._ensure_histories()
         thread_context = f"character{character_index}"
         message = self.get_llm_response(
             self._messages_for_character(character_index, user_input),
             tag=self._get_thread_tag(thread_context),
         )
-        if self.blacklist:
-            if re.search(fr"\b({'|'.join(map(re.escape, self.blacklist))})\b",
+        blacklist_terms = self._get_blacklist_terms()
+        if blacklist_terms:
+            if re.search(fr"\b({'|'.join(map(re.escape, blacklist_terms))})\b",
                          message, re.I):
                 raise JsonHandlerError(500, "Internal error.")
         if self.message_content_tag:
@@ -797,7 +1132,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             if m:
                 message = m.group(1)
 
-        self._record_fragment(character_index, user_input, message)
+        session = self._record_fragment(
+            character_index,
+            user_input,
+            message,
+            session=session,
+        )
         character = self._get_character_data(character_index)
         return {
             "message": {
@@ -806,7 +1146,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "pane": character["pane"],
             },
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": session["finished"],
         }
 
     @XBlock.json_handler
@@ -814,23 +1154,18 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         """
         Reset both workspace and coach conversations and attempt state.
 
-        This is a full learner reset: clears histories, evaluation artifacts,
-        attempts, and cached provider thread IDs.
+        Preserve prior meaningful sessions and start a fresh active session.
         """
-        self._ensure_histories()
-        self.workspace_history = []
-        self.coach_history = []
-        self.evaluation_fragments = []
-        self.finished = False
-        self.input_open = True
-        self.attempts_used = 0
-        self.final_submission = ""
-        self.final_evaluation_markdown = ""
-        self.thread_map = {}
+        session = self._get_active_session()
+        if self._session_has_meaningful_data(session):
+            self._start_new_session()
+        else:
+            self._set_active_session(_EMPTY_SESSION.copy())
+        self._clear_thread_contexts(["character0", "character1", "evaluator"])
         return {
             "chat_histories": self._get_chat_histories(),
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": self._get_active_session()["finished"],
         }
 
     @XBlock.json_handler
@@ -841,12 +1176,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         activity.
 
         """
-        if self.finished:
+        session = self._get_active_session()
+        if session["finished"]:
             raise JsonHandlerError(403, "The session has ended.")
 
-        self._ensure_histories()
         latest_fragment = None
-        for fragment in reversed(self.workspace_history or []):
+        for fragment in reversed(session["workspace_history"]):
             if (fragment.get("user_message") or "").strip():
                 latest_fragment = fragment
                 break
@@ -859,6 +1194,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self.evaluator_prompt,
             scenario_data=scenario_data,
         )
+        blacklist_instruction = self._build_blacklist_instruction()
+        if blacklist_instruction:
+            prompt += "\n\n" + blacklist_instruction
         conversation_messages = [
             {
                 "character": {"name": "", "role": "user"},
@@ -879,23 +1217,23 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             _evaluator_messages(),
             tag=self._get_thread_tag("evaluator"),
         )
-        self._record_fragment(0, "", message, is_evaluation=True)
-        self.finished = True
-        self.input_open = False
-        self.final_submission = latest_fragment["user_message"]
-        self.final_evaluation_markdown = message
+        session = self._record_fragment(0, "", message, session=session, is_evaluation=True)
+        session["finished"] = True
+        session["final_submission"] = latest_fragment["user_message"]
+        session["final_evaluation_markdown"] = message
+        self._set_active_session(session)
         character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
-        report_html = self._render_final_report(self.final_submission)
+        report_html = self._render_final_report(session["final_submission"])
         return {
             "message": {
                 "character": character,
                 "content": message,
                 "pane": character["pane"],
             },
-            "final_submission": self.final_submission,
+            "final_submission": session["final_submission"],
             "report_html": report_html,
             "evaluation_markdown": message,
             "show_report_card": True,
             "attempts": self._get_attempt_state(),
-            "finished": self.finished,
+            "finished": session["finished"],
         }

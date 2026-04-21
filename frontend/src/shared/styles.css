@@ -1,0 +1,62 @@
+/*
+ * Reset Paragon's body-level styles on the scoping wrapper so the XBlock
+ * inherits font/color from the host page (Studio or LMS).  Paragon component
+ * styles (.btn, .form-control, etc.) still apply inside the wrapper.
+ * This override can be removed when Redwood support is dropped and XBlocks
+ * render in iframes everywhere (Ulmo+).
+ */
+.ai-eval-paragon {
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  background-color: transparent;
+}
+
+
+:root {
+  --ai-eval-react-spacing-sm: 0.5rem;
+  --ai-eval-react-spacing-md: 1rem;
+  --ai-eval-react-border-color: #d0d0d0;
+  --ai-eval-react-surface-color: #ffffff;
+  --ai-eval-react-muted-color: #5c5c5c;
+  --ai-eval-react-radius: 0.5rem;
+}
+
+.ai-eval-react-shell {
+  background: var(--ai-eval-react-surface-color);
+  border: 1px solid var(--ai-eval-react-border-color);
+  border-radius: var(--ai-eval-react-radius);
+  padding: var(--ai-eval-react-spacing-md);
+}
+
+.ai-eval-react-shell > :first-child {
+  margin-top: 0;
+}
+
+.ai-eval-react-shell > :last-child {
+  margin-bottom: 0;
+}
+
+.ai-eval-react-shell__meta {
+  color: var(--ai-eval-react-muted-color);
+  display: flex;
+  gap: var(--ai-eval-react-spacing-md);
+  margin-top: var(--ai-eval-react-spacing-sm);
+}
+
+.ai-eval-react-status {
+  margin-top: var(--ai-eval-react-spacing-sm);
+  min-height: 1.25rem;
+}
+
+.ai-eval-alert-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.ai-eval-section-errors-title {
+  font-weight: 700;
+  margin: 0 0 4px;
+}

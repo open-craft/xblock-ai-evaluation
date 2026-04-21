@@ -54,6 +54,7 @@
 }
 
 .eval-ai-container .submit-loader {
+  display: inline-block;
   margin-left: 5px;
 }
 

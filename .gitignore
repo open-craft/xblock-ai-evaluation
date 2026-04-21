@@ -58,3 +58,7 @@ target/
 # IDEs
 .idea
 .idea/*
+
+# Frontend workspace
+frontend/node_modules/
+frontend/coverage/

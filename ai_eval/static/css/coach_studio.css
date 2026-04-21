@@ -1,53 +1,484 @@
-/* Coach XBlock - Studio edit layout enhancements (scoped to editor body) */
+/* Coaching Studio sectioned authoring layout. */
 
-/* Stack each field vertically: label -> help -> input */
-.xblock-editor .wrapper-comp-setting,
-.xblock-editor .list-input.settings-list .setting {
-  display: block;
-  clear: both;
-  margin-bottom: 1.25rem;
+.coaching-react-studio {
+    --pgn-color-coaching-border: var(--pgn-color-gray-100, #cbcbcb);
+    --pgn-color-coaching-border-strong: var(--pgn-color-gray-300, #b4b4b4);
+    --pgn-color-coaching-border-soft: var(--pgn-color-gray-50, #e5e5e5);
+    --pgn-color-coaching-panel-bg: var(--pgn-color-white, #ffffff);
+    --pgn-color-coaching-page-bg: var(--pgn-color-gray-25, #f4f4f4);
+    --pgn-color-coaching-nav-active: var(--pgn-color-gray-50, #e5e5e5);
+    --pgn-color-coaching-text: var(--pgn-color-gray-700, #3c3c3c);
+    --pgn-color-coaching-text-muted: var(--pgn-color-gray-500, #717171);
+    --pgn-color-coaching-title: var(--pgn-color-gray-600, #515151);
+    --pgn-color-coaching-accent: var(--pgn-color-brand, #0078b1);
+    --pgn-color-coaching-accent-soft: var(--pgn-color-info-100, #dceef6);
+    --pgn-color-coaching-danger: var(--pgn-color-danger-500, #a11d1d);
+    --pgn-color-coaching-warning-bg: var(--pgn-color-warning-100, #fff8e5);
+    --pgn-color-coaching-warning-border: var(--pgn-color-warning-300, #ead9a4);
 }
 
-.xblock-editor .wrapper-comp-setting .setting-label,
-.xblock-editor .wrapper-comp-setting .setting-input {
-  float: none !important;
-  width: 100% !important;
+.modal-window.modal-type-coach_ai_eval .modal-actions {
+    display: block;
 }
 
-.xblock-editor .wrapper-comp-setting .setting-label label,
-.xblock-editor .wrapper-comp-setting .setting-label .label {
-  display: block;
-  font-weight: 700;
-  font-size: 1.05rem;
-  color: #111827;
-  margin: 0 0 0.25rem 0;
+.coaching-react-studio .wrapper-comp-settings {
+    padding: 0;
 }
 
-/* Help/description text under the label */
-.xblock-editor .wrapper-comp-setting .setting-label .tip,
-.xblock-editor .wrapper-comp-setting .setting-label .help,
-.xblock-editor .wrapper-comp-setting .setting-label .setting-help {
-  display: block;
-  margin: 0 0 0.5rem 0;
-  color: #6b7280; /* slate-500 */
-  font-size: 0.95rem;
-  line-height: 1.35;
+.coaching-react-studio .coaching-studio-shell {
+    background: var(--pgn-color-coaching-page-bg);
+    border-radius: 4px;
+    color: var(--pgn-color-coaching-text);
+    padding: 20px 24px 24px;
 }
 
-/* Inputs span full width */
-.xblock-editor .wrapper-comp-setting .setting-input input[type="text"],
-.xblock-editor .wrapper-comp-setting .setting-input input[type="number"],
-.xblock-editor .wrapper-comp-setting .setting-input select,
-.xblock-editor .wrapper-comp-setting .setting-input textarea {
-  width: 100% !important;
-  max-width: none;
-  border: 1px solid #d1d5db; /* gray-300 */
-  border-radius: 6px;
-  padding: 0.65rem 0.75rem;
-  box-shadow: none;
+.coaching-react-studio .coaching-studio-action {
+    min-width: 88px;
+    text-align: center;
 }
 
-/* Space multi-line editors consistently */
-.xblock-editor .wrapper-comp-setting .setting-input textarea {
-  min-height: 120px;
+.coaching-react-studio .coaching-studio-action--primary {
+    background: var(--pgn-color-coaching-accent);
+    border-color: var(--pgn-color-coaching-accent);
+    color: #fff;
+}
+
+.coaching-react-studio .coaching-studio-action--primary[disabled] {
+    opacity: 0.75;
+}
+
+.coaching-react-studio .coaching-studio-field-errors {
+    color: var(--pgn-color-coaching-danger);
+}
+
+.coaching-react-studio .coaching-studio-body {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: 200px minmax(0, 1fr);
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-nav {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 24px 0 0;
+}
+
+.coaching-react-studio .coaching-studio-nav-item + .coaching-studio-nav-item {
+    margin-top: 2px;
+}
+
+.coaching-react-studio .coaching-studio-nav-button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 2px;
+    color: var(--pgn-color-coaching-text);
+    cursor: pointer;
+    display: flex;
+    font-size: 16px;
+    font-weight: 500;
+    justify-content: space-between;
+    line-height: 34px;
+    padding: 0 12px;
+    position: relative;
+    text-align: left;
+    width: 100%;
+}
+
+.coaching-react-studio .coaching-studio-nav-button:hover {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.coaching-react-studio .coaching-studio-nav-button.is-active {
+    background: var(--pgn-color-coaching-nav-active);
+}
+
+.coaching-react-studio .coaching-studio-nav-button.is-active::after {
+    background: var(--pgn-color-coaching-accent);
+    border-radius: 100px;
+    content: "";
+    height: 24px;
+    left: 0;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+}
+
+.coaching-react-studio .coaching-studio-nav-text {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-nav-badge {
+    background: #f8d5d5;
+    border-radius: 999px;
+    color: var(--pgn-color-coaching-danger);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    min-width: 20px;
+    padding: 4px 6px;
+    text-align: center;
+}
+
+.coaching-react-studio .coaching-studio-panel {
+    background: var(--pgn-color-coaching-panel-bg);
+    border: 1px solid var(--pgn-color-coaching-border);
+    border-radius: 2px;
+    min-width: 0;
+    padding: 22px 28px 28px;
+}
+
+.coaching-react-studio .coaching-studio-panel-header {
+    margin-bottom: 4px;
+    padding: 0 20px 0;
+}
+
+.coaching-react-studio .coaching-studio-panel-title {
+    color: var(--pgn-color-coaching-text);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-panel-description {
+    color: var(--pgn-color-coaching-text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 8px 0 0;
+    max-width: 72ch;
+}
+
+.coaching-react-studio .coaching-studio-section-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.coaching-react-studio .coaching-studio-card {
+    border-radius: 3px;
+    padding: 8px 20px 20px;
+}
+
+.coaching-react-studio .coaching-studio-card-header {
+    margin-bottom: 4px;
+}
+
+.coaching-react-studio .coaching-studio-card-title {
+    color: var(--pgn-color-coaching-title);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-card-description {
+    color: var(--pgn-color-coaching-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    margin: 4px 0 0;
+}
+
+.coaching-react-studio .coaching-studio-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.coaching-react-studio .coaching-studio-field {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-header {
+    margin-bottom: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-title-row {
+    align-items: baseline;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-bottom: 2px;
+}
+
+.coaching-react-studio .coaching-studio-field-counter {
+    color: var(--pgn-color-coaching-text-muted);
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.coaching-react-studio .coaching-studio-field-control {
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-list-field {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.coaching-react-studio .coaching-studio-list-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.coaching-react-studio .coaching-studio-list-row-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.coaching-react-studio .coaching-studio-list-row {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+}
+
+.coaching-react-studio .coaching-studio-list-row .coaching-studio-input {
+    flex: 1 1 auto;
+}
+
+.coaching-react-studio .coaching-studio-input[aria-invalid="true"] {
+    border-color: #d08b8b;
+}
+
+.coaching-react-studio .coaching-studio-input--compact {
+    max-width: 120px;
+}
+
+.coaching-react-studio .coaching-studio-textarea {
+    min-height: 74px;
+    resize: vertical;
+}
+
+.coaching-react-studio .coaching-studio-list-remove span {
+    color: #fff;
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.coaching-react-studio .coaching-studio-radio-group {
+    display: flex;
+    gap: 24px;
+    padding: 4px 0 2px;
+}
+
+.coaching-react-studio .coaching-studio-radio-group label {
+    align-items: center;
+    color: #454545;
+    display: inline-flex;
+    font-size: 18px;
+    gap: 8px;
+    line-height: 28px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-radio-group input[type="radio"] {
+    accent-color: var(--pgn-color-coaching-accent);
+    height: 18px;
+    margin: 0;
+    width: 18px;
+}
+
+.coaching-react-studio .coaching-studio-field-errors {
+    margin: 8px 0 0;
+    padding-left: 20px;
+}
+
+/* Paragon Form component overrides — keep coaching visual design */
+.coaching-react-studio .coaching-studio-field.pgn__form-group {
+    display: block;
+    margin: 0;
+    padding: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-control {
+    max-width: 700px;
+}
+
+.coaching-react-studio input.form-control,
+.coaching-react-studio select.form-control {
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.coaching-react-studio .coaching-studio-list-row .coaching-studio-input {
+    max-width: calc(100% - 28px);
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.coaching-react-studio .coaching-studio-list-row .form-control {
+    box-sizing: border-box;
+}
+
+.coaching-react-studio .coaching-studio-field-label.pgn__form-label {
+    color: var(--pgn-color-coaching-title);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-field-description.pgn__form-text,
+.coaching-react-studio .coaching-studio-field-help.pgn__form-text {
+    color: var(--pgn-color-coaching-text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    margin: 0;
+}
+
+.coaching-react-studio .coaching-studio-input.pgn__form-control,
+.coaching-react-studio .coaching-studio-input.form-control {
+    background: #fff;
+    border: 1px solid var(--pgn-color-coaching-border-strong);
+    border-radius: 2px;
+    box-sizing: border-box;
+    color: var(--pgn-color-coaching-text);
+    font-size: 14px;
+    line-height: 23px;
+    max-width: none;
+    padding: 6px 12px;
+    width: 100% !important;
+}
+
+.coaching-react-studio .coaching-studio-input.pgn__form-control:focus,
+.coaching-react-studio .coaching-studio-input.form-control:focus {
+    border-color: var(--pgn-color-coaching-accent);
+    box-shadow: 0 0 0 1px var(--pgn-color-coaching-accent);
+    outline: none;
+}
+
+.coaching-react-studio .coaching-studio-list-add.btn,
+.coaching-react-studio .coaching-studio-list-remove.btn {
+    align-self: flex-start;
+    background: #fff;
+    border: 1px solid var(--pgn-color-coaching-border-strong);
+    border-radius: 2px;
+    color: var(--pgn-color-coaching-text);
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 36px;
+    padding: 0 12px;
+    text-decoration: none;
+}
+
+.coaching-react-studio .coaching-studio-list-remove.btn {
+    align-items: center;
+    align-self: center;
+    background: #ff2d20;
+    border: 1px solid #ff2d20;
+    border-radius: 999px;
+    box-shadow: none;
+    color: transparent;
+    display: inline-flex;
+    font-size: 0;
+    height: 18px;
+    justify-content: center;
+    line-height: 0;
+    margin-top: 2px;
+    max-height: 18px;
+    max-width: 18px;
+    min-height: 18px;
+    min-width: 18px;
+    overflow: hidden;
+    padding: 0;
+    width: 18px;
+}
+
+.coaching-react-studio .coaching-studio-list-add.btn:hover {
+    border-color: var(--pgn-color-coaching-accent);
+    color: var(--pgn-color-coaching-accent);
+}
+
+.coaching-react-studio .coaching-studio-list-remove.btn:hover {
+    background: #ff1305;
+    border-color: #ff1305;
+}
+
+
+@media (max-width: 1180px) {
+    .coaching-react-studio .coaching-studio-shell {
+        padding: 16px;
+    }
+
+    .coaching-react-studio .coaching-studio-body {
+        gap: 16px;
+        grid-template-columns: 1fr;
+    }
+
+    .coaching-react-studio .coaching-studio-nav-list {
+        display: grid;
+        gap: 6px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        padding-top: 0;
+    }
+
+    .coaching-react-studio .coaching-studio-nav-button.is-active::after {
+        display: none;
+    }
+
+    .coaching-react-studio .coaching-studio-panel {
+        padding: 18px;
+    }
+}
+
+@media (max-width: 720px) {
+    .coaching-react-studio .coaching-studio-card {
+        padding: 16px;
+    }
+
+    .coaching-react-studio .coaching-studio-field-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .coaching-react-studio .coaching-studio-radio-group {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .coaching-react-studio .coaching-studio-list-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.coaching-react-studio .pgn__form-radio {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 0.35rem !important;
+}
+
+.coaching-react-studio .pgn__form-radio .pgn__form-label {
+    position: relative !important;
+    top: 2px !important;
+}
+
+.coaching-react-studio .pgn__form-text {
+    margin-bottom: 0.5rem !important;
+}
+
+.coaching-react-studio textarea {
+    resize: none !important;
 }
