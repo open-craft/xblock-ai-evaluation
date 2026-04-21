@@ -87,7 +87,7 @@ function getEvaluationCriteriaItems(
 }
 
 export function getScenarioEditorModel(
-  scenarioData: ScenarioData | undefined,
+  scenarioData?: ScenarioData,
 ): CoachingScenarioEditorModel {
   return {
     caseDetails: scenarioData?.case_details ?? "",

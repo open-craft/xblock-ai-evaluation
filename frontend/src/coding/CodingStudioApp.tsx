@@ -39,19 +39,6 @@ const codingSchema = Yup.object({
     .required("Question field is mandatory"),
 });
 
-function buildSubmitPayload(values: CodingStudioState) {
-  return {
-    display_name: values.display_name || "",
-    model: values.model || "",
-    model_api_key: values.model_api_key || "",
-    model_api_url: values.model_api_url || "",
-    question: values.question || "",
-    evaluation_prompt: values.evaluation_prompt || "",
-    judge0_api_key: values.judge0_api_key || "",
-    language: values.language || "",
-  };
-}
-
 function CodingSettingsForm({
   fieldMetadata,
   lockMetadata,
@@ -277,7 +264,7 @@ function CodingStudioFormContent({
     try {
       const response = await submitStudioPayload(
         payload.handler_urls.studio_submit,
-        buildSubmitPayload(valuesRef.current),
+        codingSchema.cast(valuesRef.current),
       );
 
       setValidationErrors(normalizeValidationErrors(response.validation_errors));

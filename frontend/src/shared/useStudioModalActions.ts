@@ -26,7 +26,7 @@ export function useStudioModalActions({
     const cancelAction = modalActions?.querySelector(".action-cancel") as HTMLAnchorElement | null;
 
     if (!modalActions || !saveAction || !cancelAction) {
-      return undefined;
+      return;
     }
 
     modalActions.style.display = "block";
