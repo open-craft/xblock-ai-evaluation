@@ -24,6 +24,7 @@
 
     <section>
         <h2>AI Feedback</h2>
+        {% if data.time %}<time datetime="{{ data.time.isoformat() }}">{{ data.time | pretty_time }}</time>{% endif %}
 
         {{ data.feedback | safe }}
     </section>
