@@ -9,6 +9,7 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
 from web_fragments.fragment import Fragment
+from webob import Response
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Dict, List, Scope, String
@@ -22,13 +23,14 @@ from .utils import (
 )
 from .backends.factory import BackendFactory
 from .pdf_generator import CodingData, CodingCode
+from .times import now
 
 logger = logging.getLogger(__name__)
 
 USER_RESPONSE = "USER_RESPONSE"
 AI_EVALUATION = "AI_EVALUATION"
 CODE_EXEC_RESULT = "CODE_EXEC_RESULT"
-
+TIME = "TIME"
 
 class CodingAIEvalXBlock(AIEvalXBlock):
     """
@@ -395,6 +397,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                     "stdout": data["stdout"],
                     "stderr": data["stderr"],
                 },
+                TIME: now().isoformat(),
             })
             return {"response": response}
 
@@ -456,9 +459,22 @@ class CodingAIEvalXBlock(AIEvalXBlock):
     def download_pdf(self, data, suffix=""):
         """Generate and download the pdf summary of the exercise."""
         if not self.pdf_download_allowed:
-            raise JsonHandlerError(400, "PDF download is disabled.")
+            return Response(
+                json.dumps({"error": "PDF download is disabled."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8"
+            )
 
         session = self.sessions[-1]
+
+        if not session[USER_RESPONSE] or not session[CODE_EXEC_RESULT] or not session[AI_EVALUATION]:
+            return Response(
+                json.dumps({"error": "Data not available to generate transcript."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8"
+            )
 
         code = session[USER_RESPONSE]
         language_id = SUPPORTED_LANGUAGE_MAP[self.language].monaco_id
@@ -484,5 +500,6 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 stderr=session[CODE_EXEC_RESULT]['stderr'],
             ),
             feedback=session[AI_EVALUATION],
+            time=session.get(TIME)
         )
         return self.build_pdf_response(content)

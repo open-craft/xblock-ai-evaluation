@@ -1,0 +1,33 @@
+from datetime import datetime, UTC, timezone
+
+# These are fallback times to make it easier to work with and order old data that doesn't have times.
+# coach messages should be displayed before workspace messages
+# For any message with these times, the times should not be displayed to the user (because they're fake times).
+FALLBACK_COACH_MESSAGE_TIME = datetime(1975, 1, 1, tzinfo=UTC).isoformat()
+FALLBACK_WORKSPACE_MESSAGE_TIME = datetime(1976, 1, 1, tzinfo=UTC).isoformat()
+
+
+def get_tz() -> timezone:
+    """
+    Get a common timezone to use for server-side times.
+
+    Message timestamps are recorded in this timezone,
+    and are displayed in this timezone on the PDF transcripts.
+
+    In future, this timezone could be customised.
+    """
+    return UTC
+
+
+def now() -> datetime:
+    return datetime.now(get_tz())
+
+
+def pretty_time(value: datetime) -> str:
+    """
+    Jinja filter to get a human readable date with a consistent format.
+
+    This is used to display date values in the PDFs.
+    """
+    # See https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes for formatting help.
+    return value.strftime("%d %B %Y, %I:%M%p %Z")

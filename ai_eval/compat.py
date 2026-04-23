@@ -1,9 +1,14 @@
 """Compatibility layer for Open edX."""
 
+import logging
 from typing import Any
 
 from django.conf import settings
+from django.urls import reverse
 
+from .pdf_generator import Location
+
+logger = logging.getLogger(__name__)
 
 def _get_current_site_configuration_value(key: str, default: Any = None) -> Any:  # pragma: no cover
     """
@@ -73,3 +78,41 @@ def get_site_configuration_value(block_settings_key: str, config_key: str) -> st
     lms_base = _get_current_site_configuration_value("LMS_BASE", getattr(settings, "LMS_BASE", None))
     block_config = _get_site_configuration_value(lms_base, block_settings_key, {})
     return block_config.get(config_key)
+
+
+def get_pdf_location_nav(xblock: "XBlock") -> Location | None:
+    """
+    Build and return the structured hierarchy of location information for this xblock.
+
+    Return None if an error is encountered that indicates the current runtime doesn't support this
+    or the xblock isn't in a standard course hierarchy (eg. a content library).
+    """
+    try:
+        unit = xblock.get_parent()
+        subsection = unit.get_parent()
+        section = subsection.get_parent()
+        course = section.get_parent()
+    except Exception:  # pylint: disable=broad-exception-caught
+        logger.warning(
+            "Failed to retrieve location hierarchy information, "
+            "possibly not running in openedx-platform runtime or from within a course. Skipping."
+        )
+        return None
+
+    lms_root_url = _get_current_site_configuration_value('LMS_ROOT_URL', settings.LMS_ROOT_URL)
+    unit_url = f"{lms_root_url}/courses/{course.id}/jump_to/{unit.location}"
+    subsection_url = f"{lms_root_url}/courses/{course.id}/jump_to/{subsection.location}"
+    section_url = f"{lms_root_url}/courses/{course.id}/jump_to/{section.location}"
+    course_url = f"{lms_root_url}/courses/{course.id}/"
+
+    return Location(
+        course_name=course.display_name,
+        course_url=course_url,
+        section_name=section.display_name,
+        section_url=section_url,
+        subsection_name=subsection.display_name,
+        subsection_url=subsection_url,
+        unit_name=unit.display_name,
+        unit_url=unit_url,
+    )
+

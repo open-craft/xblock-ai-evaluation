@@ -12,6 +12,7 @@ import chardet
 
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
+from webob import Response
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, String, Scope
@@ -414,7 +415,22 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     def download_pdf(self, data, suffix=""):
         """Generate and download the pdf summary of the exercise."""
         if not self.pdf_download_allowed:
-            raise JsonHandlerError(400, "PDF download is disabled.")
+            return Response(
+                json.dumps({"error": "PDF download is disabled."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8"
+            )
+
+        session = self.sessions[-1]
+
+        if not session:
+            return Response(
+                json.dumps({"error": "Data not available to generate transcript."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8"
+            )
 
         user = self.runtime.service(self, "user").get_current_user()
         # Fallbacks because these user attributes are not guaranteed to be set.
@@ -439,7 +455,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                         kind="student",
                     )
                 )
-                for data in self.sessions[-1]
+                for data in session
             ]
         )
 

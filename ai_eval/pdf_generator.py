@@ -1,6 +1,6 @@
 import logging
 from typing import Literal, Any, Annotated
-from datetime import datetime, UTC
+from datetime import datetime
 from importlib.resources import files
 
 import mistune
@@ -9,20 +9,13 @@ from weasyprint import HTML, CSS
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, ConfigDict, Field, AfterValidator
 
+from .times import pretty_time, now
+
 # Quick reference docs:
 # - https://doc.courtbouillon.org/weasyprint/stable/
 # - https://pydantic.dev/docs/
 # - https://jinja.palletsprojects.com/en/stable/
 
-
-def pretty_time(value: datetime) -> str:
-    """
-    Jinja filter to get a human readable date with a consistent format.
-
-    This is used to display date values in the PDFs.
-    """
-    # See https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes for formatting help.
-    return value.strftime("%d %B %Y, %I:%M%p %Z")
 
 
 # A shared jinja environment for consistency and potentially caching.
@@ -34,7 +27,7 @@ _JINJA_ENV = Environment(
 _JINJA_ENV.filters["pretty_time"] = pretty_time
 
 
-# XXX: The frontend uses dompurify and marked frontend/src/shared/renderMarkdown.ts;
+# TODO: The frontend uses dompurify and marked frontend/src/shared/renderMarkdown.ts;
 # we may wish to consolidate markdown rendering and html cleaning to the backend, and remove it from the frontend.
 def _markdown_to_safe_html(markdown_content: str) -> str:
     html_content = mistune.html(markdown_content)
@@ -83,8 +76,7 @@ class CoachedMessage(BaseModel):
     name: str
     # NOTE: The time field on messages was added in 2026-04, so some existing instances may not have this field.
     # Use an optional field here to avoid breaking changes.
-    # Also, the initial messages are hardcoded and don't really have a well defined timestamp (perhaps they could default to the course start date?).
-    # TODO: check if this is actually used in production anywhere; we may still be able to make the breaking changes.
+    # Either way the initial messages are hardcoded in config and don't have a timestamp (perhaps they could default to the course start date?).
     time: datetime | None
     content: Annotated[str, AfterValidator(_markdown_to_safe_html)]
 
@@ -120,7 +112,6 @@ class ShortAnswerMessage(BaseModel):
     name: str
     # NOTE: The time field on messages was added in 2026-04, so some existing instances may not have this field.
     # Use an optional field here to avoid breaking changes.
-    # TODO: check if this is actually used in production anywhere; we may still be able to make the breaking changes.
     time: datetime | None
     content: Annotated[str, AfterValidator(_markdown_to_safe_html)]
 
@@ -149,6 +140,7 @@ class CodingData(BaseModel):
 
     code: CodingCode
     feedback: Annotated[str, AfterValidator(_markdown_to_safe_html)]
+    time: datetime | None
 
     @staticmethod
     def template_file() -> str:
@@ -166,7 +158,7 @@ class Metadata(BaseModel):
 
 def generate_pdf(metadata: Metadata, data: CoachedData | ShortAnswerData | CodingData) -> bytes:
     html = _JINJA_ENV.get_template(data.template_file()).render(
-        data=data.model_dump(), time=datetime.now(UTC), **metadata.model_dump()
+        data=data.model_dump(), time=now(), **metadata.model_dump()
     )
 
     css = files("ai_eval").joinpath("static/pdf/base.css").read_text(encoding="utf8")

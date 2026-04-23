@@ -1,6 +1,5 @@
 """Multi-agent AI XBlock."""
 
-from datetime import datetime, UTC
 import hashlib
 import json
 import re
@@ -17,12 +16,14 @@ from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
 from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
+from webob import Response
 
 from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
+from .times import now, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
 
 
 SAMPLE_CHARACTER_PROMPT = textwrap.dedent("""
@@ -736,7 +737,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "character_index": character_index,
             "user_message": user_message,
             "character_message": character_message,
-            "time": datetime.now(UTC).isoformat(),
+            "time": now().isoformat(),
         }
         fragment.update(extra)
         if fragment.get("is_evaluation"):
@@ -1252,16 +1253,30 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         Generate and download the pdf summary of the exercise.
         """
         if not self.pdf_download_allowed:
-            raise JsonHandlerError(400, "PDF download is disabled.")
+            return Response(
+                json.dumps({"error": "PDF download is disabled."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8"
+            )
+
 
         if not self.sessions:
-            raise JsonHandlerError(400, "No data to build PDF.")
+            return Response(
+                json.dumps({"error": "No data to build PDF."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8"
+            )
 
         session = self.sessions[-1]
 
         if not session["finished"]:
-            raise JsonHandlerError(
-                400, "PDF can only be generated when the answer has been submitted."
+            return Response(
+                json.dumps({"error": "PDF can only be generated when the answer has been submitted."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8"
             )
 
         user = self.runtime.service(self, "user").get_current_user()
@@ -1273,157 +1288,70 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             or "Student"
         )
 
-        # Follow a simplified method of ordering the chats if timestamps are not available:
-        # simply show the coach chat first, then show the workspace chat (no interleaving by time order).
-        # TODO: is this necessary? If this block is not being used in production yet,
-        #       we can simply make the breaking changes, and let any test users know they need to reset the components.
-        no_timestamps = (
-            session["workspace_history"] and not session["workspace_history"][0].get("time")
-        ) or (session["coach_history"] and not session["coach_history"][0].get("time"))
-        if no_timestamps:
-            sections = []
+        # Here we have timestamps, so interleave the individual chats, sorted by message timestamp.
+        # A `session` looks like [{'character_message': str, 'user_message': str, 'character_index': 0, 'time': 'isotimestring'}]
+        # The 'time' key was added in 2026-04, so add a fallback time for old sessions for sorting purposes.
+        coach_history = [{**entry, "time": entry.get("time", FALLBACK_COACH_MESSAGE_TIME)} for entry in session["coach_history"]]
+        workspace_history = [{**entry, "time": entry.get("time", FALLBACK_WORKSPACE_MESSAGE_TIME)} for entry in session["workspace_history"]]
 
-            coach_messages = []
-            if self.coach_initial_message:
-                coach_messages.append(
-                    CoachedMessage(
-                        kind="coach",
-                        avatar_url=self.character_2_avatar,
-                        name=self.character_2_name,
-                        time=None,
-                        content=self.coach_initial_message,
-                    )
-                )
-            if session["coach_history"]:
-                for entry in session["coach_history"]:
-                    coach_messages.append(
-                        CoachedMessage(
-                            kind="student",
-                            avatar_url="",
-                            name=user_name,
-                            time=None,
-                            content=entry["user_message"],
-                        )
-                    )
-                    coach_messages.append(
+        entries = sorted(coach_history + workspace_history, key=lambda x: x["time"])
+        sections = []
+        used_coach_initial_message = False
+        used_workspace_initial_message = False
+        for entry in entries:
+            character_info = self._get_character_data(entry["character_index"])
+            kind = character_info["pane"]
+            if not sections or sections[-1].kind != kind:
+                sections.append(CoachedSection(kind=kind, messages=[]))
+                if (
+                    kind == "coach"
+                    and self.coach_initial_message
+                    and not used_coach_initial_message
+                ):
+                    sections[-1].messages.append(
                         CoachedMessage(
                             kind="coach",
-                            avatar_url=self.character_2_avatar,
-                            name=self.character_2_name,
+                            avatar_url=character_info["avatar"],
+                            name=character_info["name"],
                             time=None,
-                            content=entry["character_message"],
+                            content=self.coach_initial_message,
                         )
                     )
-            if coach_messages:
-                sections.append(
-                    CoachedSection(
-                        kind="coach",
-                        messages=coach_messages,
-                    )
-                )
-
-            workspace_messages = []
-            if self.initial_message:
-                workspace_messages.append(
-                    CoachedMessage(
-                        kind="workspace",
-                        avatar_url=self.character_1_avatar,
-                        name=self.character_1_name,
-                        time=None,
-                        content=self.initial_message,
-                    )
-                )
-            if session["workspace_history"]:
-                for entry in session["workspace_history"]:
-                    workspace_messages.append(
-                        CoachedMessage(
-                            kind="student",
-                            avatar_url="",
-                            name=user_name,
-                            time=None,
-                            content=entry["user_message"],
-                        )
-                    )
-                    workspace_messages.append(
+                    used_coach_initial_message = True
+                if (
+                    kind == "workspace"
+                    and self.initial_message
+                    and not used_workspace_initial_message
+                ):
+                    sections[-1].messages.append(
                         CoachedMessage(
                             kind="workspace",
-                            avatar_url=self.character_1_avatar,
-                            name=self.character_1_name,
+                            avatar_url=character_info["avatar"],
+                            name=character_info["name"],
                             time=None,
-                            content=entry["character_message"],
+                            content=self.initial_message,
                         )
                     )
-            if workspace_messages:
-                sections.append(
-                    CoachedSection(
-                        kind="workspace",
-                        messages=workspace_messages,
-                    )
+                    used_workspace_initial_message = True
+            sections[-1].messages.append(
+                CoachedMessage(
+                    kind="student",
+                    avatar_url="",
+                    name=user_name,
+                    # don't send the time if it's one of the fallback times
+                    time=entry["time"] if entry["time"] not in(FALLBACK_WORKSPACE_MESSAGE_TIME, FALLBACK_COACH_MESSAGE_TIME) else None,
+                    content=entry["user_message"],
                 )
-
-        else:
-            # Here we have timestamps, so interleave the individual chats, sorted by message timestamp.
-            # A `session` looks like [{'character_message': str, 'user_message': str, 'character_index': 0, 'time': 'isotimestring'}]
-            entries = sorted(
-                session["workspace_history"] + session["coach_history"],
-                key=lambda x: x["time"],
             )
-            sections = []
-            used_coach_initial_message = False
-            used_workspace_initial_message = False
-            for entry in entries:
-                character_info = self._get_character_data(entry["character_index"])
-                kind = character_info["pane"]
-                if not sections or sections[-1].kind != kind:
-                    sections.append(CoachedSection(kind=kind, messages=[]))
-                    if (
-                        kind == "coach"
-                        and self.coach_initial_message
-                        and not used_coach_initial_message
-                    ):
-                        sections[-1].messages.append(
-                            CoachedMessage(
-                                kind="coach",
-                                avatar_url=character_info["avatar"],
-                                name=character_info["name"],
-                                time=None,
-                                content=self.coach_initial_message,
-                            )
-                        )
-                        used_coach_initial_message = True
-                    if (
-                        kind == "workspace"
-                        and self.initial_message
-                        and not used_workspace_initial_message
-                    ):
-                        sections[-1].messages.append(
-                            CoachedMessage(
-                                kind="workspace",
-                                avatar_url=character_info["avatar"],
-                                name=character_info["name"],
-                                time=None,
-                                content=self.initial_message,
-                            )
-                        )
-                        used_workspace_initial_message = True
-                sections[-1].messages.append(
-                    CoachedMessage(
-                        kind="student",
-                        avatar_url="",
-                        name=user_name,
-                        time=entry["time"],
-                        content=entry["user_message"],
-                    )
+            sections[-1].messages.append(
+                CoachedMessage(
+                    kind=kind,
+                    avatar_url=character_info["avatar"],
+                    name=character_info["name"],
+                    time=entry["time"] if entry["time"] not in(FALLBACK_WORKSPACE_MESSAGE_TIME, FALLBACK_COACH_MESSAGE_TIME) else None,
+                    content=entry["character_message"],
                 )
-                sections[-1].messages.append(
-                    CoachedMessage(
-                        kind=kind,
-                        avatar_url=character_info["avatar"],
-                        name=character_info["name"],
-                        time=entry["time"],
-                        content=entry["character_message"],
-                    )
-                )
+            )
 
         content = CoachedData(
             final_submission=session["final_submission"],

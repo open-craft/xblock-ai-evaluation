@@ -8,18 +8,17 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils.text import slugify
 from django.utils.translation import gettext_noop as _
-from django.urls import reverse
+from webob import Response
 from xblock.core import XBlock
 from xblock.fields import Boolean, String, Scope, Dict
 from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
-from webob import Response
 
-from .compat import get_site_configuration_value
+from .compat import get_site_configuration_value, get_pdf_location_nav
 from .supported_models import SupportedModels
 from .llm import get_llm_response, get_llm_service
-from .pdf_generator import generate_pdf, Metadata, CoachedData, CodingData, ShortAnswerData, Branding, Location, Student, Info
+from .pdf_generator import generate_pdf, Metadata, CoachedData, CodingData, ShortAnswerData, Branding, Student, Info
 
 
 logger = logging.getLogger(__name__)
@@ -583,45 +582,6 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             self.thread_map = tm
         return text
 
-    def get_pdf_location_nav(self) -> Location | None:
-        """
-        Build and return the structured hierarchy of location information for this xblock.
-
-        Return None if an error is encountered that indicates the current runtime doesn't support this
-        or the xblock isn't in a standard course hierarchy (eg. a content library).
-        """
-        try:
-            from openedx.core.djangoapps.xblock.apps import get_xblock_app_config
-            unit = self.get_parent()
-            subsection = unit.get_parent()
-            section = subsection.get_parent()
-            course = section.get_parent()
-        except:
-            logger.warning(
-                "Failed to retrieve location hierarchy information, "
-                "possibly not running in openedx-platform runtime or from within a course. Skipping."
-            )
-            return None
-
-        url_base = get_xblock_app_config().get_site_root_url()
-
-        # XXX: this doesn't work from the CMS, so generating pdfs currently fail from studio (ie. if you interact with the student view in the studio interface).
-        unit_url = url_base + reverse('jump_to', kwargs={'course_id': str(course.id), 'location': str(unit.location)})
-        subsection_url = url_base + reverse('jump_to', kwargs={'course_id': str(course.id), 'location': str(subsection.location)})
-        section_url = url_base + reverse('jump_to', kwargs={'course_id': str(course.id), 'location': str(section.location)})
-        course_url = url_base + reverse('course_root', kwargs={'course_id': str(course.id)})
-
-        return Location(
-            course_name=course.display_name,
-            course_url=course_url,
-            section_name=section.display_name,
-            section_url=section_url,
-            subsection_name=subsection.display_name,
-            subsection_url=subsection_url,
-            unit_name=unit.display_name,
-            unit_url=unit_url,
-        )
-
     def get_pdf_logo(self) -> str:
         """
         Return a logo for display in the header of generated PDFs.
@@ -648,7 +608,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             branding=Branding(
                 logo=self.get_pdf_logo(),
             ),
-            location=self.get_pdf_location_nav(),
+            location=get_pdf_location_nav(self),
         )
         pdf_data: bytes = generate_pdf(metadata, content)
 

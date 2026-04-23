@@ -434,7 +434,7 @@ export default function ShortAnswerStudentApp({
           />
         </div>
 
-        {payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
+        {messages.length >= 2 && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
       </div>
     </section>
   );
