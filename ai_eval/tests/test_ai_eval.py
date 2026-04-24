@@ -25,7 +25,7 @@ from ai_eval.llm_services import CustomLLMService
 from ai_eval.backends.factory import BackendFactory
 from ai_eval.backends.judge0 import Judge0Backend
 from ai_eval.backends.custom import CustomServiceBackend
-from ai_eval.utils import SUPPORTED_LANGUAGE_MAP, LanguageLabels
+from ai_eval.utils import DEFAULT_HTTP_TIMEOUT, SUPPORTED_LANGUAGE_MAP, LanguageLabels
 
 
 def _mock_handler_url(_block, handler_name, suffix='', query='', thirdparty=False):
@@ -1253,6 +1253,32 @@ def test_custom_llm_models_dict_response_parsed():
 
     with patch("ai_eval.llm_services.requests.get", return_value=mocked_response):
         assert service.get_available_models() == ["Meta-Llama4-Maverick", "gpt-4o"]
+
+
+def test_custom_llm_completion_uses_default_http_timeout():
+    """Custom completion requests use the shared outbound HTTP timeout."""
+    service = CustomLLMService(
+        models_url="https://example.com/models",
+        completions_url="https://example.com/completions",
+        token_url="https://example.com/token",
+        client_id="client",
+        client_secret="secret",
+    )
+    service._get_headers = Mock(return_value={"Authorization": "Bearer token"})  # pylint: disable=protected-access
+
+    mocked_response = Mock()
+    mocked_response.json.return_value = {"response": "Feedback"}
+    mocked_response.raise_for_status.return_value = None
+
+    with patch("ai_eval.llm_services.requests.post", return_value=mocked_response) as mock_post:
+        assert service.get_response(
+            model="gpt-4o",
+            api_key="",
+            messages=[{"role": "user", "content": "Answer"}],
+            api_base=None,
+        ) == ("Feedback", None)
+
+    assert mock_post.call_args.kwargs["timeout"] == DEFAULT_HTTP_TIMEOUT
 
 
 @pytest.mark.parametrize(

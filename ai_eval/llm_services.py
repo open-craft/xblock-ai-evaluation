@@ -7,6 +7,7 @@ import requests
 from litellm import completion
 from .supported_models import SupportedModels
 from .compat import get_site_configuration_value
+from .utils import DEFAULT_HTTP_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ class CustomLLMService(LLMServiceBase):
             'scope': 'ml.chatbot.query'
         }
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        response = requests.post(self.token_url, data=data, headers=headers, timeout=30)
+        response = requests.post(self.token_url, data=data, headers=headers, timeout=DEFAULT_HTTP_TIMEOUT)
         response.raise_for_status()
         token_data = response.json()
         self._access_token = token_data['access_token']
@@ -213,7 +214,7 @@ class CustomLLMService(LLMServiceBase):
             "prompt": prompt,
         }
         try:
-            response = requests.post(url, json=payload, headers=self._get_headers(), timeout=10)
+            response = requests.post(url, json=payload, headers=self._get_headers(), timeout=DEFAULT_HTTP_TIMEOUT)
             response.raise_for_status()
             data = response.json()
             text = data.get("response")
@@ -231,7 +232,7 @@ class CustomLLMService(LLMServiceBase):
                 logger.warning("CUSTOM_LLM_MODELS_URL not configured")
                 return []
 
-            response = requests.get(url, headers=self._get_headers(), timeout=30)
+            response = requests.get(url, headers=self._get_headers(), timeout=DEFAULT_HTTP_TIMEOUT)
             response.raise_for_status()
             data = response.json()
 

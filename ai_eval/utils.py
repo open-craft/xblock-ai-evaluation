@@ -5,7 +5,7 @@ Utilities
 from dataclasses import dataclass
 
 
-# Default timeout (in seconds) for outbound HTTP requests made by backends.
+# Default timeout (in seconds) for outbound HTTP requests.
 # Adjust here to change the global default behavior.
 DEFAULT_HTTP_TIMEOUT = 30
 
