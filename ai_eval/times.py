@@ -7,20 +7,9 @@ FALLBACK_COACH_MESSAGE_TIME = datetime(1975, 1, 1, tzinfo=UTC).isoformat()
 FALLBACK_WORKSPACE_MESSAGE_TIME = datetime(1976, 1, 1, tzinfo=UTC).isoformat()
 
 
-def get_tz() -> timezone:
-    """
-    Get a common timezone to use for server-side times.
-
-    Message timestamps are recorded in this timezone,
-    and are displayed in this timezone on the PDF transcripts.
-
-    In future, this timezone could be customised.
-    """
-    return UTC
-
-
 def now() -> datetime:
-    return datetime.now(get_tz())
+    """Return a timezone aware datetime for the current instant, in the local timezone."""
+    return datetime.now().astimezone()
 
 
 def pretty_time(value: datetime) -> str:
@@ -30,4 +19,5 @@ def pretty_time(value: datetime) -> str:
     This is used to display date values in the PDFs.
     """
     # See https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes for formatting help.
+    print(value)
     return value.strftime("%d %B %Y, %I:%M%p %Z")

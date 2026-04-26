@@ -1,6 +1,5 @@
 """Short answers Xblock with AI evaluation."""
 
-from datetime import datetime, UTC
 import logging
 import hashlib
 import urllib.parse
@@ -22,6 +21,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 from .pdf_generator import ShortAnswerData, ShortAnswerMessage
+from .times import now
 
 
 logger = logging.getLogger(__name__)
@@ -302,7 +302,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
-        user_submission_time = datetime.now(UTC).isoformat()
+        user_submission_time = now().isoformat()
 
         attachments = []
         attachment_hash_inputs = []
@@ -370,7 +370,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 raise JsonHandlerError(500, str(e)) from e
             raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
-        llm_response_time = datetime.now(UTC).isoformat()
+        llm_response_time = now().isoformat()
 
         if response:
             self._replace_current_session(self.sessions[-1] + [
