@@ -489,7 +489,8 @@ class CodingAIEvalXBlock(AIEvalXBlock):
             prestyles='line-height: 1.5em !important;',  # override default inline styling; it sets it to 125% line-height automatically
         )
 
-        # TODO: handle output for html/css problems (the output doesn't come from judge0; it's simply the rendered code.
+        # TODO: Currently the html/css output is not rendered, to avoid security issues.
+        # We need to figure out how to safely handle output for html/css problems (the output doesn't come from judge0; it's simply the rendered code).
         # This will require some extra security/privacy considerations.
 
         content = CodingData(

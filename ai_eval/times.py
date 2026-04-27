@@ -19,5 +19,4 @@ def pretty_time(value: datetime) -> str:
     This is used to display date values in the PDFs.
     """
     # See https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes for formatting help.
-    print(value)
     return value.strftime("%d %B %Y, %I:%M%p %Z")
