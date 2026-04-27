@@ -252,6 +252,8 @@ markupsafe==3.0.3
     #   jinja2
     #   mako
     #   xblock
+mdurl==0.1.2
+    # via markdown-it-py
 mistune==3.2.0
     # via -r requirements/base.txt
 mock==5.2.0
@@ -317,10 +319,10 @@ pygments==2.19.2
     #   -r requirements/base.txt
     #   weasyprint
     #   pytest
+    #   rich
 pyphen==0.17.2
     # via
     #   -r requirements/base.txt
-    #   rich
     #   weasyprint
 pypng==0.20220715.0
     # via xblock-sdk
