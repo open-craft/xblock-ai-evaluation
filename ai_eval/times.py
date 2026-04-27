@@ -1,4 +1,5 @@
-from datetime import datetime, UTC, timezone
+"""Common datetime related functionality."""
+from datetime import datetime, UTC
 
 # These are fallback times to make it easier to work with and order old data that doesn't have times.
 # coach messages should be displayed before workspace messages

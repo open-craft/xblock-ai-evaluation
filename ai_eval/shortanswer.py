@@ -2,6 +2,7 @@
 
 import logging
 import hashlib
+import json
 import urllib.parse
 import urllib.request
 from multiprocessing.dummy import Pool
@@ -419,7 +420,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 json.dumps({"error": "PDF download is disabled."}),
                 status_code=400,
                 content_type="application/json",
-                charset="utf-8"
+                charset="utf-8",
             )
 
         session = self.sessions[-1]
@@ -429,12 +430,17 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 json.dumps({"error": "Data not available to generate transcript."}),
                 status_code=400,
                 content_type="application/json",
-                charset="utf-8"
+                charset="utf-8",
             )
 
         user = self.runtime.service(self, "user").get_current_user()
         # Fallbacks because these user attributes are not guaranteed to be set.
-        user_name = user.full_name or user.opt_attrs.get('edx-platform.username') or (user.emails and user.emails[-1]) or "Student"
+        user_name = (
+            user.full_name
+            or user.opt_attrs.get("edx-platform.username")
+            or (user.emails and user.emails[-1])
+            or "Student"
+        )
 
         content = ShortAnswerData(
             messages=[
@@ -443,7 +449,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                         avatar_url=self.character_image,
                         name="LLM",
                         content=data["content"],
-                        time=data.get("time"),  # NOTE: time field was added in 2026-04, so some existing instances may not have this field
+                        # NOTE: time field was added in 2026-04, so some existing instances may not have this field
+                        time=data.get("time"),
                         kind="llm",
                     )
                     if data["source"] == "llm"
@@ -451,7 +458,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                         avatar_url="",
                         name=user_name,
                         content=data["content"],
-                        time=data.get("time"),  # NOTE: time field was added in 2026-04, so some existing instances may not have this field
+                        # NOTE: time field was added in 2026-04, so some existing instances may not have this field
+                        time=data.get("time"),
                         kind="student",
                     )
                 )

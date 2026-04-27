@@ -30,7 +30,9 @@ class LanguageLabels:
 
 # supported programming languages and their IDs in judge0 and monaco
 # https://ce.judge0.com/#statuses-and-languages-active-and-archived-languages
-# Before adding languages, check the monaco_id is also in the list of short names for Pygments https://pygments.org/languages/
+# Before adding languages,
+# check the monaco_id is also in the list of short names for Pygments https://pygments.org/languages/
+# (used by the PDF generator).
 SUPPORTED_LANGUAGE_MAP = {
     LanguageLabels.Python: ProgrammimgLanguage(
         monaco_id="python", judge0_id=92

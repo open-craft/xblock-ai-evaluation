@@ -4,11 +4,11 @@ import logging
 from typing import Any
 
 from django.conf import settings
-from django.urls import reverse
 
 from .pdf_generator import Location
 
 logger = logging.getLogger(__name__)
+
 
 def _get_current_site_configuration_value(key: str, default: Any = None) -> Any:  # pragma: no cover
     """
@@ -115,4 +115,3 @@ def get_pdf_location_nav(xblock: "XBlock") -> Location | None:
         unit_name=unit.display_name,
         unit_url=unit_url,
     )
-

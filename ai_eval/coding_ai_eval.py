@@ -1,12 +1,13 @@
 """Coding Xblock with AI evaluation."""
 
+import json
 import logging
 from importlib.resources import files
 
 from django.conf import settings
 from django.utils.translation import gettext_noop as _
 from pygments import highlight
-from pygments.formatters import HtmlFormatter
+from pygments.formatters import HtmlFormatter  # pylint: disable=no-name-in-module
 from pygments.lexers import get_lexer_by_name
 from web_fragments.fragment import Fragment
 from webob import Response
@@ -31,6 +32,7 @@ USER_RESPONSE = "USER_RESPONSE"
 AI_EVALUATION = "AI_EVALUATION"
 CODE_EXEC_RESULT = "CODE_EXEC_RESULT"
 TIME = "TIME"
+
 
 class CodingAIEvalXBlock(AIEvalXBlock):
     """
@@ -481,16 +483,21 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         lexer = get_lexer_by_name(language_id)
         # https://pygments.org/docs/formatters/#HtmlFormatter
         formatter = HtmlFormatter(
-            linenos=False,  # line numbers are difficult here - 'inline' breaks code copy/paste, and 'table' doesn't line up properly. None play well with line wrapping.
+            # Line numbers are difficult here.
+            # 'inline' breaks code copy/paste, and 'table' doesn't line up properly.
+            # None play well with line wrapping.
+            linenos=False,
             style='xcode',  # https://pygments.org/styles/
-            noclasses=True, # inline styles so we don't need to mess with external stylesheets
+            noclasses=True,  # inline styles so we don't need to mess with external stylesheets
             wrapcode=True,  # use html5 semantic code elements
             nobackground=True,  # don't add a background; we want to control the background with our own css
-            prestyles='line-height: 1.5em !important;',  # override default inline styling; it sets it to 125% line-height automatically
+            # override default inline styling; it sets it to 125% line-height automatically
+            prestyles='line-height: 1.5em !important;',
         )
 
         # TODO: Currently the html/css output is not rendered, to avoid security issues.
-        # We need to figure out how to safely handle output for html/css problems (the output doesn't come from judge0; it's simply the rendered code).
+        # We need to figure out how to safely handle output for html/css problems
+        # (the output doesn't come from judge0; the output should be simply the rendered html/css).
         # This will require some extra security/privacy considerations.
 
         content = CodingData(

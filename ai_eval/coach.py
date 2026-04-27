@@ -8,7 +8,6 @@ import typing
 
 import jinja2
 import pydantic
-from django.utils.text import slugify
 from django.utils.translation import gettext_noop as _
 from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
@@ -1257,26 +1256,29 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 json.dumps({"error": "PDF download is disabled."}),
                 status_code=400,
                 content_type="application/json",
-                charset="utf-8"
+                charset="utf-8",
             )
-
 
         if not self.sessions:
             return Response(
                 json.dumps({"error": "No data to build PDF."}),
                 status_code=400,
                 content_type="application/json",
-                charset="utf-8"
+                charset="utf-8",
             )
 
         session = self.sessions[-1]
 
         if not session["finished"]:
             return Response(
-                json.dumps({"error": "PDF can only be generated when the answer has been submitted."}),
+                json.dumps(
+                    {
+                        "error": "PDF can only be generated when the answer has been submitted."
+                    }
+                ),
                 status_code=400,
                 content_type="application/json",
-                charset="utf-8"
+                charset="utf-8",
             )
 
         user = self.runtime.service(self, "user").get_current_user()
@@ -1289,10 +1291,17 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         )
 
         # Here we have timestamps, so interleave the individual chats, sorted by message timestamp.
-        # A `session` looks like [{'character_message': str, 'user_message': str, 'character_index': 0, 'time': 'isotimestring'}]
+        # A `session` looks like:
+        #    [{'character_message': str, 'user_message': str, 'character_index': 0, 'time': 'isotimestring'}]
         # The 'time' key was added in 2026-04, so add a fallback time for old sessions for sorting purposes.
-        coach_history = [{**entry, "time": entry.get("time", FALLBACK_COACH_MESSAGE_TIME)} for entry in session["coach_history"]]
-        workspace_history = [{**entry, "time": entry.get("time", FALLBACK_WORKSPACE_MESSAGE_TIME)} for entry in session["workspace_history"]]
+        coach_history = [
+            {**entry, "time": entry.get("time", FALLBACK_COACH_MESSAGE_TIME)}
+            for entry in session["coach_history"]
+        ]
+        workspace_history = [
+            {**entry, "time": entry.get("time", FALLBACK_WORKSPACE_MESSAGE_TIME)}
+            for entry in session["workspace_history"]
+        ]
 
         entries = sorted(coach_history + workspace_history, key=lambda x: x["time"])
         sections = []
@@ -1339,7 +1348,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                     avatar_url="",
                     name=user_name,
                     # don't send the time if it's one of the fallback times
-                    time=entry["time"] if entry["time"] not in(FALLBACK_WORKSPACE_MESSAGE_TIME, FALLBACK_COACH_MESSAGE_TIME) else None,
+                    time=(
+                        entry["time"]
+                        if entry["time"]
+                        not in (
+                            FALLBACK_WORKSPACE_MESSAGE_TIME,
+                            FALLBACK_COACH_MESSAGE_TIME,
+                        )
+                        else None
+                    ),
                     content=entry["user_message"],
                 )
             )
@@ -1348,7 +1365,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                     kind=kind,
                     avatar_url=character_info["avatar"],
                     name=character_info["name"],
-                    time=entry["time"] if entry["time"] not in(FALLBACK_WORKSPACE_MESSAGE_TIME, FALLBACK_COACH_MESSAGE_TIME) else None,
+                    time=(
+                        entry["time"]
+                        if entry["time"]
+                        not in (
+                            FALLBACK_WORKSPACE_MESSAGE_TIME,
+                            FALLBACK_COACH_MESSAGE_TIME,
+                        )
+                        else None
+                    ),
                     content=entry["character_message"],
                 )
             )

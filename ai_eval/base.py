@@ -602,7 +602,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
         metadata = Metadata(
             info=Info(
-                title=self.display_name,
+                title=self.display_name,  # pylint: disable=no-member
             ),
             student=Student(email=user_email, name=user_name),
             branding=Branding(
@@ -612,5 +612,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         )
         pdf_data: bytes = generate_pdf(metadata, content)
 
-        filename = slugify(f"{self.display_name}-{user_name}-transcript")
-        return Response(pdf_data, content_type='application/pdf', content_disposition=f'attachment; filename="{filename}.pdf"')
+        filename = slugify(f"{self.display_name}-{user_name}-transcript")  # pylint: disable=no-member
+        return Response(
+            pdf_data,
+            content_type='application/pdf',
+            content_disposition=f'attachment; filename="{filename}.pdf"',
+        )
