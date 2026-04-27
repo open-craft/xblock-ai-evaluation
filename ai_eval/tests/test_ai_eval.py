@@ -10,9 +10,10 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+import time_machine
 from xblock.exceptions import JsonHandlerError
 from xblock.field_data import DictFieldData
-from xblock.test.toy_runtime import ToyRuntime
+from xblock.test.toy_runtime import ToyRuntime as _ToyRuntime
 
 from ai_eval import (
     CodingAIEvalXBlock,
@@ -26,6 +27,28 @@ from ai_eval.backends.factory import BackendFactory
 from ai_eval.backends.judge0 import Judge0Backend
 from ai_eval.backends.custom import CustomServiceBackend
 from ai_eval.utils import SUPPORTED_LANGUAGE_MAP, LanguageLabels
+
+
+DEFAULT_FROZEN_TIME = "2000-01-02T00:00:00+00:00"
+
+
+class FakeUser():
+    """A fake hardcoded user object for use with the local runtime."""
+    emails = ["testuser@example.com"]
+    full_name = "Test User"
+
+
+class FakeUserService:
+    """A fake user service for use with the local runtime."""
+    def get_current_user(self):
+        return FakeUser()
+
+
+class ToyRuntime(_ToyRuntime):  # pylint: disable=abstract-method
+    """A toy xblock runtime that adds a user service."""
+    def __init__(self, user_id=None):
+        super().__init__(user_id)
+        self._services["user"] = FakeUserService()
 
 
 def _mock_handler_url(_block, handler_name, suffix='', query='', thirdparty=False):
@@ -46,6 +69,9 @@ def coding_block_data():
         "judge0_api_key": "judge0-key",
         "language": "Python (3.8.1)",
         "question": "ca va?",
+        "pdf_download_allowed": True,
+        "pdf_download_description": "",
+        "pdf_download_title": "Download transcript",
         "sessions": [{
             "USER_RESPONSE": "print('hello')",
             "AI_EVALUATION": "Looks good",
@@ -72,6 +98,9 @@ def shortanswer_block_data():
         "allow_reset": False,
         "character_image": "",
         "attachment_urls": [],
+        "pdf_download_allowed": True,
+        "pdf_download_description": "",
+        "pdf_download_title": "Download transcript",
     }
 
 
@@ -109,6 +138,9 @@ def coach_block_data():
         "allow_reset": True,
         "conversation_format": "<conversation>{{ messages|length }}</conversation>",
         "message_content_tag": "content",
+        "pdf_download_allowed": True,
+        "pdf_download_description": "",
+        "pdf_download_title": "Download transcript",
     }
 
 
@@ -150,6 +182,7 @@ def test_coding_block_student_view(coding_block_data):
             "get_submission_result_handler": "/handler/get_submission_result_handler",
             "get_response": "/handler/get_response",
             "reset_handler": "/handler/reset_handler",
+            "download_pdf": "/handler/download_pdf",
         },
         "initial_state": {
             "code": "print('hello')",
@@ -163,9 +196,108 @@ def test_coding_block_student_view(coding_block_data):
             "question": coding_block_data["question"],
             "language": coding_block_data["language"],
             "monaco_html": monaco_html,
+            "pdf_download_allowed": True,
+            "pdf_download_description": "",
+            "pdf_download_title": "Download transcript",
         },
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+
+
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=""))
+def test_coding_block_pdf(coding_block_data):
+    """Test generating a pdf for CodingAIEvalXBlock."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+
+    pdf_response = block.download_pdf("")
+
+    assert pdf_response.status == "200 OK"
+
+
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=""))
+def test_coding_block_pdf_not_allowed(coding_block_data):
+    """Test generating a pdf for CodingAIEvalXBlock."""
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+    block.pdf_download_allowed = False
+
+    pdf_response = block.download_pdf("")
+
+    assert pdf_response.status == "400 Bad Request"
+    assert "disabled" in json.loads(pdf_response.body)["error"]
+
+
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=""))
+def test_shortanswer_block_pdf(shortanswer_block_data):
+    """Test generating a pdf for ShortAnswerAIEvalXBlock."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+
+    pdf_response = block.download_pdf("")
+
+    assert pdf_response.status == "200 OK"
+
+
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=""))
+def test_shortanswer_block_pdf_not_allowed(shortanswer_block_data):
+    """Test generating a pdf for ShortAnswerAIEvalXBlock."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block.pdf_download_allowed = False
+
+    pdf_response = block.download_pdf("")
+
+    assert pdf_response.status == "400 Bad Request"
+    assert "disabled" in json.loads(pdf_response.body)["error"]
+
+
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=""))
+def test_coach_block_pdf(coach_block_data):
+    """Test generating a pdf for Coach AI block."""
+    session = {
+        "workspace_history": [{
+            "character_index": 0,
+            "user_message": "final learner answer",
+            "character_message": "patient reply",
+        }],
+        "coach_history": [],
+        "evaluation_fragments": [{
+            "character_index": 0,
+            "user_message": "",
+            "character_message": "# Evaluation Report",
+            "time": DEFAULT_FROZEN_TIME,
+            "is_evaluation": True,
+        }],
+        "attempts_used": 1,
+        "finished": True,
+        "final_submission": "final learner answer",
+        "final_evaluation_markdown": "# Evaluation Report",
+    }
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData(
+            {
+                **coach_block_data,
+                "initial_message": "hello, I am your evaluator",
+                "coach_initial_message": "hello, I am your coach",
+                "sessions": [session],
+            }
+        ),
+        None,
+    )
+
+    pdf_response = block.download_pdf("")
+
+    assert pdf_response.status == "200 OK"
+
+
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=""))
+def test_coach_block_pdf_not_allowed(coach_block_data):
+    """Test generating a pdf for Coach AI block."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    block.pdf_download_allowed = False
+
+    pdf_response = block.download_pdf("")
+
+    assert pdf_response.status == "400 Bad Request"
+    assert "disabled" in json.loads(pdf_response.body)["error"]
 
 
 def test_coding_block_studio_view(coding_block_data):
@@ -212,6 +344,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
         "handler_urls": {
             "get_response": "/handler/get_response",
             "reset": "/handler/reset",
+            "download_pdf": "/handler/download_pdf",
         },
         "initial_state": {
             "messages": shortanswer_block_data["sessions"][-1],
@@ -221,6 +354,9 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "max_responses": shortanswer_block_data["max_responses"],
             "allow_reset": shortanswer_block_data["allow_reset"],
             "character_image": shortanswer_block_data["character_image"],
+            "pdf_download_allowed": True,
+            "pdf_download_description": "",
+            "pdf_download_title": "Download transcript",
         },
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
@@ -306,6 +442,7 @@ def test_coach_block_student_view(coach_block_data):
             "get_character_response": "/handler/get_character_response",
             "get_evaluator_response": "/handler/get_evaluator_response",
             "reset_all": "/handler/reset_all",
+            "download_pdf": "/handler/download_pdf",
         },
         "initial_state": {
             "chat_histories": [[], []],
@@ -360,6 +497,9 @@ def test_coach_block_student_view(coach_block_data):
             },
             "allow_reset": True,
             "intro_text": "",
+            "pdf_download_allowed": True,
+            "pdf_download_description": "",
+            "pdf_download_title": "Download transcript",
         },
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
@@ -449,6 +589,7 @@ def test_coach_block_migrates_older_state_to_sessions(coach_block_data):
     assert block.final_evaluation_markdown == ""
 
 
+@time_machine.travel(DEFAULT_FROZEN_TIME, tick=False)
 @patch("ai_eval.coach.get_llm_service", return_value=Mock())
 @patch.object(CoachAIEvalXBlock, "get_llm_response", return_value="patient follow-up")
 def test_coach_get_character_response_uses_session_runtime_state(
@@ -484,6 +625,7 @@ def test_coach_get_character_response_uses_session_runtime_state(
                 "character_index": 0,
                 "user_message": "second answer",
                 "character_message": "patient follow-up",
+                "time": DEFAULT_FROZEN_TIME,
             },
         ],
         "coach_history": [],
@@ -497,6 +639,7 @@ def test_coach_get_character_response_uses_session_runtime_state(
     mock_get_llm.assert_called_once()
 
 
+@time_machine.travel(DEFAULT_FROZEN_TIME, tick=False)
 @patch("ai_eval.coach.get_llm_service", return_value=Mock())
 @patch.object(CoachAIEvalXBlock, "_render_final_report", return_value="<article>report</article>")
 @patch.object(CoachAIEvalXBlock, "get_llm_response", return_value="# Evaluation Report")
@@ -533,6 +676,7 @@ def test_coach_get_evaluator_response_persists_active_session(
             "character_index": 0,
             "user_message": "",
             "character_message": "# Evaluation Report",
+            "time": DEFAULT_FROZEN_TIME,
             "is_evaluation": True,
         }],
         "attempts_used": 1,
@@ -802,6 +946,9 @@ def test_coach_studio_submit_rejects_incomplete_payload(coach_block_data):
         "blacklist": ["Missing field in Studio payload."],
         "max_attempts": ["Missing field in Studio payload."],
         "allow_reset": ["Missing field in Studio payload."],
+        "pdf_download_allowed": ["Missing field in Studio payload."],
+        "pdf_download_description": ["Missing field in Studio payload."],
+        "pdf_download_title": ["Missing field in Studio payload."],
     }
 
 
@@ -960,6 +1107,9 @@ def test_shortanswer_studio_submit_success(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "/static/new-image.jpg",
                     "attachment_urls": ["http://example.com/1.txt"],
+                    "pdf_download_allowed": False,
+                    "pdf_download_description": "",
+                    "pdf_download_title": "Download transcript",
                 },
             )
 
@@ -996,6 +1146,9 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "",
                     "attachment_urls": ["http://example.com/bad.txt"],
+                    "pdf_download_allowed": False,
+                    "pdf_download_description": "",
+                    "pdf_download_title": "",
                 },
             )
 
@@ -1036,6 +1189,9 @@ def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_
         "allow_reset": ["Missing field in Studio payload."],
         "character_image": ["Missing field in Studio payload."],
         "attachment_urls": ["Missing field in Studio payload."],
+        "pdf_download_allowed": ["Missing field in Studio payload."],
+        "pdf_download_description": ["Missing field in Studio payload."],
+        "pdf_download_title": ["Missing field in Studio payload."],
     }
 
 
@@ -1063,6 +1219,9 @@ def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "/static/new-image.jpg",
                     "attachment_urls": ["http://example.com/1.txt"],
+                    "pdf_download_allowed": False,
+                    "pdf_download_description": "",
+                    "pdf_download_title": "Download transcript",
                 },
             )
 
@@ -1091,6 +1250,9 @@ def test_coding_studio_submit_success(coding_block_data):
                     "evaluation_prompt": "Updated prompt",
                     "judge0_api_key": "updated-judge0-key",
                     "language": LanguageLabels.Python,
+                    "pdf_download_allowed": False,
+                    "pdf_download_description": "",
+                    "pdf_download_title": "Download transcript",
                 },
             )
 
@@ -1123,6 +1285,9 @@ def test_coding_studio_submit_validation_errors(coding_block_data):
                     "evaluation_prompt": "Updated prompt",
                     "judge0_api_key": "",
                     "language": LanguageLabels.Python,
+                    "pdf_download_allowed": False,
+                    "pdf_download_description": "",
+                    "pdf_download_title": "",
                 },
             )
 
@@ -1160,6 +1325,9 @@ def test_coding_studio_submit_rejects_incomplete_payload(coding_block_data):
         "evaluation_prompt": ["Missing field in Studio payload."],
         "judge0_api_key": ["Missing field in Studio payload."],
         "language": ["Missing field in Studio payload."],
+        "pdf_download_allowed": ["Missing field in Studio payload."],
+        "pdf_download_description": ["Missing field in Studio payload."],
+        "pdf_download_title": ["Missing field in Studio payload."],
     }
 
 
@@ -1184,6 +1352,9 @@ def test_coding_studio_submit_allows_warnings(coding_block_data):
                     "evaluation_prompt": "Updated prompt",
                     "judge0_api_key": "updated-judge0-key",
                     "language": LanguageLabels.Python,
+                    "pdf_download_allowed": False,
+                    "pdf_download_description": "",
+                    "pdf_download_title": "",
                 },
             )
 
@@ -1529,6 +1700,7 @@ def test_coding_block_submit_code_uses_backend(mock_get_backend, coding_block_da
     mock_backend.submit_code.assert_called_once_with("print('hello')", "Python (3.8.1)")
 
 
+@time_machine.travel(DEFAULT_FROZEN_TIME, tick=False)
 @patch.object(CodingAIEvalXBlock, 'get_llm_response', return_value="Looks good")
 def test_coding_block_get_response_persists_current_session(mock_get_llm, coding_block_data):
     """Coding responses should replace the current session entry for persistence."""
@@ -1551,6 +1723,7 @@ def test_coding_block_get_response_persists_current_session(mock_get_llm, coding
             "stdout": "hello",
             "stderr": "",
         },
+        "TIME": DEFAULT_FROZEN_TIME,
     }]
     mock_get_llm.assert_called_once()
 

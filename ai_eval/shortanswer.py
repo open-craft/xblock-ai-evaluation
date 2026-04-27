@@ -22,7 +22,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 from .pdf_generator import ShortAnswerData, ShortAnswerMessage
-from .times import now
+from .utils import now
 
 
 logger = logging.getLogger(__name__)

@@ -21,10 +21,10 @@ from .llm_services import TIMEOUT_ERROR_MESSAGE
 from .utils import (
     SUPPORTED_LANGUAGE_MAP,
     LanguageLabels,
+    now,
 )
 from .backends.factory import BackendFactory
 from .pdf_generator import CodingData, CodingCode
-from .times import now
 
 logger = logging.getLogger(__name__)
 

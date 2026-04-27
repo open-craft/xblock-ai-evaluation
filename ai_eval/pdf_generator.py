@@ -3,13 +3,11 @@ from typing import Literal, Annotated
 from datetime import datetime
 from importlib.resources import files
 
-import mistune
-import nh3
 from weasyprint import HTML, CSS
 from jinja2 import Environment, FileSystemLoader
 from pydantic import BaseModel, ConfigDict, AfterValidator
 
-from .times import pretty_time, now
+from .utils import pretty_time, now, markdown_to_safe_html
 
 # Quick reference docs:
 # - https://doc.courtbouillon.org/weasyprint/stable/
@@ -24,19 +22,6 @@ _JINJA_ENV = Environment(
     auto_reload=True,
 )
 _JINJA_ENV.filters["pretty_time"] = pretty_time
-
-
-# TODO: The frontend uses dompurify and marked frontend/src/shared/renderMarkdown.ts;
-# we may wish to consolidate markdown rendering and html cleaning to the backend, and remove it from the frontend.
-def _markdown_to_safe_html(markdown_content: str) -> str:
-    """
-    Convert untrusted markdown to safe html, for outputting to PDF with Weasyprint.
-    """
-    html_content = mistune.html(markdown_content)
-    # docs: https://nh3.readthedocs.io/en/latest/
-    # Disable links and images, to avoid privacy or security issues
-    # (eg. malicious links, large images causing a DOS attack).
-    return nh3.clean(html_content, tags=nh3.ALLOWED_TAGS - {"a", "img"})
 
 
 class Info(BaseModel):
@@ -88,7 +73,7 @@ class CoachedMessage(BaseModel):
     # Either way the initial messages are hardcoded in config and don't have a timestamp
     # (perhaps they could default to the course start date in future?).
     time: datetime | None
-    content: Annotated[str, AfterValidator(_markdown_to_safe_html)]
+    content: Annotated[str, AfterValidator(markdown_to_safe_html)]
 
 
 class CoachedSection(BaseModel):
@@ -103,8 +88,8 @@ class CoachedData(BaseModel):
     """Data representing the AI Coached block."""
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    final_submission: Annotated[str, AfterValidator(_markdown_to_safe_html)]
-    final_evaluation: Annotated[str, AfterValidator(_markdown_to_safe_html)]
+    final_submission: Annotated[str, AfterValidator(markdown_to_safe_html)]
+    final_evaluation: Annotated[str, AfterValidator(markdown_to_safe_html)]
     evaluator_name: str
     # This is a sectioned list of messages.
     # The sectioning is because there are two chat windows (student + coach, student + evaluator),
@@ -126,7 +111,7 @@ class ShortAnswerMessage(BaseModel):
     # NOTE: The time field on messages was added in 2026-04, so some existing instances may not have this field.
     # Use an optional field here to avoid breaking changes.
     time: datetime | None
-    content: Annotated[str, AfterValidator(_markdown_to_safe_html)]
+    content: Annotated[str, AfterValidator(markdown_to_safe_html)]
 
 
 class ShortAnswerData(BaseModel):
@@ -157,7 +142,7 @@ class CodingData(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     code: CodingCode
-    feedback: Annotated[str, AfterValidator(_markdown_to_safe_html)]
+    feedback: Annotated[str, AfterValidator(markdown_to_safe_html)]
     time: datetime | None
 
     @staticmethod
@@ -195,7 +180,7 @@ def generate_pdf(
     css = files("ai_eval").joinpath("static/pdf/base.css").read_text(encoding="utf8")
 
     # See https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#security for security considerations here.
-    # Any user-provided html must be sanitized with _markdown_to_safe_html()
+    # Any user-provided html must be sanitized with markdown_to_safe_html()
     # which should avoid attacks involved malicious html, malicious inline css,
     # unexpected network requests for external resources, or leaking local files.
     # XXX: There is a known issue where fontTools (used by Weasyprint) spams the logs with invalid formatting errors.
