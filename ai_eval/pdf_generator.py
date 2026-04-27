@@ -154,7 +154,7 @@ class Metadata(BaseModel):
     """Metadata for the PDF.
 
     This data structure is the same for all PDF templates,
-    and is mostly for data to be included in the metadat, header, or nav.
+    and is mostly for data to be included in the metadata, header, or nav.
     It does not include the actual content of the block (chat messages, etc.).
     """
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
