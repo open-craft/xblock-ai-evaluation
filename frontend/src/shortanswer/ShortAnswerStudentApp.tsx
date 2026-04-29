@@ -10,6 +10,7 @@ import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
 import { ArrowUpward, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/paragon/icons";
 import { PoweredByAI } from "../shared/PoweredByAI";
 import { TypingIndicator } from "../shared/TypingIndicator";
+import { DownloadPDFSection } from "../shared/DownloadPDFSection";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
@@ -460,6 +461,8 @@ export default function ShortAnswerStudentApp({
             textareaRef={textareaRef}
           />
         </div>
+
+        {messages.length >= 2 && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
       </div>
     </section>
   );

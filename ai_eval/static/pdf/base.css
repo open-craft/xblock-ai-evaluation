@@ -1,0 +1,289 @@
+:root {
+    --header-height: 1.5cm;
+    --footer-height: 0.7cm;
+
+    --margin-base: 0.5cm;
+    --margin-page-top: calc(var(--header-height) + var(--margin-base));
+    --margin-page-bottom: calc(var(--footer-height) + var(--margin-base));
+
+    --font-size-base: 10pt;
+    --border-radius: 5px;
+
+    --color-gray: #F5F5F5;
+
+    --color-main-bg: white;
+    --color-main-fg: #001731;
+
+    --color-workspace-bg: #476480;
+    --color-workspace-fg: #FFFFFF;
+    --color-student-bg: var(--color-main-bg);
+    --color-student-fg: var(--color-main-fg);
+    --color-coach-bg: var(--color-gray);
+    --color-coach-fg: var(--color-main-fg);
+    --color-coach-border: #D9D9D9;
+
+    --color-shortanswerstudent-bg: #F0F3F5;
+    --color-shortanswerstudent-fg: var(--color-main-fg);
+
+    --color-code-border: var(--color-coach-border);
+    --color-code-stderr: #B02934;
+}
+
+@page {
+    size: letter portrait;
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: var(--margin-page-top);
+    margin-bottom: var(--margin-page-bottom);
+
+    /* Hack to get the page number and position it in the footer.
+     * The page counter doesn't work within the usual css or footer element.
+     */
+    @bottom-right {
+        font-size: calc(var(--font-size-base) * 0.9);
+        content: counter(page);
+        padding: 0 var(--margin-base);
+        margin-bottom: -16px;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: var(--font-size-base);
+    /* Inter is the desired font, but include some similar fallbacks if not installed on the system. */
+    font-family: "Inter", "DejaVu Sans", sans-serif;
+    color: var(--color-main-fg);
+    line-height: 1.6;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    position: fixed;
+    left: 0;
+    right: 0;
+    padding: 0 var(--margin-base);
+    background-color: var(--color-gray);
+    top: calc(-1 * var(--margin-page-top));
+    height: var(--header-height);
+
+    display: flex;
+    align-items: center;
+    font-size: calc(var(--font-size-base) * 0.9);
+    gap: 1rem;
+
+    .logo {
+        object-fit: contain;
+        max-width: 30%;
+    }
+
+    .title {
+        background-color: var(--color-main-bg);
+        padding: 0.2rem;
+        border-radius: var(--border-radius);
+    }
+
+    .details {
+        flex-grow: 1;
+        text-align: right;
+    }
+
+    a {
+        text-decoration: none;
+        color: var(--color-main-fg);
+        font-weight: bold;
+    }
+}
+
+header img {
+    height: 100%;
+}
+
+footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    background-color: var(--color-gray);
+    bottom: calc(-1 * var(--margin-page-bottom));
+    height: var(--footer-height);
+}
+
+nav {
+    border-bottom: 1px solid var(--color-gray);
+    display: flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0.5rem var(--margin-base);
+    margin-top: calc(-1 * var(--margin-base));
+
+    ol {
+        display: flex;
+        flex-wrap: wrap;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+
+        a {
+            text-decoration: none;
+            color: var(--color-main-fg);
+        }
+
+        li:not(:last-child)::after {
+            display: inline-block;
+            margin: 0 0.5rem;
+            content: "/";
+        }
+    }
+}
+
+main {
+    padding: 0 calc(var(--margin-base) * 2);
+
+    h1 {
+        font-size: calc(var(--font-size-base) * 1.45);
+    }
+
+    h2 {
+        font-size: calc(var(--font-size-base) * 1.2);
+        margin: 0;
+    }
+
+    section {
+        background-color: var(--color-gray);
+        padding: var(--margin-base);
+        border-radius: var(--border-radius);
+        margin-bottom: var(--margin-base);
+        box-decoration-break: clone;
+    }
+
+    .chat-bubble {
+        padding: var(--margin-base);
+        margin: calc(var(--margin-base) / 2) 0;
+        border-radius: var(--border-radius);
+        /* This would be neat, but can result in almost blank pages where the layout engine tries hard to keep a section together. */
+        /* break-inside: avoid; */
+
+        .meta {
+            font-size: calc(var(--font-size-base) * 0.8);
+            display: flex;
+            align-items: center;
+            height: 2em;
+            gap: 0.5em;
+
+            img {
+                height: 2.2em;
+                width: 2.2em;
+                border-radius: 2.2em;
+            }
+
+            .author {
+                font-weight: bold;
+            }
+
+            time {
+                opacity: 0.9;
+            }
+        }
+
+        .content {
+            padding: calc(var(--margin-base) / 2) 0;
+        }
+    }
+
+    .coached-workspace, .shortanswer-llm {
+        background-color: var(--color-workspace-bg);
+        color: var(--color-workspace-fg);
+    }
+
+    .coached-student {
+        background-color: var(--color-student-bg);
+        color: var(--color-student-fg);
+    }
+
+    .coached-coach {
+        background-color: var(--color-coach-bg);
+        color: var(--color-coach-fg);
+        border: 1px solid var(--color-coach-border);
+    }
+
+    .shortanswer-student {
+        background-color: var(--color-shortanswerstudent-bg);
+        color: var(--color-shortanswerstudent-fg);
+    }
+
+    .code-window {
+        border: 1px solid var(--color-code-border);
+        border-radius: var(--border-radius);
+        box-shadow: 0 0 3px var(--color-gray);
+        display: flex;
+        padding: 0;
+        font-size: calc(var(--font-size-base) * 0.9);
+
+        .code-pane {
+            flex: 70%;
+            background-color: var(--color-main-bg);
+            margin: 0;
+            /* to avoid clipping over the parent border */
+            border-radius: var(--border-radius) 0 0 var(--border-radius);
+
+            .header {
+                display: flex;
+                justify-content: flex-end;
+                align-items: center;
+                font-size: calc(var(--font-size-base) * 0.7);
+                height: 32px;
+                padding: 0 6px;
+
+                .language {
+                    color: var(--color-main-bg);
+                    background-color: var(--color-main-fg);
+                    border-radius: var(--border-radius);
+                    padding: 0.2em;
+                }
+            }
+
+            .highlight {
+                padding: var(--margin-base);
+
+                pre {
+                    white-space: pre-wrap;
+                    margin: 0;
+                }
+            }
+        }
+
+        .output-pane {
+            border-left: 1px solid var(--color-code-border);
+            flex: 30%;
+
+            .title {
+                border-bottom: 1px solid var(--color-code-border);
+                line-height: 32px;
+                height: 32px;
+                padding: 0 6px;
+            }
+
+            .content {
+                padding: var(--margin-base);
+                .stderr {
+                    color: var(--color-code-stderr);
+                }
+            }
+
+            .stdout, .stderr {
+                font-family: monospace;
+                white-space: pre-wrap;
+                margin: 0;
+                line-height: 1.5em;
+            }
+        }
+
+
+    }
+}

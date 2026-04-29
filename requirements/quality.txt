@@ -20,6 +20,10 @@ amqp==5.3.1
     # via
     #   -r requirements/test.txt
     #   kombu
+annotated-doc==0.0.4
+    # via
+    #   -r requirements/test.txt
+    #   typer
 annotated-types==0.7.0
     # via
     #   -r requirements/test.txt
@@ -68,6 +72,10 @@ botocore==1.40.44
     #   -r requirements/test.txt
     #   boto3
     #   s3transfer
+brotli==1.2.0
+    # via
+    #   -r requirements/test.txt
+    #   fonttools
 celery==5.5.3
     # via -r requirements/test.txt
 certifi==2025.8.3
@@ -80,6 +88,9 @@ chardet==5.2.0
     # via
     #   -r requirements/test.txt
     #   binaryornot
+cffi==2.0.0
+    # via
+    #   weasyprint
 charset-normalizer==3.4.3
     # via
     #   -r requirements/test.txt
@@ -120,6 +131,10 @@ coverage[toml]==7.10.7
     # via
     #   -r requirements/test.txt
     #   pytest-cov
+cssselect2==0.9.0
+    # via
+    #   -r requirements/test.txt
+    #   weasyprint
 ddt==1.7.2
     # via -r requirements/test.txt
 dill==0.4.0
@@ -155,6 +170,10 @@ filelock==3.19.1
     # via
     #   -r requirements/test.txt
     #   huggingface-hub
+fonttools[woff]==4.62.1
+    # via
+    #   -r requirements/test.txt
+    #   weasyprint
 frozenlist==1.7.0
     # via
     #   -r requirements/test.txt
@@ -277,6 +296,8 @@ mdurl==0.1.2
     # via
     #   -r requirements/test.txt
     #   markdown-it-py
+mistune==3.2.0
+    # via -r requirements/test.txt
 mock==5.2.0
     # via -r requirements/test.txt
 multidict==6.6.4
@@ -284,6 +305,8 @@ multidict==6.6.4
     #   -r requirements/test.txt
     #   aiohttp
     #   yarl
+nh3==0.3.5
+    # via -r requirements/test.txt
 openai==2.1.0
     # via
     #   -r requirements/test.txt
@@ -302,6 +325,10 @@ path==16.16.0
     # via
     #   -r requirements/test.txt
     #   edx-i18n-tools
+pillow==12.2.0
+    # via
+    #   -r requirements/test.txt
+    #   weasyprint
 platformdirs==4.4.0
     # via pylint
 pluggy==1.6.0
@@ -324,6 +351,10 @@ propcache==0.3.2
     #   yarl
 pycodestyle==2.14.0
     # via -r requirements/quality.in
+pycparser==3.0
+    # via
+    #   -r requirements/test.txt
+    #   cffi
 pydantic==2.11.7
     # via
     #   -r requirements/test.txt
@@ -333,6 +364,10 @@ pydantic-core==2.33.2
     # via
     #   -r requirements/test.txt
     #   pydantic
+pydyf==0.12.1
+    # via
+    #   -r requirements/test.txt
+    #   weasyprint
 pygments==2.19.2
     # via
     #   -r requirements/test.txt
@@ -352,6 +387,10 @@ pylint-plugin-utils==0.9.0
     # via
     #   pylint-celery
     #   pylint-django
+pyphen==0.17.2
+    # via
+    #   -r requirements/test.txt
+    #   weasyprint
 pypng==0.20220715.0
     # via
     #   -r requirements/test.txt
@@ -453,6 +492,17 @@ tiktoken==0.11.0
     # via
     #   -r requirements/test.txt
     #   litellm
+time-machine[dateutil]==3.2.0
+    # via -r requirements/test.txt
+tinycss2==1.5.1
+    # via
+    #   -r requirements/test.txt
+    #   cssselect2
+    #   weasyprint
+tinyhtml5==2.1.0
+    # via
+    #   -r requirements/test.txt
+    #   weasyprint
 tokenizers==0.22.1
     # via
     #   -r requirements/test.txt
@@ -502,11 +552,19 @@ wcwidth==0.2.14
     # via
     #   -r requirements/test.txt
     #   prompt-toolkit
+weasyprint==68.1
+    # via -r requirements/test.txt
 web-fragments==3.1.0
     # via
     #   -r requirements/test.txt
     #   xblock
     #   xblock-sdk
+webencodings==0.5.1
+    # via
+    #   -r requirements/test.txt
+    #   cssselect2
+    #   tinycss2
+    #   tinyhtml5
 webob==1.8.9
     # via
     #   -r requirements/test.txt
@@ -526,6 +584,10 @@ zipp==3.23.0
     # via
     #   -r requirements/test.txt
     #   importlib-metadata
+zopfli==0.4.1
+    # via
+    #   -r requirements/test.txt
+    #   fonttools
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

@@ -14,6 +14,7 @@ function makePayload(overrides?: Partial<CodingStudentPayload>): CodingStudentPa
       get_submission_result_handler: "/handler/get_submission_result",
       reset_handler: "/handler/reset",
       submit_code_handler: "/handler/submit_code",
+      download_pdf: "/handler/download_pdf",
     },
     initial_state: {
       code: "",
@@ -24,6 +25,9 @@ function makePayload(overrides?: Partial<CodingStudentPayload>): CodingStudentPa
       language: "Python (3.8.1)",
       monaco_html: "",
       question: "Write a function that adds two numbers.",
+      pdf_download_allowed: false,
+      pdf_download_title: "",
+      pdf_download_description: ""
     },
     mfe_config_api: "/mfe_config",
     style_urls: [],

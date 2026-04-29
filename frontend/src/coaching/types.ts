@@ -34,6 +34,7 @@ export interface CoachingStudentHandlerUrls {
   get_character_response: string;
   get_evaluator_response: string;
   reset_all: string;
+  download_pdf: string;
 }
 
 export interface CoachingStudentInitialState {
@@ -53,6 +54,9 @@ export interface CoachingStudentMeta {
     coach: string;
     workspace: string;
   };
+  pdf_download_allowed: boolean;
+  pdf_download_title: string;
+  pdf_download_description: string;
 }
 
 export type CoachingStudentPayload = SharedPayload<
@@ -101,6 +105,9 @@ export interface CoachingStudioState {
   model_api_url: string;
   scenario_data: ScenarioData;
   workspace_title: string;
+  pdf_download_allowed: boolean;
+  pdf_download_title: string;
+  pdf_download_description: string;
 }
 
 export interface CoachingStudioHandlerUrls {

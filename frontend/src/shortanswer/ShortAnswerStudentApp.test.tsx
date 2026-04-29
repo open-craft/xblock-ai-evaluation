@@ -16,6 +16,7 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
     handler_urls: {
       get_response: "/handler/get_response",
       reset: "/handler/reset",
+      download_pdf: "/handler/download_pdf",
     },
     initial_state: {
       messages: null,
@@ -27,6 +28,9 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
       max_responses: 10,
       question: "What is 2+2?",
       hide_question: false,
+      pdf_download_allowed: false,
+      pdf_download_title: "",
+      pdf_download_description: ""
     },
     mfe_config_api: "/mfe_config",
     style_urls: [],
@@ -174,6 +178,9 @@ describe("ShortAnswerStudentApp", () => {
           max_responses: 10,
           question: "test",
           hide_question: false,
+          pdf_download_allowed: false,
+          pdf_download_title: "",
+          pdf_download_description: ""
         },
       });
 

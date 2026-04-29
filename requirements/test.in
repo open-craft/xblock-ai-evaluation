@@ -6,6 +6,7 @@
 pytest-cov                # pytest extension for code coverage statistics
 pytest-django             # pytest extension for better Django support
 ddt                       # data-driven tests
+time-machine[dateutil]    # Freeze time for consistent timestamps for testing
 
 mock                      # required by the workbench
 openedx-django-pyfs       # required by the workbench

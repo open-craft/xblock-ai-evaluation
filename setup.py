@@ -35,6 +35,10 @@ setup(
         "celery",
         "chardet",
         "litellm",
+        "weasyprint",
+        "mistune",
+        "nh3",
+        "Pygments",
     ],
     entry_points={
         "xblock.v1": [

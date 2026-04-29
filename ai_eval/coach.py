@@ -16,11 +16,14 @@ from xblock.fields import Boolean, Dict, Integer, List, Scope, String
 from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
+from webob import Response
 
 from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
+from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
+from .utils import now, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
 
 
 resource_loader = ResourceLoader(__name__)
@@ -745,6 +748,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "character_index": character_index,
             "user_message": user_message,
             "character_message": character_message,
+            "time": now().isoformat(),
         }
         fragment.update(extra)
         if fragment.get("is_evaluation"):
@@ -982,6 +986,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "get_character_response": self.runtime.handler_url(self, "get_character_response"),
                 "get_evaluator_response": self.runtime.handler_url(self, "get_evaluator_response"),
                 "reset_all": self.runtime.handler_url(self, "reset_all"),
+                "download_pdf": self.runtime.handler_url(self, "download_pdf"),
             },
             initial_state={
                 "chat_histories": self._get_chat_histories(),
@@ -1008,6 +1013,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 },
                 "allow_reset": self.allow_reset,
                 "intro_text": self.intro_text,
+                "pdf_download_allowed": self.pdf_download_allowed,
+                "pdf_download_title": self.pdf_download_title,
+                "pdf_download_description": self.pdf_download_description,
             },
             style_urls=[
                 "static/bundles/shared.css",
@@ -1268,3 +1276,143 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "attempts": self._get_attempt_state(),
             "finished": session["finished"],
         }
+
+    @XBlock.handler
+    def download_pdf(self, data, suffix=""):
+        """
+        Generate and download the pdf summary of the exercise.
+        """
+        if not self.pdf_download_allowed:
+            return Response(
+                json.dumps({"error": "PDF download is disabled."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8",
+            )
+
+        if not self.sessions:
+            return Response(
+                json.dumps({"error": "No data to build PDF."}),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8",
+            )
+
+        session = self.sessions[-1]
+
+        if not session["finished"]:
+            return Response(
+                json.dumps(
+                    {
+                        "error": "PDF can only be generated when the answer has been submitted."
+                    }
+                ),
+                status_code=400,
+                content_type="application/json",
+                charset="utf-8",
+            )
+
+        user = self.runtime.service(self, "user").get_current_user()
+        # Fallbacks because these user attributes are not guaranteed to be set.
+        user_name = (
+            user.full_name
+            or user.opt_attrs.get("edx-platform.username")
+            or (user.emails and user.emails[-1])
+            or "Student"
+        )
+
+        # Here we have timestamps, so interleave the individual chats, sorted by message timestamp.
+        # A `session` looks like:
+        #    [{'character_message': str, 'user_message': str, 'character_index': 0, 'time': 'isotimestring'}]
+        # The 'time' key was added in 2026-04, so add a fallback time for old sessions for sorting purposes.
+        coach_history = [
+            {**entry, "time": entry.get("time", FALLBACK_COACH_MESSAGE_TIME)}
+            for entry in session["coach_history"]
+        ]
+        workspace_history = [
+            {**entry, "time": entry.get("time", FALLBACK_WORKSPACE_MESSAGE_TIME)}
+            for entry in session["workspace_history"]
+        ]
+
+        entries = sorted(coach_history + workspace_history, key=lambda x: x["time"])
+        sections = []
+        used_coach_initial_message = False
+        used_workspace_initial_message = False
+        for entry in entries:
+            character_info = self._get_character_data(entry["character_index"])
+            kind = character_info["pane"]
+            if not sections or sections[-1].kind != kind:
+                sections.append(CoachedSection(kind=kind, messages=[]))
+                if (
+                    kind == "coach"
+                    and self.coach_initial_message
+                    and not used_coach_initial_message
+                ):
+                    sections[-1].messages.append(
+                        CoachedMessage(
+                            kind="coach",
+                            avatar_url=character_info["avatar"],
+                            name=character_info["name"],
+                            time=None,
+                            content=self.coach_initial_message,
+                        )
+                    )
+                    used_coach_initial_message = True
+                if (
+                    kind == "workspace"
+                    and self.initial_message
+                    and not used_workspace_initial_message
+                ):
+                    sections[-1].messages.append(
+                        CoachedMessage(
+                            kind="workspace",
+                            avatar_url=character_info["avatar"],
+                            name=character_info["name"],
+                            time=None,
+                            content=self.initial_message,
+                        )
+                    )
+                    used_workspace_initial_message = True
+            sections[-1].messages.append(
+                CoachedMessage(
+                    kind="student",
+                    avatar_url="",
+                    name=user_name,
+                    # don't send the time if it's one of the fallback times
+                    time=(
+                        entry["time"]
+                        if entry["time"]
+                        not in (
+                            FALLBACK_WORKSPACE_MESSAGE_TIME,
+                            FALLBACK_COACH_MESSAGE_TIME,
+                        )
+                        else None
+                    ),
+                    content=entry["user_message"],
+                )
+            )
+            sections[-1].messages.append(
+                CoachedMessage(
+                    kind=kind,
+                    avatar_url=character_info["avatar"],
+                    name=character_info["name"],
+                    time=(
+                        entry["time"]
+                        if entry["time"]
+                        not in (
+                            FALLBACK_WORKSPACE_MESSAGE_TIME,
+                            FALLBACK_COACH_MESSAGE_TIME,
+                        )
+                        else None
+                    ),
+                    content=entry["character_message"],
+                )
+            )
+
+        content = CoachedData(
+            final_submission=session["final_submission"],
+            final_evaluation=session["final_evaluation_markdown"],
+            evaluator_name=self.character_1_name,
+            sections=sections,
+        )
+        return self.build_pdf_response(content)
