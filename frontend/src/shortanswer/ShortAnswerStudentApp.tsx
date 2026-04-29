@@ -5,6 +5,7 @@ import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
+import { DownloadPDFSection } from "../shared/DownloadPDFSection";
 
 let nextStableId = 0;
 
@@ -432,6 +433,8 @@ export default function ShortAnswerStudentApp({
             textareaRef={textareaRef}
           />
         </div>
+
+        {messages.length >= 2 && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
       </div>
     </section>
   );

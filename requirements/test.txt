@@ -60,6 +60,10 @@ botocore==1.40.44
     #   -r requirements/base.txt
     #   boto3
     #   s3transfer
+brotli==1.2.0
+    # via
+    #   -r requirements/base.txt
+    #   fonttools
 celery==5.5.3
     # via -r requirements/base.txt
 certifi==2025.8.3
@@ -70,6 +74,10 @@ certifi==2025.8.3
     #   requests
 chardet==5.2.0
     # via binaryornot
+cffi==2.0.0
+    # via
+    #   -r requirements/base.txt
+    #   weasyprint
 charset-normalizer==3.4.3
     # via
     #   -r requirements/base.txt
@@ -99,6 +107,10 @@ cookiecutter==2.6.0
     # via xblock-sdk
 coverage[toml]==7.10.7
     # via pytest-cov
+cssselect2==0.9.0
+    # via
+    #   -r requirements/base.txt
+    #   weasyprint
 ddt==1.7.2
     # via -r requirements/test.in
 distro==1.9.0
@@ -129,6 +141,10 @@ filelock==3.19.1
     # via
     #   -r requirements/base.txt
     #   huggingface-hub
+fonttools[woff]==4.62.1
+    # via
+    #   -r requirements/base.txt
+    #   weasyprint
 frozenlist==1.7.0
     # via
     #   -r requirements/base.txt
@@ -238,6 +254,8 @@ markupsafe==3.0.3
     #   xblock
 mdurl==0.1.2
     # via markdown-it-py
+mistune==3.2.0
+    # via -r requirements/base.txt
 mock==5.2.0
     # via -r requirements/test.in
 multidict==6.6.4
@@ -245,6 +263,8 @@ multidict==6.6.4
     #   -r requirements/base.txt
     #   aiohttp
     #   yarl
+nh3==0.3.5
+    # via -r requirements/base.txt
 openai==2.1.0
     # via
     #   -r requirements/base.txt
@@ -262,6 +282,10 @@ packaging==25.0
     #   pytest
 path==16.16.0
     # via edx-i18n-tools
+pillow==12.2.0
+    # via
+    #   -r requirements/base.txt
+    #   weasyprint
 pluggy==1.6.0
     # via
     #   pytest
@@ -277,6 +301,10 @@ propcache==0.3.2
     #   -r requirements/base.txt
     #   aiohttp
     #   yarl
+pycparser==3.0
+    # via
+    #   -r requirements/base.txt
+    #   cffi
 pydantic==2.11.7
     # via
     #   -r requirements/base.txt
@@ -288,8 +316,14 @@ pydantic-core==2.33.2
     #   pydantic
 pygments==2.19.2
     # via
+    #   -r requirements/base.txt
+    #   weasyprint
     #   pytest
     #   rich
+pyphen==0.17.2
+    # via
+    #   -r requirements/base.txt
+    #   weasyprint
 pypng==0.20220715.0
     # via xblock-sdk
 pytest==8.4.2
@@ -306,6 +340,7 @@ python-dateutil==2.9.0.post0
     #   arrow
     #   botocore
     #   celery
+    #   time-machine
     #   xblock
 python-dotenv==1.1.1
     # via
@@ -377,6 +412,17 @@ tiktoken==0.11.0
     # via
     #   -r requirements/base.txt
     #   litellm
+time-machine[dateutil]==3.2.0
+    # via -r requirements/test.in
+tinycss2==1.5.1
+    # via
+    #   -r requirements/base.txt
+    #   cssselect2
+    #   weasyprint
+tinyhtml5==2.1.0
+    # via
+    #   -r requirements/base.txt
+    #   weasyprint
 tokenizers==0.22.1
     # via
     #   -r requirements/base.txt
@@ -422,11 +468,19 @@ wcwidth==0.2.14
     # via
     #   -r requirements/base.txt
     #   prompt-toolkit
+weasyprint==68.1
+    # via -r requirements/base.txt
 web-fragments==3.1.0
     # via
     #   -r requirements/base.txt
     #   xblock
     #   xblock-sdk
+webencodings==0.5.1
+    # via
+    #   -r requirements/base.txt
+    #   cssselect2
+    #   tinycss2
+    #   tinyhtml5
 webob==1.8.9
     # via
     #   -r requirements/base.txt
@@ -446,6 +500,10 @@ zipp==3.23.0
     # via
     #   -r requirements/base.txt
     #   importlib-metadata
+zopfli==0.4.1
+    # via
+    #   -r requirements/base.txt
+    #   fonttools
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

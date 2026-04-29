@@ -3,18 +3,22 @@ from typing import Any, Self
 
 import logging
 from importlib.resources import files
-from django.core.cache import cache
 
+from django.conf import settings
+from django.core.cache import cache
+from django.utils.text import slugify
 from django.utils.translation import gettext_noop as _
+from webob import Response
 from xblock.core import XBlock
-from xblock.fields import String, Scope, Dict
+from xblock.fields import Boolean, String, Scope, Dict
 from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
 
-from .compat import get_site_configuration_value
+from .compat import get_site_configuration_value, get_pdf_location_nav
 from .supported_models import SupportedModels
 from .llm import get_llm_response, get_llm_service
+from .pdf_generator import generate_pdf, Metadata, CoachedData, CodingData, ShortAnswerData, Branding, Student, Info
 
 
 logger = logging.getLogger(__name__)
@@ -66,7 +70,7 @@ def _get_model_choices(block):
     return [PLACEHOLDER] + [{"display_name": m, "value": m} for m in available_models]
 
 
-@XBlock.wants("settings")
+@XBlock.wants("settings", "user")
 class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     """
     Base class for Xblocks with AI evaluation
@@ -106,11 +110,35 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         scope=Scope.user_state,
     )
 
+    pdf_download_allowed = Boolean(
+        display_name=_("Allow PDF Download"),
+        help=_(
+            "If enabled, learners can download a PDF transcript of the problem."
+        ),
+        default=False,
+        scope=Scope.settings,
+    )
+    pdf_download_title = String(
+        display_name=_("Download Section Title"),
+        help=_("Title of the section that contains the PDF transcript download button."),
+        default="Download transcript",
+        scope=Scope.settings,
+    )
+    pdf_download_description = String(
+        display_name=_("Download Section Description"),
+        help=_("Description of the section that contains the PDF transcript download button."),
+        default="",
+        scope=Scope.settings,
+    )
+
     editable_fields = (
         "display_name",
         "model",
         "model_api_key",
         "model_api_url",
+        "pdf_download_allowed",
+        "pdf_download_title",
+        "pdf_download_description",
     )
 
     block_settings_key = "ai_eval"
@@ -553,3 +581,40 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             tm[tag] = new_thread_id
             self.thread_map = tm
         return text
+
+    def get_pdf_logo(self) -> str:
+        """
+        Return a logo for display in the header of generated PDFs.
+        """
+        configured_header_logo = get_site_configuration_value(self.block_settings_key, "PDF_HEADER_LOGO")
+        footer_logo = getattr(settings, "FOOTER_OPENEDX_LOGO_IMAGE", "")
+        return configured_header_logo or footer_logo or ""
+
+    def build_pdf_response(self, content: CoachedData | CodingData | ShortAnswerData) -> Response:
+        """
+        Helper function to be called by the download pdf handlers in the child xblocks.
+        """
+        # https://openedx.atlassian.net/wiki/spaces/PLAT/pages/113607155/How+do+I+access+student+data+from+within+an+XBlock
+        user = self.runtime.service(self, "user").get_current_user()
+        user_email = user.emails[0] if user.emails else ""
+        # Fallbacks because these user attributes are not guaranteed to be set.
+        user_name = user.full_name or user.opt_attrs.get('edx-platform.username') or "Student"
+
+        metadata = Metadata(
+            info=Info(
+                title=self.display_name,  # pylint: disable=no-member
+            ),
+            student=Student(email=user_email, name=user_name),
+            branding=Branding(
+                logo=self.get_pdf_logo(),
+            ),
+            location=get_pdf_location_nav(self),
+        )
+        pdf_data: bytes = generate_pdf(metadata, content)
+
+        filename = slugify(f"{self.display_name}-{user_name}-transcript")  # pylint: disable=no-member
+        return Response(
+            pdf_data,
+            content_type='application/pdf',
+            content_disposition=f'attachment; filename="{filename}.pdf"',
+        )
