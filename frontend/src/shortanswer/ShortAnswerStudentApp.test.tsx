@@ -58,6 +58,21 @@ describe("ShortAnswerStudentApp", () => {
   });
 
   describe("submit answer", () => {
+    it("keeps submit disabled until the learner types an answer", async () => {
+      const user = userEvent.setup();
+
+      render(<ShortAnswerStudentApp payload={makePayload()} />);
+
+      const textarea = screen.getByRole("textbox");
+      const submitButton = screen.getByRole("button", { name: /submit/i });
+
+      expect(submitButton).toBeDisabled();
+
+      await user.type(textarea, "my answer");
+
+      expect(submitButton).toBeEnabled();
+    });
+
     it("sends user input on submit", async () => {
       mockSendAnswer.mockResolvedValue("Good answer!");
       const user = userEvent.setup();
@@ -109,6 +124,12 @@ describe("ShortAnswerStudentApp", () => {
   });
 
   describe("reset", () => {
+    it("keeps reset disabled until the conversation has a user message", () => {
+      render(<ShortAnswerStudentApp payload={makePayload()} />);
+
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeDisabled();
+    });
+
     it("clears messages after reset", async () => {
       mockResetChat.mockResolvedValue({});
       const user = userEvent.setup();

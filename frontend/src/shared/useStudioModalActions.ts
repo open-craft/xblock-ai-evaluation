@@ -49,23 +49,34 @@ export function useStudioModalActions({
     saveAction.textContent = saveLabel;
     cancelAction.textContent = cancelLabel;
     saveAction.setAttribute("aria-disabled", String(isSaving));
+    cancelAction.setAttribute("aria-disabled", String(isSaving));
     saveAction.classList.toggle("is-disabled", isSaving);
+    cancelAction.classList.toggle("is-disabled", isSaving);
+
+    const stopLegacyStudioHandler = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
 
     const onSaveClick = (event: Event) => {
-      event.preventDefault();
+      stopLegacyStudioHandler(event);
       onSave();
     };
     const onCancelClick = (event: Event) => {
-      event.preventDefault();
+      stopLegacyStudioHandler(event);
+      if (isSaving) {
+        return;
+      }
       onCancel();
     };
 
-    saveAction.addEventListener("click", onSaveClick);
-    cancelAction.addEventListener("click", onCancelClick);
+    saveAction.addEventListener("click", onSaveClick, true);
+    cancelAction.addEventListener("click", onCancelClick, true);
 
     return () => {
-      saveAction.removeEventListener("click", onSaveClick);
-      cancelAction.removeEventListener("click", onCancelClick);
+      saveAction.removeEventListener("click", onSaveClick, true);
+      cancelAction.removeEventListener("click", onCancelClick, true);
     };
   }, [rootSelector, intl, isSaving, onSave, onCancel, i18nPrefix]);
 }

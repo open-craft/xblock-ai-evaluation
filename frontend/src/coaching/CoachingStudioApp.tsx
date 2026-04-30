@@ -1427,11 +1427,20 @@ function CoachingStudioFormContent({
       id: "coaching.studio.cancel",
       defaultMessage: "Cancel",
     });
-    const onSaveClick = (nativeEvent: Event) => {
+    const stopLegacyStudioHandler = (nativeEvent: Event) => {
       nativeEvent.preventDefault();
+      nativeEvent.stopPropagation();
+      nativeEvent.stopImmediatePropagation();
+    };
+    const onSaveClick = (nativeEvent: Event) => {
+      stopLegacyStudioHandler(nativeEvent);
       saveStudioSettings();
     };
     const onCancelClick = (nativeEvent: Event) => {
+      stopLegacyStudioHandler(nativeEvent);
+      if (isSaving) {
+        return;
+      }
       handleCancel(nativeEvent);
     };
 
@@ -1443,14 +1452,17 @@ function CoachingStudioFormContent({
     saveAction.textContent = saveLabel;
     cancelAction.textContent = cancelLabel;
     saveAction.setAttribute("aria-disabled", String(isSaving));
+    cancelAction.setAttribute("aria-disabled", String(isSaving));
     saveAction.classList.toggle("disabled", isSaving);
     saveAction.classList.toggle("is-disabled", isSaving);
-    saveAction.addEventListener("click", onSaveClick);
-    cancelAction.addEventListener("click", onCancelClick);
+    cancelAction.classList.toggle("disabled", isSaving);
+    cancelAction.classList.toggle("is-disabled", isSaving);
+    saveAction.addEventListener("click", onSaveClick, true);
+    cancelAction.addEventListener("click", onCancelClick, true);
 
     return () => {
-      saveAction.removeEventListener("click", onSaveClick);
-      cancelAction.removeEventListener("click", onCancelClick);
+      saveAction.removeEventListener("click", onSaveClick, true);
+      cancelAction.removeEventListener("click", onCancelClick, true);
     };
   }, [intl, isSaving, runtime, saveStudioSettings]);
 

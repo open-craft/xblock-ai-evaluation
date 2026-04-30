@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@openedx/paragon";
 import { useIntl } from "react-intl";
 
 import { getErrorMessage } from "../shared/request";
@@ -155,11 +156,10 @@ function MessageComposer({
       </div>
       <div className="chat-submit-row">
         {allowReset ? (
-          <button
+          <Button
             type="button"
-            className={
-              "btn chat-button chat-reset-button" + (canReset ? "" : " disabled")
-            }
+            variant="outline-primary"
+            className={"chat-button chat-reset-button" + (canReset ? "" : " disabled")}
             disabled={!canReset}
             aria-disabled={!canReset}
             onClick={onReset}
@@ -168,7 +168,7 @@ function MessageComposer({
               id: "shortanswer.student.reset",
               defaultMessage: "Reset chat",
             })}
-          </button>
+          </Button>
         ) : null}
         <textarea
           ref={textareaRef}
@@ -186,18 +186,18 @@ function MessageComposer({
           onChange={onChange}
           onKeyDown={onKeyDown}
         />
-        <button
+        <Button
           type="button"
+          variant="primary"
           className={
-            "btn btn-primary chat-button chat-submit-button" +
-            (canSubmit ? "" : " disabled")
+            "chat-button chat-submit-button" + (canSubmit ? "" : " disabled")
           }
           disabled={!canSubmit}
           aria-disabled={!canSubmit}
           onClick={onSubmit}
         >
           {submitLabel}
-        </button>
+        </Button>
       </div>
     </React.Fragment>
   );

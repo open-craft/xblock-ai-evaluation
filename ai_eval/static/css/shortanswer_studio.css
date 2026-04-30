@@ -13,7 +13,32 @@
 }
 
 .shortanswer-react-studio {
-    color: #2d3b45;
+    --shortanswer-studio-text: var(--pgn-color-gray-700, #2d3b45);
+    --shortanswer-studio-label: var(--pgn-color-gray-700, #3c3c3c);
+    --shortanswer-studio-muted: var(--pgn-color-gray-500, #707070);
+    --shortanswer-studio-danger: var(--pgn-color-danger-500, #a11d1d);
+    --shortanswer-studio-danger-hover: var(--pgn-color-danger-700, #ff1305);
+    --shortanswer-studio-danger-text: var(--pgn-color-white, #ffffff);
+    --shortanswer-studio-radius: var(--pgn-size-rounded-pill, 999px);
+    --shortanswer-studio-spacing-xs: var(--pgn-spacing-spacer-1, 0.25rem);
+    --shortanswer-studio-spacing-sm: var(--pgn-spacing-spacer-2, 0.5rem);
+    --shortanswer-studio-row-gap: var(--pgn-spacing-spacer-1-5, 0.35rem);
+    --shortanswer-studio-label-font-size: var(--pgn-typography-font-size-base, 16px);
+    --shortanswer-studio-label-font-weight: var(--pgn-typography-font-weight-semi-bold, 600);
+    --shortanswer-studio-label-padding-top: var(--pgn-spacing-spacer-2, 0.5rem);
+    --shortanswer-studio-control-font-size: var(--pgn-typography-form-input-font-size-base, 15px);
+    --shortanswer-studio-control-height: var(--pgn-size-form-input-height-base, 44px);
+    --shortanswer-studio-control-padding-y: var(--pgn-spacing-form-input-padding-y-base, 8px);
+    --shortanswer-studio-control-padding-x: var(--pgn-spacing-form-input-padding-x-base, 12px);
+    --shortanswer-studio-textarea-font-size: var(--pgn-typography-font-size-sm, 14px);
+    --shortanswer-studio-help-font-size: var(--pgn-typography-form-feedback-font-size, 12px);
+    --shortanswer-studio-checkbox-size: var(--pgn-size-form-control-indicator-base, 18px);
+    --shortanswer-studio-checkbox-margin-top: var(--pgn-spacing-form-input-check-margin-y, 0.3rem);
+    --shortanswer-studio-remove-size: var(--pgn-size-form-control-indicator-base, 18px);
+    --shortanswer-studio-remove-font-size: var(--pgn-typography-form-input-font-size-base, 15px);
+    --shortanswer-studio-remove-font-weight: var(--pgn-typography-font-weight-bold, 700);
+
+    color: var(--shortanswer-studio-text);
 }
 
 .shortanswer-react-studio .wrapper-comp-settings {
@@ -36,11 +61,11 @@
 }
 
 .shortanswer-react-studio .pgn__form-group > .pgn__form-label {
-    color: #3c3c3c;
-    font-size: 16px;
-    font-weight: 600;
+    color: var(--shortanswer-studio-label);
+    font-size: var(--shortanswer-studio-label-font-size);
+    font-weight: var(--shortanswer-studio-label-font-weight);
     grid-column: 1;
-    padding-top: 0.5rem;
+    padding-top: var(--shortanswer-studio-label-padding-top);
 }
 
 .shortanswer-react-studio .pgn__form-group > :not(.pgn__form-label) {
@@ -49,23 +74,23 @@
 
 .shortanswer-react-studio .pgn__form-group input.form-control,
 .shortanswer-react-studio .pgn__form-group select.form-control {
-    font-size: 15px;
-    height: 44px;
-    min-height: 44px;
-    padding: 8px 12px;
+    font-size: var(--shortanswer-studio-control-font-size);
+    height: var(--shortanswer-studio-control-height);
+    min-height: var(--shortanswer-studio-control-height);
+    padding: var(--shortanswer-studio-control-padding-y) var(--shortanswer-studio-control-padding-x);
 }
 
 .shortanswer-react-studio .pgn__form-group textarea.form-control {
-    font-size: 14px;
+    font-size: var(--shortanswer-studio-textarea-font-size);
 }
 
 .shortanswer-react-studio .pgn__form-group .pgn__form-text {
-    color: #707070;
-    font-size: 12px;
+    color: var(--shortanswer-studio-muted);
+    font-size: var(--shortanswer-studio-help-font-size);
 }
 
 .shortanswer-react-studio .pgn__form-group .pgn__form-text-invalid {
-    color: #a11d1d;
+    color: var(--shortanswer-studio-danger);
 }
 
 .shortanswer-react-studio .pgn__form-group .pgn__form-text-invalid .pgn__icon {
@@ -85,17 +110,17 @@
 }
 
 .shortanswer-react-studio .pgn__form-group .pgn__form-checkbox > div .pgn__form-label {
-    color: #3c3c3c;
-    font-size: 16px;
-    font-weight: 600;
+    color: var(--shortanswer-studio-label);
+    font-size: var(--shortanswer-studio-label-font-size);
+    font-weight: var(--shortanswer-studio-label-font-weight);
 }
 
 .shortanswer-react-studio .pgn__form-group .pgn__form-checkbox-input {
     grid-column: 2;
-    height: 18px;
-    margin-top: 0.3rem;
+    height: var(--shortanswer-studio-checkbox-size);
+    margin-top: var(--shortanswer-studio-checkbox-margin-top);
     order: 2;
-    width: 18px;
+    width: var(--shortanswer-studio-checkbox-size);
 }
 
 /* --- AttachmentUrlsEditor --- */
@@ -103,8 +128,8 @@
 .shortanswer-react-studio .shortanswer-studio-attachment-row {
     align-items: center;
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 0.35rem;
+    gap: var(--shortanswer-studio-spacing-sm);
+    margin-bottom: var(--shortanswer-studio-row-gap);
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-row .pgn__form-control-decorator-group {
@@ -120,33 +145,33 @@
 
 .shortanswer-react-studio .shortanswer-studio-attachment-row .btn-outline-danger {
     align-items: center;
-    background: #ff2d20;
-    border: 1px solid #ff2d20;
-    border-radius: 999px;
+    background: var(--shortanswer-studio-danger);
+    border: 1px solid var(--shortanswer-studio-danger);
+    border-radius: var(--shortanswer-studio-radius);
     box-shadow: none;
-    color: #fff;
+    color: var(--shortanswer-studio-danger-text);
     display: inline-flex;
-    font-size: 15px;
-    font-weight: 700;
-    height: 18px;
+    font-size: var(--shortanswer-studio-remove-font-size);
+    font-weight: var(--shortanswer-studio-remove-font-weight);
+    height: var(--shortanswer-studio-remove-size);
     justify-content: center;
     line-height: 1;
-    max-height: 18px;
-    max-width: 18px;
-    min-height: 18px;
-    min-width: 18px;
+    max-height: var(--shortanswer-studio-remove-size);
+    max-width: var(--shortanswer-studio-remove-size);
+    min-height: var(--shortanswer-studio-remove-size);
+    min-width: var(--shortanswer-studio-remove-size);
     overflow: hidden;
     padding: 0;
-    width: 18px;
+    width: var(--shortanswer-studio-remove-size);
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-row .btn-outline-danger:hover {
-    background: #ff1305;
-    border-color: #ff1305;
+    background: var(--shortanswer-studio-danger-hover);
+    border-color: var(--shortanswer-studio-danger-hover);
 }
 
 .shortanswer-react-studio .shortanswer-studio-attachment-list > .btn {
-    margin-top: 0.25rem;
+    margin-top: var(--shortanswer-studio-spacing-xs);
 }
 
 @media (max-width: 1180px) {
