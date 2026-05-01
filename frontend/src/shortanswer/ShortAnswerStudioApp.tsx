@@ -5,7 +5,7 @@ import * as Yup from "yup";
 import { Button, Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
-import { StudioFooter } from "../shared/StudioFooter";
+import { StudioEditorLayout } from "../shared/StudioEditorLayout";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -451,28 +451,29 @@ function ShortAnswerStudioFormContent({
 
   return (
     <div className="shortanswer-react-studio" data-block-kind="shortanswer">
-      <div className="wrapper-comp-settings is-active" id="settings-tab">
-        <StudioValidationSummary
-          hasFieldErrors={hasFieldErrors}
-          requestError={requestError}
-          validationWarnings={validationWarnings}
-        />
-        <ShortAnswerSettingsForm
-          values={formik.values}
-          validationErrors={validationErrors}
-          lockMetadata={lockMetadata}
-          fieldMetadata={fieldMetadata}
-          onChange={(fieldName, nextValue) => {
-            formik.setFieldValue(fieldName, nextValue);
-          }}
-        />
-      </div>
-      <StudioFooter
+      <StudioEditorLayout
         i18nPrefix="shortanswer"
         isSaving={isSaving}
         onCancel={handleCancel}
         onSave={handleSave}
-      />
+      >
+        <div className="wrapper-comp-settings is-active" id="settings-tab">
+          <StudioValidationSummary
+            hasFieldErrors={hasFieldErrors}
+            requestError={requestError}
+            validationWarnings={validationWarnings}
+          />
+          <ShortAnswerSettingsForm
+            values={formik.values}
+            validationErrors={validationErrors}
+            lockMetadata={lockMetadata}
+            fieldMetadata={fieldMetadata}
+            onChange={(fieldName, nextValue) => {
+              formik.setFieldValue(fieldName, nextValue);
+            }}
+          />
+        </div>
+      </StudioEditorLayout>
     </div>
   );
 }

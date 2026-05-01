@@ -2,11 +2,12 @@ import React, { useEffect, useRef } from "react";
 import { useIntl } from "react-intl";
 import { ActionRow, Button } from "@openedx/paragon";
 
-interface StudioFooterProps {
+interface StudioEditorLayoutProps {
   i18nPrefix: string;
   isSaving: boolean;
   onCancel: () => void;
   onSave: () => void;
+  children?: React.ReactNode;
 }
 
 function useHidePlatformModalActions(rootRef: React.RefObject<HTMLElement>) {
@@ -28,12 +29,13 @@ function useHidePlatformModalActions(rootRef: React.RefObject<HTMLElement>) {
   }, [rootRef]);
 }
 
-export function StudioFooter({
+export function StudioEditorLayout({
   i18nPrefix,
   isSaving,
   onCancel,
   onSave,
-}: StudioFooterProps) {
+  children,
+}: StudioEditorLayoutProps) {
   const intl = useIntl();
   const rootRef = useRef<HTMLDivElement>(null);
   useHidePlatformModalActions(rootRef);
@@ -48,24 +50,29 @@ export function StudioFooter({
 
   return (
     <div className="ai-eval-studio-footer" ref={rootRef}>
-      <ActionRow>
-        <Button
-          type="button"
-          variant="tertiary"
-          onClick={onCancel}
-          disabled={isSaving}
-        >
-          {cancelLabel}
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          onClick={onSave}
-          disabled={isSaving}
-        >
-          {saveLabel}
-        </Button>
-      </ActionRow>
+      <div className="ai-eval-studio-scroll">
+        {children}
+      </div>
+      <div className="ai-eval-studio-actions">
+        <ActionRow>
+          <Button
+            type="button"
+            variant="tertiary"
+            onClick={onCancel}
+            disabled={isSaving}
+          >
+            {cancelLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={onSave}
+            disabled={isSaving}
+          >
+            {saveLabel}
+          </Button>
+        </ActionRow>
+      </div>
     </div>
   );
 }

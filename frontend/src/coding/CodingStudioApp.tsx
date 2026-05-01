@@ -5,7 +5,7 @@ import * as Yup from "yup";
 import { Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
-import { StudioFooter } from "../shared/StudioFooter";
+import { StudioEditorLayout } from "../shared/StudioEditorLayout";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -342,28 +342,29 @@ function CodingStudioFormContent({
       className="shortanswer-react-studio coding-react-studio"
       data-block-kind="coding"
     >
-      <div className="wrapper-comp-settings is-active" id="settings-tab">
-        <StudioValidationSummary
-          hasFieldErrors={hasFieldErrors}
-          requestError={requestError}
-          validationWarnings={validationWarnings}
-        />
-        <CodingSettingsForm
-          fieldMetadata={fieldMetadata}
-          lockMetadata={lockMetadata}
-          validationErrors={validationErrors}
-          values={formik.values}
-          onChange={(fieldName, nextValue) => {
-            formik.setFieldValue(fieldName, nextValue);
-          }}
-        />
-      </div>
-      <StudioFooter
+      <StudioEditorLayout
         i18nPrefix="coding"
         isSaving={isSaving}
         onCancel={handleCancel}
         onSave={handleSave}
-      />
+      >
+        <div className="wrapper-comp-settings is-active" id="settings-tab">
+          <StudioValidationSummary
+            hasFieldErrors={hasFieldErrors}
+            requestError={requestError}
+            validationWarnings={validationWarnings}
+          />
+          <CodingSettingsForm
+            fieldMetadata={fieldMetadata}
+            lockMetadata={lockMetadata}
+            validationErrors={validationErrors}
+            values={formik.values}
+            onChange={(fieldName, nextValue) => {
+              formik.setFieldValue(fieldName, nextValue);
+            }}
+          />
+        </div>
+      </StudioEditorLayout>
     </div>
   );
 }

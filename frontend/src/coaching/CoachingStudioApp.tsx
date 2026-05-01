@@ -5,7 +5,7 @@ import * as Yup from "yup";
 import { Alert, Button, Form } from "@openedx/paragon";
 
 import { RequestError } from "../shared/request";
-import { StudioFooter } from "../shared/StudioFooter";
+import { StudioEditorLayout } from "../shared/StudioEditorLayout";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -1412,38 +1412,39 @@ function CoachingStudioFormContent({
       className="shortanswer-react-studio coaching-react-studio"
       data-block-kind="coaching"
     >
-      <div className="wrapper-comp-settings is-active" id="settings-tab">
-        <div className="coaching-studio-shell">
-          <StudioValidationSummary
-            requestError={requestError}
-            validationWarnings={validationWarnings}
-          />
-
-          <div className="coaching-studio-body">
-            <SectionNav
-              activeSection={activeSection}
-              onSectionChange={setActiveSection}
-              validationErrors={validationErrors}
-            />
-            <SectionPanel
-              activeSection={activeSection}
-              fieldMetadata={fieldMetadata}
-              lockMetadata={lockMetadata}
-              onChange={(fieldName, nextValue) => {
-                formik.setFieldValue(fieldName, nextValue);
-              }}
-              validationErrors={validationErrors}
-              values={formik.values}
-            />
-          </div>
-        </div>
-      </div>
-      <StudioFooter
+      <StudioEditorLayout
         i18nPrefix="coaching"
         isSaving={isSaving}
         onCancel={handleCancel}
         onSave={saveStudioSettings}
-      />
+      >
+        <div className="wrapper-comp-settings is-active" id="settings-tab">
+          <div className="coaching-studio-shell">
+            <StudioValidationSummary
+              requestError={requestError}
+              validationWarnings={validationWarnings}
+            />
+
+            <div className="coaching-studio-body">
+              <SectionNav
+                activeSection={activeSection}
+                onSectionChange={setActiveSection}
+                validationErrors={validationErrors}
+              />
+              <SectionPanel
+                activeSection={activeSection}
+                fieldMetadata={fieldMetadata}
+                lockMetadata={lockMetadata}
+                onChange={(fieldName, nextValue) => {
+                  formik.setFieldValue(fieldName, nextValue);
+                }}
+                validationErrors={validationErrors}
+                values={formik.values}
+              />
+            </div>
+          </div>
+        </div>
+      </StudioEditorLayout>
     </div>
   );
 }

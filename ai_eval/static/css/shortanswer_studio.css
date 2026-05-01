@@ -45,9 +45,22 @@
     padding: 0;
 }
 
-.shortanswer-react-studio .ai-eval-studio-footer {
+/*
+ * Sticky footer pattern: form scrolls while Save / Cancel buttons stay pinned
+ * at the bottom.
+ */
+.shortanswer-react-studio .ai-eval-studio-scroll {
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+.shortanswer-react-studio .ai-eval-studio-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--pgn-color-white, #ffffff);
+    z-index: 1;
     border-top: 1px solid var(--pgn-color-gray-200, #eaeaea);
-    margin: 2rem 0 0;
+    margin-top: 2rem;
     padding: 1rem 0 0;
 }
 

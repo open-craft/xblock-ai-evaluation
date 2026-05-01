@@ -9,10 +9,10 @@ import ShortAnswerStudioApp from "../shortanswer/ShortAnswerStudioApp";
 import { ShortAnswerStudioPayload } from "../shortanswer/types";
 import { render, screen, waitFor } from "../test/helpers";
 import { XBlockRuntime } from "./types";
-import { StudioFooter } from "./StudioFooter";
+import { StudioEditorLayout } from "./StudioEditorLayout";
 
 function renderInsideStudioModal(
-  props: Partial<React.ComponentProps<typeof StudioFooter>> = {},
+  props: Partial<React.ComponentProps<typeof StudioEditorLayout>> = {},
 ) {
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -20,7 +20,7 @@ function renderInsideStudioModal(
   const view = render(
     <div className="edit-xblock-modal">
       <div className="react-editor">
-        <StudioFooter
+        <StudioEditorLayout
           i18nPrefix="test"
           isSaving={false}
           onCancel={jest.fn()}
@@ -42,7 +42,7 @@ function renderInsideStudioModal(
   };
 }
 
-describe("StudioFooter", () => {
+describe("StudioEditorLayout", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
@@ -214,7 +214,7 @@ const coachingPayload: CoachingStudioPayload = {
   },
 };
 
-describe("StudioFooter — editor integration", () => {
+describe("StudioEditorLayout — editor integration", () => {
   let originalFetch: typeof global.fetch;
 
   beforeAll(() => {
@@ -230,7 +230,7 @@ describe("StudioFooter — editor integration", () => {
     jest.restoreAllMocks();
   });
 
-  it("saves Short Answer through the React footer and hides platform modal actions", async () => {
+  it("saves Short Answer through the React layout and hides platform modal actions", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
     const fetch = mockSuccessfulSave();
@@ -252,7 +252,7 @@ describe("StudioFooter — editor integration", () => {
     );
   });
 
-  it("cancels Coding through the React footer", async () => {
+  it("cancels Coding through the React layout", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
 
@@ -263,7 +263,7 @@ describe("StudioFooter — editor integration", () => {
     expect(runtime.notify).toHaveBeenCalledWith("cancel", {});
   });
 
-  it("cancels Coaching through the React footer", async () => {
+  it("cancels Coaching through the React layout", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
 
