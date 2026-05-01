@@ -17,10 +17,6 @@
     --pgn-color-coaching-warning-border: var(--pgn-color-warning-300, #ead9a4);
 }
 
-.modal-window.modal-type-coach_ai_eval .modal-actions {
-    display: block;
-}
-
 .coaching-react-studio .wrapper-comp-settings {
     padding: 0;
 }

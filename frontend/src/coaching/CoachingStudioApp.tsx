@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Formik, useFormikContext } from "formik";
 import * as Yup from "yup";
 import { Alert, Button, Form } from "@openedx/paragon";
 
 import { RequestError } from "../shared/request";
+import { StudioFooter } from "../shared/StudioFooter";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -1252,6 +1253,7 @@ function CoachingStudioFormContent({
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
   const meta: CoachingStudioMeta = payload.meta || {};
   const fieldMetadata = meta.field_metadata || {};
   const lockMetadata = meta.lock_metadata;
@@ -1276,9 +1278,10 @@ function CoachingStudioFormContent({
   }
 
   async function saveStudioSettings() {
-    if (!payload.handler_urls.studio_submit || isSaving) {
+    if (!payload.handler_urls.studio_submit || isSavingRef.current) {
       return;
     }
+    isSavingRef.current = true;
 
     const savingMessage = intl.formatMessage({
       id: "coaching.studio.saving",
@@ -1322,6 +1325,7 @@ function CoachingStudioFormContent({
         }),
         message: validationMessage,
       });
+      isSavingRef.current = false;
       return;
     }
 
@@ -1343,6 +1347,7 @@ function CoachingStudioFormContent({
       const nextValidationErrors = normalizeValidationErrors(response.validation_errors);
       setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
       handleValidationResponse(nextValidationErrors, activeSection);
+      isSavingRef.current = false;
       setIsSaving(false);
 
       if (response.success) {
@@ -1382,6 +1387,7 @@ function CoachingStudioFormContent({
       }
 
       setRequestError(inlineRequestError);
+      isSavingRef.current = false;
       setIsSaving(false);
       notifyRuntime(runtime, "error", {
         title: intl.formatMessage({
@@ -1393,78 +1399,13 @@ function CoachingStudioFormContent({
     }
   }
 
-  function handleCancel(event?: Event | React.SyntheticEvent<HTMLElement>) {
-    if (event && "preventDefault" in event) {
-      event.preventDefault();
+  function handleCancel() {
+    if (isSavingRef.current) {
+      return;
     }
 
     notifyRuntime(runtime, "cancel", {});
   }
-
-  useEffect(() => {
-    const root = document.querySelector(".coaching-react-studio");
-    const modal = root?.closest(".edit-xblock-modal");
-    const modalActions = modal?.querySelector(".modal-actions") as HTMLElement | null;
-    const saveItem = modalActions?.querySelector(".action-save")?.closest("li") as HTMLLIElement | null;
-    const cancelItem = modalActions?.querySelector(".action-cancel")?.closest("li") as HTMLLIElement | null;
-    const saveAction = modalActions?.querySelector(".action-save") as HTMLAnchorElement | null;
-    const cancelAction = modalActions?.querySelector(".action-cancel") as HTMLAnchorElement | null;
-
-    if (!modalActions || !saveItem || !cancelItem || !saveAction || !cancelAction) {
-      return undefined;
-    }
-
-    const saveLabel = isSaving
-      ? intl.formatMessage({
-          id: "coaching.studio.savingButton",
-          defaultMessage: "Saving...",
-        })
-      : intl.formatMessage({
-          id: "coaching.studio.save",
-          defaultMessage: "Save",
-        });
-    const cancelLabel = intl.formatMessage({
-      id: "coaching.studio.cancel",
-      defaultMessage: "Cancel",
-    });
-    const stopLegacyStudioHandler = (nativeEvent: Event) => {
-      nativeEvent.preventDefault();
-      nativeEvent.stopPropagation();
-      nativeEvent.stopImmediatePropagation();
-    };
-    const onSaveClick = (nativeEvent: Event) => {
-      stopLegacyStudioHandler(nativeEvent);
-      saveStudioSettings();
-    };
-    const onCancelClick = (nativeEvent: Event) => {
-      stopLegacyStudioHandler(nativeEvent);
-      if (isSaving) {
-        return;
-      }
-      handleCancel(nativeEvent);
-    };
-
-    modalActions.style.display = "block";
-    saveItem.style.display = "inline-block";
-    cancelItem.style.display = "inline-block";
-    saveAction.className = "button action-primary action-save";
-    cancelAction.className = "button action-cancel";
-    saveAction.textContent = saveLabel;
-    cancelAction.textContent = cancelLabel;
-    saveAction.setAttribute("aria-disabled", String(isSaving));
-    cancelAction.setAttribute("aria-disabled", String(isSaving));
-    saveAction.classList.toggle("disabled", isSaving);
-    saveAction.classList.toggle("is-disabled", isSaving);
-    cancelAction.classList.toggle("disabled", isSaving);
-    cancelAction.classList.toggle("is-disabled", isSaving);
-    saveAction.addEventListener("click", onSaveClick, true);
-    cancelAction.addEventListener("click", onCancelClick, true);
-
-    return () => {
-      saveAction.removeEventListener("click", onSaveClick, true);
-      cancelAction.removeEventListener("click", onCancelClick, true);
-    };
-  }, [intl, isSaving, runtime, saveStudioSettings]);
 
   return (
     <div
@@ -1497,6 +1438,12 @@ function CoachingStudioFormContent({
           </div>
         </div>
       </div>
+      <StudioFooter
+        i18nPrefix="coaching"
+        isSaving={isSaving}
+        onCancel={handleCancel}
+        onSave={saveStudioSettings}
+      />
     </div>
   );
 }

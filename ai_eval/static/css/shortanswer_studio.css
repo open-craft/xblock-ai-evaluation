@@ -27,14 +27,14 @@
     --shortanswer-studio-label-font-weight: var(--pgn-typography-font-weight-semi-bold, 600);
     --shortanswer-studio-label-padding-top: var(--pgn-spacing-spacer-2, 0.5rem);
     --shortanswer-studio-control-font-size: var(--pgn-typography-form-input-font-size-base, 15px);
-    --shortanswer-studio-control-height: var(--pgn-size-form-input-height-base, 44px);
+    --shortanswer-studio-control-height: max(var(--pgn-size-form-input-height-base, 44px), 44px);
     --shortanswer-studio-control-padding-y: var(--pgn-spacing-form-input-padding-y-base, 8px);
     --shortanswer-studio-control-padding-x: var(--pgn-spacing-form-input-padding-x-base, 12px);
     --shortanswer-studio-textarea-font-size: var(--pgn-typography-font-size-sm, 14px);
     --shortanswer-studio-help-font-size: var(--pgn-typography-form-feedback-font-size, 12px);
-    --shortanswer-studio-checkbox-size: var(--pgn-size-form-control-indicator-base, 18px);
+    --shortanswer-studio-checkbox-size: max(var(--pgn-size-form-control-indicator-base, 18px), 18px);
     --shortanswer-studio-checkbox-margin-top: var(--pgn-spacing-form-input-check-margin-y, 0.3rem);
-    --shortanswer-studio-remove-size: var(--pgn-size-form-control-indicator-base, 18px);
+    --shortanswer-studio-remove-size: max(var(--pgn-size-form-control-indicator-base, 18px), 18px);
     --shortanswer-studio-remove-font-size: var(--pgn-typography-form-input-font-size-base, 15px);
     --shortanswer-studio-remove-font-weight: var(--pgn-typography-font-weight-bold, 700);
 
@@ -43,6 +43,12 @@
 
 .shortanswer-react-studio .wrapper-comp-settings {
     padding: 0;
+}
+
+.shortanswer-react-studio .ai-eval-studio-footer {
+    border-top: 1px solid var(--pgn-color-gray-200, #eaeaea);
+    margin: 2rem 0 0;
+    padding: 1rem 0 0;
 }
 
 /* --- Paragon Form.Group two-column layout --- */

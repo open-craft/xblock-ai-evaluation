@@ -5,8 +5,8 @@ import * as Yup from "yup";
 import { Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
+import { StudioFooter } from "../shared/StudioFooter";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
-import { useStudioModalActions } from "../shared/useStudioModalActions";
 import {
   collectYupErrors,
   getSaveErrorMessage,
@@ -215,14 +215,16 @@ function CodingStudioFormContent({
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
   const meta: CodingStudioMeta = payload.meta || {};
   const fieldMetadata = meta.field_metadata || {};
   const lockMetadata = meta.lock_metadata;
 
   const handleSave = useCallback(async function handleSave() {
-    if (!payload.handler_urls.studio_submit || isSaving) {
+    if (!payload.handler_urls.studio_submit || isSavingRef.current) {
       return;
     }
+    isSavingRef.current = true;
 
     const validationMessage = intl.formatMessage({
       id: "coding.studio.validationError",
@@ -243,6 +245,7 @@ function CodingStudioFormContent({
           }),
           message: validationMessage,
         });
+        isSavingRef.current = false;
         return;
       }
     }
@@ -269,6 +272,7 @@ function CodingStudioFormContent({
 
       setValidationErrors(normalizeValidationErrors(response.validation_errors));
       setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
+      isSavingRef.current = false;
       setIsSaving(false);
 
       if (response.success) {
@@ -312,6 +316,7 @@ function CodingStudioFormContent({
       }
 
       setRequestError(inlineRequestError);
+      isSavingRef.current = false;
       setIsSaving(false);
       notifyRuntime(runtime, "error", {
         title: intl.formatMessage({
@@ -321,22 +326,16 @@ function CodingStudioFormContent({
         message: inlineRequestError,
       });
     }
-  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime]);
+  }, [intl, payload.handler_urls.studio_submit, runtime]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
   const handleCancel = useCallback(() => {
+    if (isSavingRef.current) {
+      return;
+    }
     notifyRuntime(runtime, "cancel", {});
   }, [runtime]);
-
-  useStudioModalActions({
-    rootSelector: ".coding-react-studio",
-    intl,
-    isSaving,
-    onSave: handleSave,
-    onCancel: handleCancel,
-    i18nPrefix: "coding",
-  });
 
   return (
     <div
@@ -359,6 +358,12 @@ function CodingStudioFormContent({
           }}
         />
       </div>
+      <StudioFooter
+        i18nPrefix="coding"
+        isSaving={isSaving}
+        onCancel={handleCancel}
+        onSave={handleSave}
+      />
     </div>
   );
 }

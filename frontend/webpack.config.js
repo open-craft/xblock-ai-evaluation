@@ -56,6 +56,17 @@ module.exports = function webpackConfig(_, argv) {
                 postcssOptions: {
                   plugins: [
                     [
+                      // Scopes Paragon v23 :root { --pgn-* } design-token
+                      // rules to .ai-eval-paragon so the XBlock carries its
+                      // own token baseline rather than inheriting :root-level
+                      // theme overrides from the parent LMS page.  For
+                      // deployments without custom token overrides (e.g. WGU
+                      // Ulmo with empty SIMPLE_THEME_SCSS_OVERRIDES) this is
+                      // equivalent to inheriting the platform theme.
+                      //
+                      // To make the XBlock respond to platform :root-level
+                      // theme tokens, remove this plugin and the
+                      // .ai-eval-paragon class addition in mountApp.tsx.
                       "postcss-prefix-selector",
                       {
                         prefix: ".ai-eval-paragon",

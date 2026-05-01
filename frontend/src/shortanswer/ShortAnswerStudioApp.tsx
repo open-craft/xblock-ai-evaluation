@@ -5,8 +5,8 @@ import * as Yup from "yup";
 import { Button, Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
+import { StudioFooter } from "../shared/StudioFooter";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
-import { useStudioModalActions } from "../shared/useStudioModalActions";
 import {
   collectYupErrors,
   getSaveErrorMessage,
@@ -328,13 +328,15 @@ function ShortAnswerStudioFormContent({
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
   const fieldMetadata = payload.meta.field_metadata || {};
   const lockMetadata = payload.meta.lock_metadata;
 
   const handleSave = useCallback(async function handleSave() {
-    if (!payload.handler_urls.studio_submit || isSaving) {
+    if (!payload.handler_urls.studio_submit || isSavingRef.current) {
       return;
     }
+    isSavingRef.current = true;
 
     const validationMessage = intl.formatMessage({
       id: "shortanswer.studio.validationError",
@@ -355,6 +357,7 @@ function ShortAnswerStudioFormContent({
           }),
           message: validationMessage,
         });
+        isSavingRef.current = false;
         return;
       }
     }
@@ -381,6 +384,7 @@ function ShortAnswerStudioFormContent({
 
       setValidationErrors(normalizeValidationErrors(response.validation_errors));
       setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
+      isSavingRef.current = false;
       setIsSaving(false);
 
       if (response.success) {
@@ -424,6 +428,7 @@ function ShortAnswerStudioFormContent({
       }
 
       setRequestError(inlineRequestError);
+      isSavingRef.current = false;
       setIsSaving(false);
       notifyRuntime(runtime, "error", {
         title: intl.formatMessage({
@@ -433,22 +438,16 @@ function ShortAnswerStudioFormContent({
         message: inlineRequestError,
       });
     }
-  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime]);
+  }, [intl, payload.handler_urls.studio_submit, runtime]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
   const handleCancel = useCallback(() => {
+    if (isSavingRef.current) {
+      return;
+    }
     notifyRuntime(runtime, "cancel", {});
   }, [runtime]);
-
-  useStudioModalActions({
-    rootSelector: ".shortanswer-react-studio",
-    intl,
-    isSaving,
-    onSave: handleSave,
-    onCancel: handleCancel,
-    i18nPrefix: "shortanswer",
-  });
 
   return (
     <div className="shortanswer-react-studio" data-block-kind="shortanswer">
@@ -468,6 +467,12 @@ function ShortAnswerStudioFormContent({
           }}
         />
       </div>
+      <StudioFooter
+        i18nPrefix="shortanswer"
+        isSaving={isSaving}
+        onCancel={handleCancel}
+        onSave={handleSave}
+      />
     </div>
   );
 }
