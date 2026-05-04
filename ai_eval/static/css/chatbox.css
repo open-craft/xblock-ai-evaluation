@@ -14,7 +14,7 @@
   --shortanswer-secondary-hover-bg: var(--pgn-color-gray-100, #f2f2f2);
   --shortanswer-secondary-hover-border: var(--pgn-color-gray-500, #6f7275);
   --shortanswer-radius: var(--pgn-size-border-radius-base, 0.375rem);
-  --shortanswer-input-radius: var(--pgn-size-border-radius-lg, 0.75rem);
+  --shortanswer-input-radius: var(--pgn-size-rounded-pill, 24px);
   --shortanswer-spacing-sm: var(--pgn-spacing-spacer-2, 0.5rem);
   --shortanswer-spacing-md-sm: var(--pgn-spacing-spacer-2-5, 0.75rem);
   --shortanswer-bubble-padding-y: var(--pgn-spacing-form-control-gutter, 0.625rem);
@@ -91,14 +91,20 @@
 
 .chat-submit-row {
   display: flex;
-  align-items: stretch;
+  align-items: flex-end;
   gap: var(--shortanswer-spacing-md-sm);
   margin-bottom: var(--shortanswer-submit-margin-bottom);
   font-size: var(--shortanswer-submit-font-size);
   padding: var(--shortanswer-bubble-padding-y);
 }
 
-.chat-submit-row textarea {
+.chat-input-wrapper {
+  flex: 1 1 auto;
+  position: relative;
+  display: flex;
+}
+
+.chat-input-wrapper textarea {
   background: var(--shortanswer-input-bg);
   border: 1px solid var(--shortanswer-input-border);
   border-radius: var(--shortanswer-input-radius);
@@ -108,17 +114,40 @@
   min-height: 44px;
   overflow: auto;
   max-height: 200px;
-  padding: var(--shortanswer-input-padding-y) var(--shortanswer-input-padding-x);
+  padding: var(--shortanswer-input-padding-y) 44px var(--shortanswer-input-padding-y) var(--shortanswer-input-padding-x);
   resize: none !important;
 }
 
-.chat-submit-row textarea:focus {
+.chat-input-wrapper textarea:focus {
   border-color: var(--shortanswer-focus);
   box-shadow: var(--shortanswer-focus-shadow);
   outline: none;
 }
 
-.chat-submit-row .chat-button {
+.chat-send-button {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50% !important;
+  border: none;
+  background: var(--shortanswer-ai-bg);
+  color: var(--shortanswer-ai-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.chat-send-button:not(.disabled):hover {
+  opacity: 0.85;
+}
+
+.chat-submit-row .chat-reset-button {
   align-items: center;
   display: inline-flex;
   flex: 0 0 auto;
@@ -135,21 +164,12 @@
   font-size: var(--shortanswer-button-font-size);
   line-height: var(--shortanswer-button-line-height);
   box-shadow: none;
-}
-
-.chat-submit-row .chat-submit-button {
-  gap: var(--shortanswer-submit-button-gap);
-}
-
-.chat-submit-row .chat-reset-button,
-.chat-submit-row .chat-finish-button {
   background: var(--shortanswer-secondary-bg);
   border-color: var(--shortanswer-secondary-border) !important;
   color: var(--shortanswer-secondary-text);
 }
 
-.chat-submit-row .chat-reset-button:hover,
-.chat-submit-row .chat-finish-button:hover {
+.chat-submit-row .chat-reset-button:hover {
   background: var(--shortanswer-secondary-hover-bg);
   border-color: var(--shortanswer-secondary-hover-border) !important;
 }
@@ -216,6 +236,17 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.chat-powered-by {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.25rem;
+  font-size: 1rem;
+  color: var(--pgn-color-gray-500, #707070);
+  padding: 0 var(--shortanswer-bubble-padding-y);
+  margin-top: 0.25rem;
 }
 
 .chat-instructions {

@@ -128,7 +128,7 @@
     order: 1;
 }
 
-.shortanswer-react-studio .pgn__form-group .pgn__form-checkbox > div .pgn__form-label {
+.shortanswer-react-studio .pgn__form-group .pgn__form-checkbox .pgn__form-label {
     color: var(--shortanswer-studio-label);
     font-size: var(--shortanswer-studio-label-font-size);
     font-weight: var(--shortanswer-studio-label-font-weight);

@@ -72,6 +72,7 @@ def shortanswer_block_data():
         "allow_reset": False,
         "character_image": "",
         "attachment_urls": [],
+        "skip_question": False,
     }
 
 
@@ -221,6 +222,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "max_responses": shortanswer_block_data["max_responses"],
             "allow_reset": shortanswer_block_data["allow_reset"],
             "character_image": shortanswer_block_data["character_image"],
+            "skip_question": shortanswer_block_data["skip_question"],
         },
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
@@ -960,6 +962,7 @@ def test_shortanswer_studio_submit_success(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "/static/new-image.jpg",
                     "attachment_urls": ["http://example.com/1.txt"],
+                    "skip_question": False,
                 },
             )
 
@@ -996,6 +999,7 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "",
                     "attachment_urls": ["http://example.com/bad.txt"],
+                    "skip_question": False,
                 },
             )
 
@@ -1036,6 +1040,7 @@ def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_
         "allow_reset": ["Missing field in Studio payload."],
         "character_image": ["Missing field in Studio payload."],
         "attachment_urls": ["Missing field in Studio payload."],
+        "skip_question": ["Missing field in Studio payload."],
     }
 
 
@@ -1063,6 +1068,7 @@ def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "/static/new-image.jpg",
                     "attachment_urls": ["http://example.com/1.txt"],
+                    "skip_question": False,
                 },
             )
 
