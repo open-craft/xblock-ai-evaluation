@@ -50,11 +50,11 @@ const shortAnswerSchema = Yup.object({
   model_api_key: Yup.string().ensure(),
   model_api_url: Yup.string().ensure(),
   question: Yup.string().ensure()
-    .when("skip_question", {
+    .when("hide_question", {
       is: false,
       then: (schema) => schema.required("Question field is mandatory"),
     }),
-  skip_question: Yup.boolean()
+  hide_question: Yup.boolean()
     .transform((_value: unknown, original: unknown) => Boolean(original))
     .default(false),
 });
@@ -76,7 +76,7 @@ function buildSubmitPayload(values: ShortAnswerStudioState) {
     model_api_key: values.model_api_key || "",
     model_api_url: values.model_api_url || "",
     question: values.question || "",
-    skip_question: Boolean(values.skip_question),
+    hide_question: Boolean(values.hide_question),
     evaluation_prompt: values.evaluation_prompt || "",
     max_responses: values.max_responses,
     allow_reset: Boolean(values.allow_reset),
@@ -238,16 +238,16 @@ function ShortAnswerSettingsForm({
         <FieldHelp metadata={fieldMetadata.model_api_url} />
       </Form.Group>
 
-      <Form.Group controlId="xb-field-edit-skip_question">
+      <Form.Group controlId="xb-field-edit-hide_question">
         <Form.Checkbox
-          checked={Boolean(values.skip_question)}
+          checked={Boolean(values.hide_question)}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-            onChange("skip_question", event.target.checked);
+            onChange("hide_question", event.target.checked);
           }}
         >
-          {fieldMetadata.skip_question?.display_name || "Skip question"}
+          {fieldMetadata.hide_question?.display_name || "Hide question"}
         </Form.Checkbox>
-        <FieldHelp metadata={fieldMetadata.skip_question} />
+        <FieldHelp metadata={fieldMetadata.hide_question} />
       </Form.Group>
 
       <Form.Group controlId="xb-field-edit-question" isInvalid={Boolean(validationErrors.question)}>
@@ -255,7 +255,7 @@ function ShortAnswerSettingsForm({
         <Form.Control
           as="textarea"
           rows={10}
-          disabled={Boolean(values.skip_question)}
+          disabled={Boolean(values.hide_question)}
           value={values.question || ""}
           onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => {
             onChange("question", event.target.value);

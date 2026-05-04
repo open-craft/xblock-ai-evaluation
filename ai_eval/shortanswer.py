@@ -61,8 +61,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
-    skip_question = Boolean(
-        display_name=_("Skip Question"),
+    hide_question = Boolean(
+        display_name=_("Hide Question"),
         help=_(
             "Hide the question field from the learner and omit it from the AI prompt."
         ),
@@ -112,7 +112,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
     editable_fields = AIEvalXBlock.editable_fields + (
         "question",
-        "skip_question",
+        "hide_question",
         "evaluation_prompt",
         "max_responses",
         "allow_reset",
@@ -159,7 +159,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         """
         validation_errors, validation_warnings = super()._collect_studio_validation_issues(data)
 
-        if not data.skip_question and not data.question:
+        if not data.hide_question and not data.question:
             self._add_studio_validation_error(
                 validation_errors,
                 "question",
@@ -206,7 +206,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             },
             meta={
                 "question": self.question,
-                "skip_question": self.skip_question,
+                "hide_question": self.hide_question,
                 "max_responses": self.max_responses,
                 "allow_reset": self.allow_reset,
                 "character_image": self.character_image,
@@ -325,7 +325,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         # Include evaluation prompt, question, and attachment content hashes
         prompt_hasher = hashlib.sha256()
         prompt_hasher.update((self.evaluation_prompt or "").strip().encode("utf-8"))
-        if not self.skip_question:
+        if not self.hide_question:
             prompt_hasher.update((self.question or "").strip().encode("utf-8"))
         for item in attachment_hash_inputs:
             prompt_hasher.update(item.encode("utf-8"))
@@ -336,7 +336,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         provider_tag = "custom" if isinstance(llm_service, CustomLLMService) else "default"
         current_tag = f"{provider_tag}:{self.model}:{prompt_hash}"
 
-        question_line = "" if self.skip_question else f"{self.question}.\n\n"
+        question_line = "" if self.hide_question else f"{self.question}.\n\n"
         system_msg = {
             "role": "system",
             "content": f"""

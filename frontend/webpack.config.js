@@ -46,52 +46,6 @@ module.exports = function webpackConfig(_, argv) {
         },
         {
           test: /\.css$/i,
-          include: /node_modules/,
-          use: [
-            MiniCssExtractPlugin.loader,
-            "css-loader",
-            {
-              loader: "postcss-loader",
-              options: {
-                postcssOptions: {
-                  plugins: [
-                    [
-                      // Scopes Paragon v23 :root { --pgn-* } design-token
-                      // rules to .ai-eval-paragon so the XBlock carries its
-                      // own token baseline rather than inheriting :root-level
-                      // theme overrides from the parent LMS page.  For
-                      // deployments without custom token overrides (e.g. WGU
-                      // Ulmo with empty SIMPLE_THEME_SCSS_OVERRIDES) this is
-                      // equivalent to inheriting the platform theme.
-                      //
-                      // To make the XBlock respond to platform :root-level
-                      // theme tokens, remove this plugin and the
-                      // .ai-eval-paragon class addition in mountApp.tsx.
-                      "postcss-prefix-selector",
-                      {
-                        prefix: ".ai-eval-paragon",
-                        transform: function transform(prefix, selector) {
-                          if (
-                            selector === "body" ||
-                            selector === "html" ||
-                            selector === ":root"
-                          ) {
-                            return prefix;
-                          }
-                          return prefix + " " + selector;
-                        },
-                      },
-                    ],
-                  ],
-                },
-              },
-            },
-          ],
-          sideEffects: true,
-        },
-        {
-          test: /\.css$/i,
-          exclude: /node_modules/,
           use: [MiniCssExtractPlugin.loader, "css-loader"],
           sideEffects: true,
         },
