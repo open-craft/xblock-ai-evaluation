@@ -19,6 +19,7 @@ export interface ShortAnswerStudentMeta {
   character_image: string;
   max_responses: number;
   question: string;
+  skip_question: boolean;
 }
 
 export type ShortAnswerStudentPayload = SharedPayload<
@@ -45,6 +46,7 @@ export interface ShortAnswerStudioState {
   model_api_key: string;
   model_api_url: string;
   question: string;
+  skip_question: boolean;
 }
 
 export interface ShortAnswerStudioHandlerUrls {

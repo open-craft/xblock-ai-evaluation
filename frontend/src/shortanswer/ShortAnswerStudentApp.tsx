@@ -227,6 +227,7 @@ export default function ShortAnswerStudentApp({
   const userMessageCount = countUserMessages(messages);
   const maxResponses = Number(payload.meta.max_responses || 0);
   const allowReset = Boolean(payload.meta.allow_reset);
+  const skipQuestion = Boolean(payload.meta.skip_question);
   const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;
   const canReset = allowReset && !pending && userMessageCount > 0;
   const controlsDisabled = pending || userMessageCount >= maxResponses;
@@ -402,7 +403,9 @@ export default function ShortAnswerStudentApp({
       ) : null}
 
       <div className="shortanswer_block">
-        <QuestionPanel questionHtml={questionHtml} questionRef={questionRef} />
+        {!skipQuestion && (
+          <QuestionPanel questionHtml={questionHtml} questionRef={questionRef} />
+        )}
         <div id="chatbox">
           <MessageList
             messages={messages}

@@ -25,6 +25,7 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
       character_image: "",
       max_responses: 10,
       question: "What is 2+2?",
+      skip_question: false,
     },
     ...overrides,
   };
@@ -168,6 +169,7 @@ describe("ShortAnswerStudentApp", () => {
           character_image: "",
           max_responses: 10,
           question: "test",
+          skip_question: false,
         },
       });
 
