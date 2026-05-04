@@ -190,6 +190,5 @@ def generate_pdf(
         # we can put css in a separate file, or include it in a <style> element in the template html
         stylesheets=[CSS(string=css)],
         # archival and accessible standard - see https://pdf.abbyy.com/learning-center/pdf-standards/
-        pdf_variant="pdf/a-3a",
-        pdf_tags=True,  # a11y
+        pdf_variant="pdf/a-3b",
     )
