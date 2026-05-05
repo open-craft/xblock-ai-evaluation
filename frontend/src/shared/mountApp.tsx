@@ -1,5 +1,5 @@
 import React from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 
 import { SharedIntlProvider } from "./i18n";
 import { XBlockElementLike, XBlockPropsFactory, XBlockRuntime } from "./types";
@@ -44,12 +44,9 @@ export function mountReactTree(
   selector?: string,
 ) {
   const mountNode = resolveMountNode(element, selector);
-  mountNode.classList.add("ai-eval-paragon");
 
-  ReactDOM.render(
-    <SharedIntlProvider>{reactElement}</SharedIntlProvider>,
-    mountNode,
-  );
+  const root = createRoot(mountNode);
+  root.render(<SharedIntlProvider>{reactElement}</SharedIntlProvider>);
 
   return mountNode;
 }

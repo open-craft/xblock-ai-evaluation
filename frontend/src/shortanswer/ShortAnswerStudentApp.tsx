@@ -1,23 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Button, Icon } from "@openedx/paragon";
 import { useIntl } from "react-intl";
 
 import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
-
-let nextStableId = 0;
-
-function useStableId(prefix: string) {
-  const idRef = useRef<string>();
-
-  if (!idRef.current) {
-    nextStableId += 1;
-    idRef.current = prefix + "-" + String(nextStableId);
-  }
-
-  return idRef.current;
-}
+import { ArrowUpward, AutoAwesome } from "@openedx/paragon/icons";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
@@ -117,7 +106,6 @@ function MessageComposer({
   canSubmit,
   disabled,
   draft,
-  instructionsId,
   onChange,
   onKeyDown,
   onReset,
@@ -129,7 +117,6 @@ function MessageComposer({
   canSubmit: boolean;
   disabled: boolean;
   draft: string;
-  instructionsId: string;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onReset: () => void;
@@ -137,29 +124,19 @@ function MessageComposer({
   textareaRef: React.RefObject<HTMLTextAreaElement>;
 }) {
   const intl = useIntl();
-  const submitLabel = intl.formatMessage({
+  const sendLabel = intl.formatMessage({
     id: "shortanswer.student.submit",
     defaultMessage: "Submit",
   });
 
   return (
     <React.Fragment>
-      <div className="chat-instructions" id={instructionsId}>
-        <p>
-          {intl.formatMessage({
-            id: "shortanswer.student.instructions",
-            defaultMessage:
-              "Use the Submit button or press Ctrl+Enter (Cmd+Enter on Mac) to send your message. Use Shift+Enter to insert a new line.",
-          })}
-        </p>
-      </div>
       <div className="chat-submit-row">
         {allowReset ? (
-          <button
+          <Button
             type="button"
-            className={
-              "btn chat-button chat-reset-button" + (canReset ? "" : " disabled")
-            }
+            variant="outline-primary"
+            className={"chat-button chat-reset-button" + (canReset ? "" : " disabled")}
             disabled={!canReset}
             aria-disabled={!canReset}
             onClick={onReset}
@@ -168,36 +145,42 @@ function MessageComposer({
               id: "shortanswer.student.reset",
               defaultMessage: "Reset chat",
             })}
-          </button>
+          </Button>
         ) : null}
-        <textarea
-          ref={textareaRef}
-          className={"chat-user-input" + (disabled ? " disabled" : "")}
-          rows={1}
-          aria-describedby={instructionsId}
-          disabled={disabled}
-          aria-disabled={disabled}
-          placeholder={intl.formatMessage({
-            id: "shortanswer.student.placeholder",
-            defaultMessage: "Type your answer here",
-          })}
-          maxLength={1000}
-          value={draft}
-          onChange={onChange}
-          onKeyDown={onKeyDown}
-        />
-        <button
-          type="button"
-          className={
-            "btn btn-primary chat-button chat-submit-button" +
-            (canSubmit ? "" : " disabled")
-          }
-          disabled={!canSubmit}
-          aria-disabled={!canSubmit}
-          onClick={onSubmit}
-        >
-          {submitLabel}
-        </button>
+        <div className="chat-input-wrapper">
+          <textarea
+            ref={textareaRef}
+            className={"chat-user-input" + (disabled ? " disabled" : "")}
+            rows={1}
+            disabled={disabled}
+            aria-disabled={disabled}
+            placeholder={intl.formatMessage({
+              id: "shortanswer.student.placeholder",
+              defaultMessage: "Type your answer here. Ctrl+Enter to send, Shift+Enter for new line.",
+            })}
+            maxLength={1000}
+            value={draft}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+          />
+          <button
+            type="button"
+            className={"chat-send-button" + (canSubmit ? "" : " disabled")}
+            disabled={!canSubmit}
+            aria-disabled={!canSubmit}
+            aria-label={sendLabel}
+            onClick={onSubmit}
+          >
+            <Icon src={ArrowUpward} />
+          </button>
+        </div>
+      </div>
+      <div className="chat-powered-by">
+        <Icon src={AutoAwesome} size="sm" />
+        {intl.formatMessage({
+          id: "shortanswer.student.poweredBy",
+          defaultMessage: "Powered by AI",
+        })}
       </div>
     </React.Fragment>
   );
@@ -223,10 +206,10 @@ export default function ShortAnswerStudentApp({
   const imageRef = useRef<HTMLImageElement>(null);
   const questionRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const instructionsId = useStableId("shortanswer-chat-instructions");
   const userMessageCount = countUserMessages(messages);
   const maxResponses = Number(payload.meta.max_responses || 0);
   const allowReset = Boolean(payload.meta.allow_reset);
+  const hideQuestion = Boolean(payload.meta.hide_question);
   const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;
   const canReset = allowReset && !pending && userMessageCount > 0;
   const controlsDisabled = pending || userMessageCount >= maxResponses;
@@ -402,7 +385,9 @@ export default function ShortAnswerStudentApp({
       ) : null}
 
       <div className="shortanswer_block">
-        <QuestionPanel questionHtml={questionHtml} questionRef={questionRef} />
+        {!hideQuestion && (
+          <QuestionPanel questionHtml={questionHtml} questionRef={questionRef} />
+        )}
         <div id="chatbox">
           <MessageList
             messages={messages}
@@ -417,7 +402,6 @@ export default function ShortAnswerStudentApp({
             canSubmit={canSubmit}
             disabled={controlsDisabled}
             draft={draft}
-            instructionsId={instructionsId}
             onChange={(event) => {
               setDraft(event.target.value);
             }}

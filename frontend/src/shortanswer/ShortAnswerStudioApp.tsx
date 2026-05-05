@@ -5,8 +5,8 @@ import * as Yup from "yup";
 import { Button, Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
+import { StudioEditorLayout } from "../shared/StudioEditorLayout";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
-import { useStudioModalActions } from "../shared/useStudioModalActions";
 import {
   collectYupErrors,
   getSaveErrorMessage,
@@ -50,7 +50,13 @@ const shortAnswerSchema = Yup.object({
   model_api_key: Yup.string().ensure(),
   model_api_url: Yup.string().ensure(),
   question: Yup.string().ensure()
-    .required("Question field is mandatory"),
+    .when("hide_question", {
+      is: false,
+      then: (schema) => schema.required("Question field is mandatory"),
+    }),
+  hide_question: Yup.boolean()
+    .transform((_value: unknown, original: unknown) => Boolean(original))
+    .default(false),
 });
 
 function normalizeAttachmentUrls(value: unknown) {
@@ -70,6 +76,7 @@ function buildSubmitPayload(values: ShortAnswerStudioState) {
     model_api_key: values.model_api_key || "",
     model_api_url: values.model_api_url || "",
     question: values.question || "",
+    hide_question: Boolean(values.hide_question),
     evaluation_prompt: values.evaluation_prompt || "",
     max_responses: values.max_responses,
     allow_reset: Boolean(values.allow_reset),
@@ -231,11 +238,24 @@ function ShortAnswerSettingsForm({
         <FieldHelp metadata={fieldMetadata.model_api_url} />
       </Form.Group>
 
+      <Form.Group controlId="xb-field-edit-hide_question">
+        <Form.Checkbox
+          checked={Boolean(values.hide_question)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange("hide_question", event.target.checked);
+          }}
+        >
+          {fieldMetadata.hide_question?.display_name || "Hide question"}
+        </Form.Checkbox>
+        <FieldHelp metadata={fieldMetadata.hide_question} />
+      </Form.Group>
+
       <Form.Group controlId="xb-field-edit-question" isInvalid={Boolean(validationErrors.question)}>
         <Form.Label>{fieldMetadata.question?.display_name || "question"}</Form.Label>
         <Form.Control
           as="textarea"
           rows={10}
+          disabled={Boolean(values.hide_question)}
           value={values.question || ""}
           onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => {
             onChange("question", event.target.value);
@@ -328,13 +348,15 @@ function ShortAnswerStudioFormContent({
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
   const fieldMetadata = payload.meta.field_metadata || {};
   const lockMetadata = payload.meta.lock_metadata;
 
   const handleSave = useCallback(async function handleSave() {
-    if (!payload.handler_urls.studio_submit || isSaving) {
+    if (!payload.handler_urls.studio_submit || isSavingRef.current) {
       return;
     }
+    isSavingRef.current = true;
 
     const validationMessage = intl.formatMessage({
       id: "shortanswer.studio.validationError",
@@ -355,6 +377,7 @@ function ShortAnswerStudioFormContent({
           }),
           message: validationMessage,
         });
+        isSavingRef.current = false;
         return;
       }
     }
@@ -381,6 +404,7 @@ function ShortAnswerStudioFormContent({
 
       setValidationErrors(normalizeValidationErrors(response.validation_errors));
       setValidationWarnings(normalizeValidationWarnings(response.validation_warnings));
+      isSavingRef.current = false;
       setIsSaving(false);
 
       if (response.success) {
@@ -424,6 +448,7 @@ function ShortAnswerStudioFormContent({
       }
 
       setRequestError(inlineRequestError);
+      isSavingRef.current = false;
       setIsSaving(false);
       notifyRuntime(runtime, "error", {
         title: intl.formatMessage({
@@ -433,41 +458,42 @@ function ShortAnswerStudioFormContent({
         message: inlineRequestError,
       });
     }
-  }, [intl, isSaving, payload.handler_urls.studio_submit, runtime]);
+  }, [intl, payload.handler_urls.studio_submit, runtime]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
   const handleCancel = useCallback(() => {
+    if (isSavingRef.current) {
+      return;
+    }
     notifyRuntime(runtime, "cancel", {});
   }, [runtime]);
 
-  useStudioModalActions({
-    rootSelector: ".shortanswer-react-studio",
-    intl,
-    isSaving,
-    onSave: handleSave,
-    onCancel: handleCancel,
-    i18nPrefix: "shortanswer",
-  });
-
   return (
     <div className="shortanswer-react-studio" data-block-kind="shortanswer">
-      <div className="wrapper-comp-settings is-active" id="settings-tab">
-        <StudioValidationSummary
-          hasFieldErrors={hasFieldErrors}
-          requestError={requestError}
-          validationWarnings={validationWarnings}
-        />
-        <ShortAnswerSettingsForm
-          values={formik.values}
-          validationErrors={validationErrors}
-          lockMetadata={lockMetadata}
-          fieldMetadata={fieldMetadata}
-          onChange={(fieldName, nextValue) => {
-            formik.setFieldValue(fieldName, nextValue);
-          }}
-        />
-      </div>
+      <StudioEditorLayout
+        i18nPrefix="shortanswer"
+        isSaving={isSaving}
+        onCancel={handleCancel}
+        onSave={handleSave}
+      >
+        <div className="wrapper-comp-settings is-active" id="settings-tab">
+          <StudioValidationSummary
+            hasFieldErrors={hasFieldErrors}
+            requestError={requestError}
+            validationWarnings={validationWarnings}
+          />
+          <ShortAnswerSettingsForm
+            values={formik.values}
+            validationErrors={validationErrors}
+            lockMetadata={lockMetadata}
+            fieldMetadata={fieldMetadata}
+            onChange={(fieldName, nextValue) => {
+              formik.setFieldValue(fieldName, nextValue);
+            }}
+          />
+        </div>
+      </StudioEditorLayout>
     </div>
   );
 }
