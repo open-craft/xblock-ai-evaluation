@@ -1,4 +1,4 @@
-.shortanswer-react-app {
+:root {
   --shortanswer-user-bg: var(--pgn-color-primary-100, #f0f3f5);
   --shortanswer-user-text: var(--pgn-color-gray-700, #44586c);
   --shortanswer-ai-bg: var(--pgn-color-primary-500, #476480);
