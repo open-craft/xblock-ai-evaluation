@@ -35,7 +35,7 @@ setup(
         "celery",
         "chardet",
         "litellm",
-        "weasyprint",
+        "weasyprint>=57.2,<62",
         "mistune",
         "nh3",
         "Pygments",

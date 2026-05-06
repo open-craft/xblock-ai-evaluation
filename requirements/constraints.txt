@@ -10,3 +10,11 @@
 
 # Common constraints for edx repos
 -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
+
+# pydyf 0.11.0 changed PDF.__init__ to no longer accept version/identifier args,
+# which breaks weasyprint 61.x. Keep pydyf on a compatible version.
+pydyf>=0.8.0,<0.11
+
+# The CI and tox.ini test against Django 4.2. Pin here so pip-compile resolves a
+# compatible version instead of pulling in Django 5.x.
+Django>=4.2,<4.3

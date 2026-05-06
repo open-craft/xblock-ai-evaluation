@@ -189,7 +189,9 @@ def generate_pdf(
     return HTML(string=html).write_pdf(
         # we can put css in a separate file, or include it in a <style> element in the template html
         stylesheets=[CSS(string=css)],
-        # archival and accessible standard - see https://pdf.abbyy.com/learning-center/pdf-standards/
-        pdf_variant="pdf/a-3a",
-        pdf_tags=True,  # a11y
+        # archival standard - see https://pdf.abbyy.com/learning-center/pdf-standards/
+        # NOTE: when we update to weasyprint >= 67.0, change this variant to pdf/a-3a,
+        # with `pdf_tags=True` for improved accessibility.
+        # https://doc.courtbouillon.org/weasyprint/stable/changelog.html#version-67-0
+        pdf_variant="pdf/a-3b",
     )
