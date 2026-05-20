@@ -406,10 +406,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     def studio_view(self, context=None):
         """Render the React Studio editor for Coaching."""
         fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
-        fragment.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
-        fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
-        fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
-        fragment.add_css(self.resource_string("static/css/coach_studio.css"))
         fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.studio.js"))
         fragment.initialize_js(
             "CoachAIEvalXBlockStudio",
@@ -420,6 +416,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 },
                 initial_state=self._studio_initial_state(),
                 meta=self._studio_payload_meta(),
+                style_urls=[
+                    "static/bundles/shared.css",
+                    "static/css/studio_api_key_lock.css",
+                    "static/css/shortanswer_studio.css",
+                    "static/css/coach_studio.css",
+                ]
             ),
         )
         return fragment
@@ -950,8 +952,6 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         active_session = self._get_active_session()
         characters = list(map(self._get_character_data, range(2)))
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
-        frag.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
-        frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.js"))
         js_data = self._build_view_payload(
             view="student",
@@ -990,6 +990,10 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "pdf_download_title": self.pdf_download_title,
                 "pdf_download_description": self.pdf_download_description,
             },
+            style_urls=[
+                "static/bundles/shared.css",
+                "static/css/chatbox.css",
+            ]
         )
         final_report = self._build_final_report_payload()
         if final_report:

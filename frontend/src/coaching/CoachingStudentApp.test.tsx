@@ -57,6 +57,8 @@ function makePayload(overrides?: Partial<CoachingStudentPayload>): CoachingStude
       pdf_download_title: "",
       pdf_download_description: ""
     },
+    mfe_config_api: "/mfe_config",
+    style_urls: [],
     ...overrides,
   };
 }

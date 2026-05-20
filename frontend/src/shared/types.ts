@@ -20,6 +20,8 @@ export interface SharedPayload<
   handler_urls: HandlerUrls;
   initial_state: InitialState;
   meta: Meta;
+  mfe_config_api: string;
+  style_urls: string[];
 }
 
 export type XBlockPropsFactory<Props> = (

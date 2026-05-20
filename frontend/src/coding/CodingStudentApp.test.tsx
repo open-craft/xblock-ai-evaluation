@@ -29,6 +29,8 @@ function makePayload(overrides?: Partial<CodingStudentPayload>): CodingStudentPa
       pdf_download_title: "",
       pdf_download_description: ""
     },
+    mfe_config_api: "/mfe_config",
+    style_urls: [],
     ...overrides,
   };
 }

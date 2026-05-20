@@ -66,13 +66,19 @@
  */
 .ai-eval-paragon {
   font-size: inherit;
-  font-family: inherit;
+  font-family: var(--pgn-typography-font-family-base);
   font-weight: inherit;
   line-height: inherit;
   color: inherit;
   background-color: transparent;
 }
 
+.ai-eval-paragon {
+    /* override injected styles from lms-course */
+    p, label {
+        font-family: var(--pgn-typography-font-family-base) !important;
+    }
+}
 
 :root {
   --ai-eval-react-spacing-sm: 0.5rem;
