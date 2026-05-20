@@ -489,12 +489,13 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     # Frontend payload helpers
 
-    def _build_view_payload(
+    def _build_view_payload(  # pylint: disable=too-many-positional-arguments
         self,
         view: str,
         handler_urls: dict[str, str],
         initial_state: dict[str, Any],
         meta: dict[str, Any],
+        style_urls: list[str],
     ) -> dict[str, Any]:
         """
         Return the normalized view payload shape used by future views.
@@ -504,6 +505,8 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             "handler_urls": handler_urls,
             "initial_state": initial_state,
             "meta": meta,
+            "mfe_config_api": f"{settings.LMS_ROOT_URL}/api/mfe_config/v1?mfe=learning",
+            "style_urls": [settings.LMS_ROOT_URL + self.runtime.local_resource_url(self, url) for url in style_urls],
         }
 
     @staticmethod

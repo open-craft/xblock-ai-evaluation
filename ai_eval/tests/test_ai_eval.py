@@ -200,6 +200,11 @@ def test_coding_block_student_view(coding_block_data):
             "pdf_download_description": "",
             "pdf_download_title": "Download transcript",
         },
+        "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
+        "style_urls": [
+            "http://local.openedx.io:8000",
+            "http://local.openedx.io:8000",
+        ],
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 
@@ -358,6 +363,11 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "pdf_download_description": "",
             "pdf_download_title": "Download transcript",
         },
+        "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
+        "style_urls": [
+            "http://local.openedx.io:8000",
+            "http://local.openedx.io:8000",
+        ],
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 
@@ -501,6 +511,11 @@ def test_coach_block_student_view(coach_block_data):
             "pdf_download_description": "",
             "pdf_download_title": "Download transcript",
         },
+        "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
+        "style_urls": [
+            "http://local.openedx.io:8000",
+            "http://local.openedx.io:8000",
+        ],
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 

@@ -12,6 +12,12 @@ def use_utc_tz(settings):
     settings.TIME_ZONE = "UTC"
 
 
+@pytest.fixture(autouse=True)
+def add_lms_settings(settings):
+    """Set common settings that are available on the LMS"""
+    settings.LMS_ROOT_URL = "http://local.openedx.io:8000"
+
+
 # https://time-machine.readthedocs.io/en/latest/usage.html#time_machine.naive_mode
 # Ensure any accidental naive dates in frozen time are caught. This helps reproducibility of tests.
 time_machine.naive_mode = time_machine.NaiveMode.ERROR
