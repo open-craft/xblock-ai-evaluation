@@ -190,9 +190,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         when viewing courses.
         """
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
-
-        frag.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
-        frag.add_css(self.resource_string("static/css/chatbox.css"))
         frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.js"))
 
         js_data = self._build_view_payload(
@@ -211,6 +208,10 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 "allow_reset": self.allow_reset,
                 "character_image": self.character_image,
             },
+            style_urls=[
+                "static/bundles/shared.css",
+                "static/css/chatbox.css",
+            ]
         )
         frag.initialize_js("ShortAnswerAIEvalXBlock", js_data)
         return frag
@@ -220,9 +221,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         Render the Studio editor for Short Answer.
         """
         fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
-        fragment.add_css_url(self.runtime.local_resource_url(self, "static/bundles/shared.css"))
-        fragment.add_css(self.resource_string("static/css/studio_api_key_lock.css"))
-        fragment.add_css(self.resource_string("static/css/shortanswer_studio.css"))
         fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.studio.js"))
         fragment.initialize_js(
             "ShortAnswerAIEvalXBlockStudio",
@@ -233,6 +231,11 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 },
                 initial_state=self._studio_initial_state(),
                 meta=self._studio_payload_meta(),
+                style_urls=[
+                    "static/bundles/shared.css",
+                    "static/css/studio_api_key_lock.css",
+                    "static/css/shortanswer_studio.css",
+                ]
             ),
         )
         return fragment

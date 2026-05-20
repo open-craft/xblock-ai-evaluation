@@ -27,6 +27,8 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
       question: "What is 2+2?",
       hide_question: false,
     },
+    mfe_config_api: "/mfe_config",
+    style_urls: [],
     ...overrides,
   };
 }

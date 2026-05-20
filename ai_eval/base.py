@@ -6,6 +6,7 @@ from importlib.resources import files
 from django.core.cache import cache
 
 from django.utils.translation import gettext_noop as _
+from django.conf import settings
 from xblock.core import XBlock
 from xblock.fields import String, Scope, Dict
 from xblock.utils.resources import ResourceLoader
@@ -463,10 +464,12 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     def _build_view_payload(
         self,
+        *,
         view: str,
         handler_urls: dict[str, str],
         initial_state: dict[str, Any],
         meta: dict[str, Any],
+        style_urls: list[str],
     ) -> dict[str, Any]:
         """
         Return the normalized view payload shape used by future views.
@@ -476,6 +479,8 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             "handler_urls": handler_urls,
             "initial_state": initial_state,
             "meta": meta,
+            "mfe_config_api": f"{settings.LMS_ROOT_URL}/api/mfe_config/v1?mfe=learning",
+            "style_urls": [settings.LMS_ROOT_URL + self.runtime.local_resource_url(self, url) for url in style_urls],
         }
 
     @staticmethod
