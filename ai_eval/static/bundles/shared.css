@@ -5,6 +5,7 @@
   --ai-eval-react-surface-color: #ffffff;
   --ai-eval-react-muted-color: #5c5c5c;
   --ai-eval-react-radius: 0.5rem;
+  --ai-eval-body-font: var(--pgn-typography-font-family-base);
 }
 
 .ai-eval-react-shell {
@@ -12,6 +13,12 @@
   border: 1px solid var(--ai-eval-react-border-color);
   border-radius: var(--ai-eval-react-radius);
   padding: var(--ai-eval-react-spacing-md);
+}
+
+.shortanswer-react-app {
+  p, label {
+    font-family: var(--pgn-typography-font-family-base);
+  }
 }
 
 .ai-eval-react-shell > :first-child {
