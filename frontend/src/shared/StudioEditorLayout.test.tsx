@@ -144,6 +144,8 @@ const shortAnswerPayload: ShortAnswerStudioPayload = {
       },
     },
   },
+  mfe_config_api: "/mfe_config",
+  style_urls: [],
 };
 
 const codingPayload: CodingStudioPayload = {
@@ -171,6 +173,8 @@ const codingPayload: CodingStudioPayload = {
       },
     },
   },
+  mfe_config_api: "/mfe_config",
+  style_urls: [],
 };
 
 const coachingPayload: CoachingStudioPayload = {
@@ -212,6 +216,8 @@ const coachingPayload: CoachingStudioPayload = {
       },
     },
   },
+  mfe_config_api: "/mfe_config",
+  style_urls: [],
 };
 
 describe("StudioEditorLayout — editor integration", () => {

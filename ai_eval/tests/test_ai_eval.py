@@ -165,6 +165,11 @@ def test_coding_block_student_view(coding_block_data):
             "language": coding_block_data["language"],
             "monaco_html": monaco_html,
         },
+        "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
+        "style_urls": [
+            "http://local.openedx.io:8000",
+            "http://local.openedx.io:8000",
+        ],
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 
@@ -224,6 +229,11 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "character_image": shortanswer_block_data["character_image"],
             "hide_question": shortanswer_block_data["hide_question"],
         },
+        "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
+        "style_urls": [
+            "http://local.openedx.io:8000",
+            "http://local.openedx.io:8000",
+        ],
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 
@@ -363,6 +373,11 @@ def test_coach_block_student_view(coach_block_data):
             "allow_reset": True,
             "intro_text": "",
         },
+        "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
+        "style_urls": [
+            "http://local.openedx.io:8000",
+            "http://local.openedx.io:8000",
+        ],
     }
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 

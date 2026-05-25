@@ -53,6 +53,8 @@ function makePayload(overrides?: Partial<CoachingStudentPayload>): CoachingStude
         coach: "Coach",
       },
     },
+    mfe_config_api: "/mfe_config",
+    style_urls: [],
     ...overrides,
   };
 }

@@ -1,4 +1,6 @@
-:root {
+/* use root and host selectors to work both in and out of the shadow dom,
+ * for if we toggle use of the shadow dom later */
+:root, :host {
   --ai-eval-react-spacing-sm: 0.5rem;
   --ai-eval-react-spacing-md: 1rem;
   --ai-eval-react-border-color: #d0d0d0;

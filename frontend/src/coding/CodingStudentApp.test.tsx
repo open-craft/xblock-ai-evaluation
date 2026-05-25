@@ -25,6 +25,8 @@ function makePayload(overrides?: Partial<CodingStudentPayload>): CodingStudentPa
       monaco_html: "",
       question: "Write a function that adds two numbers.",
     },
+    mfe_config_api: "/mfe_config",
+    style_urls: [],
     ...overrides,
   };
 }
