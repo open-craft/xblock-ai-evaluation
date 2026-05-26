@@ -35,7 +35,7 @@ function QuestionPanel({
   return (
     <>
       {title && <h4 className="text-secondary-500">{title}</h4>}
-      <Collapsible.Advanced ref={questionRef} className="shortanswer-question">
+      <Collapsible.Advanced defaultOpen ref={questionRef} className="shortanswer-question">
         <Collapsible.Trigger>
           <Row>
             <Col xs={1} className="pr-2 ml-n5">
