@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Icon } from "@openedx/paragon";
+import { Button, Col, Collapsible, Icon, Row } from "@openedx/paragon";
 import { useIntl } from "react-intl";
 
 import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
-import { ArrowUpward, AutoAwesome } from "@openedx/paragon/icons";
+import { ArrowUpward, AutoAwesome, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/paragon/icons";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
@@ -24,20 +24,50 @@ function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
 }
 
 function QuestionPanel({
+  title,
   questionHtml,
   questionRef,
 }: {
+  title: string;
   questionHtml: string;
   questionRef: React.RefObject<HTMLDivElement>;
 }) {
   return (
-    <div className="shortanswer-question">
-      <div
-        className="question-text"
-        ref={questionRef}
-        dangerouslySetInnerHTML={{ __html: questionHtml }}
-      />
-    </div>
+    <>
+      {title && <h4 className="text-secondary-500">{title}</h4>}
+      <Collapsible.Advanced ref={questionRef} className="shortanswer-question">
+        <Collapsible.Trigger>
+          <Row>
+            <Col xs={1} className="pr-2 ml-n5">
+                <Collapsible.Visible whenClosed>
+                  <Icon className="ml-auto" src={KeyboardArrowDown} />
+                </Collapsible.Visible>
+                <Collapsible.Visible whenOpen>
+                  <Icon className="ml-auto" src={KeyboardArrowUp} />
+                </Collapsible.Visible>
+            </Col>
+            <Col xs={11} className="pl-0">
+              <div
+                className="question-text-truncated"
+                dangerouslySetInnerHTML={{ __html: questionHtml }}
+              />
+            </Col>
+          </Row>
+        </Collapsible.Trigger>
+
+        <Collapsible.Body>
+          <Row>
+            <Col xs={1} className="pr-2 ml-n5"></Col>
+            <Col xs={11} className="pl-0">
+              <div
+                className="question-text"
+                dangerouslySetInnerHTML={{ __html: questionHtml }}
+              />
+            </Col>
+          </Row>
+          </Collapsible.Body>
+      </Collapsible.Advanced>
+    </>
   );
 }
 
@@ -69,19 +99,20 @@ function MessageList({
       aria-busy={pending ? "true" : undefined}
     >
       {messages.map((message, index) => {
-        const messageClassName = message.source === "user" ? "user-answer" : "ai-eval";
+        const messageClassName = message.source === "user" ? "user-answer p-3" : "ai-eval";
 
         return (
           <div className="chat-message-container" key={String(index)}>
-            <div className={"chat-message " + messageClassName}>
-              <div dangerouslySetInnerHTML={{ __html: renderedMessages[index] }} />
-            </div>
+            <div
+              className={"mb-5 chat-message " + messageClassName}
+              dangerouslySetInnerHTML={{ __html: renderedMessages[index] }}
+            />
           </div>
         );
       })}
       <div className="chat-message-container chat-spinner-container">
         {pending ? (
-          <div className="chat-message message-spinner" aria-hidden="true">
+          <div className="mb-5 chat-message message-spinner" aria-hidden="true">
             <div className="bounce1" />
             <div className="bounce2" />
             <div className="bounce3" />
@@ -135,8 +166,8 @@ function MessageComposer({
         {allowReset ? (
           <Button
             type="button"
-            variant="outline-primary"
-            className={"chat-button chat-reset-button" + (canReset ? "" : " disabled")}
+            variant="outline-secondary"
+            className="rounded-pill"
             disabled={!canReset}
             aria-disabled={!canReset}
             onClick={onReset}
@@ -163,8 +194,9 @@ function MessageComposer({
             onChange={onChange}
             onKeyDown={onKeyDown}
           />
-          <button
+          <Button
             type="button"
+            variant="secondary"
             className={"chat-send-button" + (canSubmit ? "" : " disabled")}
             disabled={!canSubmit}
             aria-disabled={!canSubmit}
@@ -172,7 +204,7 @@ function MessageComposer({
             onClick={onSubmit}
           >
             <Icon src={ArrowUpward} />
-          </button>
+          </Button>
         </div>
       </div>
       <div className="chat-powered-by">
@@ -364,30 +396,31 @@ export default function ShortAnswerStudentApp({
 
   return (
     <section className="shortanswer-react-app" data-block-kind="shortanswer" data-view={payload.view}>
-      {payload.meta.character_image ? (
-        <div className="shortanswer_image">
-          <img
-            ref={imageRef}
-            src={payload.meta.character_image}
-            alt=""
-            onLoad={() => {
-              const imageElement = imageRef.current;
-              const questionElement = questionRef.current;
-              if (!imageElement || !questionElement) {
-                setChatMinHeight(null);
-                return;
-              }
-              const nextMinHeight = imageElement.height - questionElement.offsetHeight;
-              setChatMinHeight(nextMinHeight > 0 ? nextMinHeight : null);
-            }}
-          />
-        </div>
-      ) : null}
-
       <div className="shortanswer_block">
         {!hideQuestion && (
-          <QuestionPanel questionHtml={questionHtml} questionRef={questionRef} />
+          <QuestionPanel title={payload.meta.title} questionHtml={questionHtml} questionRef={questionRef} />
         )}
+
+        {payload.meta.character_image ? (
+          <div className="shortanswer_image">
+            <img
+              ref={imageRef}
+              src={payload.meta.character_image}
+              alt=""
+              onLoad={() => {
+                const imageElement = imageRef.current;
+                const questionElement = questionRef.current;
+                if (!imageElement || !questionElement) {
+                  setChatMinHeight(null);
+                  return;
+                }
+                const nextMinHeight = imageElement.height - questionElement.offsetHeight;
+                setChatMinHeight(nextMinHeight > 0 ? nextMinHeight : null);
+              }}
+            />
+          </div>
+        ) : null}
+
         <div id="chatbox">
           <MessageList
             messages={messages}

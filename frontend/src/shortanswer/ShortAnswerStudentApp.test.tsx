@@ -21,6 +21,7 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
       messages: null,
     },
     meta: {
+      title: "",
       allow_reset: true,
       character_image: "",
       max_responses: 10,
@@ -167,6 +168,7 @@ describe("ShortAnswerStudentApp", () => {
           ],
         },
         meta: {
+          title: "",
           allow_reset: false,
           character_image: "",
           max_responses: 10,

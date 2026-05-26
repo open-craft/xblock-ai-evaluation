@@ -38,6 +38,13 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         scope=Scope.settings,
     )
 
+    show_display_name = Boolean(
+        display_name=_("Show Display Name"),
+        help=_("Show the display name as a heading on the component to students."),
+        default=False,
+        scope=Scope.settings,
+    )
+
     evaluation_prompt = String(
         display_name=_("Evaluation prompt"),
         help=_(
@@ -111,6 +118,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     )
 
     editable_fields = AIEvalXBlock.editable_fields + (
+        "show_display_name",
         "question",
         "hide_question",
         "evaluation_prompt",
@@ -202,6 +210,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 "messages": list(self.sessions[-1]),
             },
             meta={
+                "title": self.display_name if self.show_display_name else "",
                 "question": self.question,
                 "hide_question": self.hide_question,
                 "max_responses": self.max_responses,

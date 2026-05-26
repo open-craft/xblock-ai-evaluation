@@ -4,6 +4,7 @@
   "scripts": {
     "build": "webpack --mode production",
     "build:dev": "webpack --mode development",
+    "build:watch": "webpack --mode development --watch",
     "typecheck": "tsc --noEmit",
     "watch": "webpack --mode development --watch",
     "test": "jest --coverage",

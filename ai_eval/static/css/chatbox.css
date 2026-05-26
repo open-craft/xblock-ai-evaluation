@@ -30,12 +30,37 @@
   --shortanswer-button-font-size: var(--pgn-typography-font-size-sm, 0.875em);
   --shortanswer-button-line-height: var(--pgn-typography-line-height-sm, 1.25em);
   --shortanswer-submit-button-gap: var(--pgn-spacing-spacer-1-5, 0.35rem);
+
+  --shortanswer-message-user-bg-color: #E9F6F5;
 }
 
 .shortanswer-react-app::after {
   content: "";
   display: block;
   clear: both;
+}
+
+.shortanswer-question {
+    background-color: var(--pgn-color-gray-200);
+    border-radius: 16px;
+    padding-top: calc(var(--pgn-spacing-spacer-base) * 2);
+    padding-right: calc(var(--pgn-spacing-spacer-base) * 1.5);
+    padding-bottom: var(--pgn-spacing-spacer-base);
+    padding-left: calc(var(--pgn-spacing-spacer-base) * 1.5);
+    margin-bottom: calc(var(--pgn-spacing-spacer-base) * 2);
+}
+
+/* hack to use the Paragon Collapsible for displaying the first paragraph on closed, and show the remaining on open */
+.shortanswer-question .question-text-truncated > :first-child,
+.shortanswer-question .question-text > :first-child
+{
+    font-weight: bold;
+}
+.shortanswer-question .question-text-truncated > :not(:first-child) {
+    display: none;
+}
+.shortanswer-question .question-text > :first-child {
+    display: none;
 }
 
 .shortanswer_image {
@@ -54,10 +79,12 @@
 
 
 .chat-history {
+  /* headings inside the chat should be the same colour as the rest of the text */
+  --pgn-color-headings-base: var(--pgn-color-body-base);
+
   max-height: 400px;
   overflow-y: auto;
   margin-bottom: var(--shortanswer-bubble-padding-y);
-  padding: 0 var(--shortanswer-history-padding-x);
 }
 
 .chat-message-container {
@@ -67,37 +94,27 @@
 .chat-message-container .chat-message {
   flex: 0 1 auto;
   max-width: 80%;
-  padding: var(--shortanswer-bubble-padding-y) var(--shortanswer-bubble-padding-y) var(--shortanswer-spacing-sm) var(--shortanswer-bubble-padding-y);
-  margin-bottom: var(--shortanswer-bubble-padding-y);
-  border-radius: var(--shortanswer-radius);
 }
 
 .user-answer {
-  text-align: right;
   margin-left: auto;
-  background-color: var(--shortanswer-user-bg);
-  color: var(--shortanswer-user-text);
+  background-color: var(--shortanswer-message-user-bg-color);
+  border-radius: calc(var(--pgn-spacing-spacer-base) * 1.5);
+  border-bottom-right-radius: calc(var(--pgn-spacing-spacer-base) * 0.25);
 }
 
-.ai-eval,
-.message-spinner {
-  text-align: left;
-  color: var(--shortanswer-ai-text);
-  margin-right: auto;
-  background-color: var(--shortanswer-ai-bg);
-}
-
-.ai-eval * {
-  color: var(--shortanswer-ai-text) !important;
+/* the last item in a message shouldn't have a bottom margin,
+ * because this adds too much padding at the bottom of the chat history container */
+.user-answer > *:last-child {
+    margin-bottom: 0;
 }
 
 .chat-submit-row {
   display: flex;
-  align-items: flex-end;
   gap: var(--shortanswer-spacing-md-sm);
   margin-bottom: var(--shortanswer-submit-margin-bottom);
   font-size: var(--shortanswer-submit-font-size);
-  padding: var(--shortanswer-bubble-padding-y);
+  padding-top: var(--shortanswer-bubble-padding-y);
 }
 
 .chat-input-wrapper {
@@ -127,53 +144,14 @@
 }
 
 .chat-send-button {
-  position: absolute;
+  position: absolute !important;
   right: 6px;
   bottom: 6px;
   width: 32px;
   height: 32px;
   border-radius: 50% !important;
-  border: none;
-  background: var(--shortanswer-ai-bg);
-  color: var(--shortanswer-ai-text);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
   padding: 0;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.chat-send-button:not(.disabled):hover {
-  opacity: 0.85;
-}
-
-.chat-submit-row .chat-reset-button {
-  align-items: center;
-  display: inline-flex;
-  flex: 0 0 auto;
-  height: 44px;
-  justify-content: center;
-  text-align: center;
-  padding: var(--shortanswer-button-padding-y) var(--shortanswer-button-padding-x);
-  border-radius: var(--shortanswer-radius);
-  border: 1px solid transparent;
-  -webkit-appearance: none;
-  appearance: none;
-  cursor: pointer;
-  white-space: nowrap;
-  font-size: var(--shortanswer-button-font-size);
-  line-height: var(--shortanswer-button-line-height);
-  box-shadow: none;
-  background: var(--shortanswer-secondary-bg);
-  border-color: var(--shortanswer-secondary-border) !important;
-  color: var(--shortanswer-secondary-text);
-}
-
-.chat-submit-row .chat-reset-button:hover {
-  background: var(--shortanswer-secondary-hover-bg);
-  border-color: var(--shortanswer-secondary-hover-border) !important;
 }
 
 .chat-submit-row .disabled {

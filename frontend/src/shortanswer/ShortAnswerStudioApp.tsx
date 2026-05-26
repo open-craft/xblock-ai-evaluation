@@ -49,6 +49,7 @@ const shortAnswerSchema = Yup.object({
     .required("Model field is mandatory - please select one from the dropdown."),
   model_api_key: Yup.string().ensure(),
   model_api_url: Yup.string().ensure(),
+  show_display_name: Yup.boolean(),
   question: Yup.string().ensure()
     .when("hide_question", {
       is: false,
@@ -75,6 +76,7 @@ function buildSubmitPayload(values: ShortAnswerStudioState) {
     model: values.model || "",
     model_api_key: values.model_api_key || "",
     model_api_url: values.model_api_url || "",
+    show_display_name: values.show_display_name,
     question: values.question || "",
     hide_question: Boolean(values.hide_question),
     evaluation_prompt: values.evaluation_prompt || "",
@@ -183,6 +185,19 @@ function ShortAnswerSettingsForm({
         />
         <FieldErrors errors={validationErrors.display_name} />
         <FieldHelp metadata={fieldMetadata.display_name} />
+      </Form.Group>
+
+      <Form.Group controlId="xb-field-edit-show_display_name" isInvalid={Boolean(validationErrors.show_display_name)}>
+        <Form.Checkbox
+          checked={Boolean(values.show_display_name)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange("show_display_name", event.target.checked);
+          }}
+        >
+          {fieldMetadata.show_display_name.display_name}
+        </Form.Checkbox>
+        <FieldErrors errors={validationErrors.show_display_name} />
+        <FieldHelp metadata={fieldMetadata.show_display_name} />
       </Form.Group>
 
       <Form.Group controlId="xb-field-edit-model" isInvalid={Boolean(validationErrors.model)}>
