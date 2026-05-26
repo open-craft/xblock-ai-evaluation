@@ -30,8 +30,6 @@
   --shortanswer-button-font-size: var(--pgn-typography-font-size-sm, 0.875em);
   --shortanswer-button-line-height: var(--pgn-typography-line-height-sm, 1.25em);
   --shortanswer-submit-button-gap: var(--pgn-spacing-spacer-1-5, 0.35rem);
-
-  --shortanswer-message-user-bg-color: #E9F6F5;
 }
 
 .shortanswer-react-app::after {
@@ -42,7 +40,7 @@
 
 .shortanswer-question {
     background-color: var(--pgn-color-gray-200);
-    border-radius: 16px;
+    border-radius: var(--pgn-spacing-spacer-base);
     padding-top: calc(var(--pgn-spacing-spacer-base) * 2);
     padding-right: calc(var(--pgn-spacing-spacer-base) * 1.5);
     padding-bottom: var(--pgn-spacing-spacer-base);
@@ -98,7 +96,7 @@
 
 .user-answer {
   margin-left: auto;
-  background-color: var(--shortanswer-message-user-bg-color);
+  background-color: var(--pgn-shortanswer-message-user-bg-color, #E9F6F5);
   border-radius: calc(var(--pgn-spacing-spacer-base) * 1.5);
   border-bottom-right-radius: calc(var(--pgn-spacing-spacer-base) * 0.25);
 }

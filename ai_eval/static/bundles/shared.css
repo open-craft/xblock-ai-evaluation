@@ -10,10 +10,6 @@
   --ai-eval-body-font: var(--pgn-typography-font-family-base);
 }
 
-.text-secondary-500 {
-    color: var(--pgn-color-secondary-500);
-}
-
 .ai-eval-react-shell {
   background: var(--ai-eval-react-surface-color);
   border: 1px solid var(--ai-eval-react-border-color);
