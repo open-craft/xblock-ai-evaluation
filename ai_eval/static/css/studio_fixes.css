@@ -1,0 +1,13 @@
+/* The base styles of cms set html { font-size: 62.5% } to get the base font size of 1rem = 10px.
+ * But Paragon's CSS Variables define the text sizes in "rem" units with the expectation of 1rem = 16px.
+ * To fix this, we set html { font-size: 100% } to make 1rem = 16px, matching the Paragons CSS Variables.
+ * This must be set here, as the other styles are set inside the Shadow DOM.
+ */
+html {
+    font-size: 100%;
+}
+
+/* reset the extra unwanted margin at the bottom */
+.modal-window .editor-with-buttons {
+    margin-bottom: 0 !important;
+}

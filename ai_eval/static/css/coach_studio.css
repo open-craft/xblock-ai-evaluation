@@ -26,7 +26,7 @@
  * at the bottom.
  */
 .coaching-react-studio .ai-eval-studio-scroll {
-    max-height: calc(100vh - 200px);
+    max-height: calc(100vh - 240px); /* minus height of modal header + action buttons */
     overflow-y: auto;
 }
 
@@ -36,7 +36,6 @@
     background: var(--pgn-color-coaching-panel-bg, #ffffff);
     z-index: 1;
     border-top: 1px solid var(--pgn-color-coaching-border, #cbcbcb);
-    margin-top: 2rem;
     padding: 1rem 0 0;
 }
 

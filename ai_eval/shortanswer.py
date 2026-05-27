@@ -14,6 +14,7 @@ from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, String, Scope
+from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import FutureFields
 
 from .base import AIEvalXBlock
@@ -23,11 +24,15 @@ from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 
+resource_loader = ResourceLoader(__name__)
+
 
 class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     """
     Short Answer Xblock.
     """
+
+    has_author_view = True
 
     ATTACHMENT_PARALLEL_DOWNLOADS = 5
 
@@ -194,10 +199,27 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
     def student_view(self, context=None):
         """
-        The primary view of the ShortAnswerAIEvalXBlock, shown to students
+        The primary view of this block, shown to students
         when viewing courses.
         """
+        return self._render_preview(is_studio=False)
+
+    def author_view(self, context=None):
+        """
+        The preview shown in studio.
+        """
+        return self._render_preview(is_studio=True)
+
+    def _render_preview(self, is_studio: bool):
+        """
+        Shared preview rendering between student and author views.
+        """
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
+
+        # When rendering the student preview in studio, load studio-specific style fixes.
+        if is_studio:
+            frag.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
+
         frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.js"))
 
         js_data = self._build_view_payload(
@@ -229,7 +251,13 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         """
         Render the Studio editor for Short Answer.
         """
-        fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
+        # Ideally we shouldn't need to define any HTML as the React App StudioUI should take care of everything.
+        # However, the Studio Runtime for the XBlock looks for certain elements in the DOM to render it's wrapper.
+        #
+        # So, "editor-with-buttons" is defined to prevent the footer nativations from showing up.
+        fragment = Fragment('<div data-ai-eval-react-root="true" class="editor-with-buttons is-active"></div>')
+        fragment.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
+
         fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.studio.js"))
         fragment.initialize_js(
             "ShortAnswerAIEvalXBlockStudio",

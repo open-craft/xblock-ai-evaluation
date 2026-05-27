@@ -187,7 +187,7 @@ def test_coding_block_studio_view(coding_block_data):
                 frag = block.studio_view()
 
     assert frag.js_init_fn == "CodingAIEvalXBlockStudio"
-    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+    assert '<div data-ai-eval-react-root="true"' in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",
@@ -286,7 +286,7 @@ def test_shortanswer_block_studio_view(shortanswer_block_data):
                 frag = block.studio_view()
 
     assert frag.js_init_fn == "ShortAnswerAIEvalXBlockStudio"
-    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+    assert '<div data-ai-eval-react-root="true"' in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",
@@ -396,7 +396,7 @@ def test_coach_block_studio_view(coach_block_data):
                 frag = block.studio_view()
 
     assert frag.js_init_fn == "CoachAIEvalXBlockStudio"
-    assert '<div data-ai-eval-react-root="true"></div>' in frag.content
+    assert '<div data-ai-eval-react-root="true"' in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",

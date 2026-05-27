@@ -50,7 +50,7 @@
  * at the bottom.
  */
 .shortanswer-react-studio .ai-eval-studio-scroll {
-    max-height: calc(100vh - 200px);
+    max-height: calc(100vh - 240px); /* minus height of modal header + action buttons */
     overflow-y: auto;
 }
 
@@ -60,7 +60,6 @@
     background: var(--pgn-color-white, #ffffff);
     z-index: 1;
     border-top: 1px solid var(--pgn-color-gray-200, #eaeaea);
-    margin-top: 2rem;
     padding: 1rem 0 0;
 }
 
