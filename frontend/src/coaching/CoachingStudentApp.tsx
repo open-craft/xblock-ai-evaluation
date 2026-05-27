@@ -12,6 +12,7 @@ import {
   CoachingMessage,
   CoachingStudentPayload,
 } from "./types";
+import { PoweredByAI } from "../shared/PoweredByAI";
 
 type PaneKey = "workspace" | "coach";
 type CoachMode = "chat" | "report" | "review";
@@ -825,6 +826,7 @@ export default function CoachingStudentApp({
               report={report}
             />
           ) : null}
+
         </section>
 
         {!reportMode ? <aside
@@ -1054,6 +1056,8 @@ export default function CoachingStudentApp({
           }}
         />
       ) : null}
+
+      <PoweredByAI />
     </section>
   );
 }
