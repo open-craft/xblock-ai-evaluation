@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { useIntl } from "react-intl";
 import { ActionRow, Button } from "@openedx/paragon";
 
@@ -10,25 +10,6 @@ interface StudioEditorLayoutProps {
   children?: React.ReactNode;
 }
 
-function useHidePlatformModalActions(rootRef: React.RefObject<HTMLElement>) {
-  useEffect(() => {
-    const root = rootRef.current;
-    const modal = root?.closest(".edit-xblock-modal");
-    const modalActions = modal?.querySelector(".modal-actions") as HTMLElement | null;
-
-    if (!modalActions) {
-      return undefined;
-    }
-
-    const previousDisplay = modalActions.style.display;
-    modalActions.style.display = "none";
-
-    return () => {
-      modalActions.style.display = previousDisplay;
-    };
-  }, [rootRef]);
-}
-
 export function StudioEditorLayout({
   i18nPrefix,
   isSaving,
@@ -37,8 +18,6 @@ export function StudioEditorLayout({
   children,
 }: StudioEditorLayoutProps) {
   const intl = useIntl();
-  const rootRef = useRef<HTMLDivElement>(null);
-  useHidePlatformModalActions(rootRef);
 
   const saveLabel = isSaving
     ? intl.formatMessage({ id: `${i18nPrefix}.studio.savingButton`, defaultMessage: "Saving..." })
@@ -49,7 +28,7 @@ export function StudioEditorLayout({
   });
 
   return (
-    <div className="ai-eval-studio-footer" ref={rootRef}>
+    <>
       <div className="ai-eval-studio-scroll">
         {children}
       </div>
@@ -73,6 +52,6 @@ export function StudioEditorLayout({
           </Button>
         </ActionRow>
       </div>
-    </div>
+    </>
   );
 }

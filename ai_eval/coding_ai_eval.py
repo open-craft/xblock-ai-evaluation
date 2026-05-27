@@ -9,6 +9,7 @@ from web_fragments.fragment import Fragment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Dict, List, Scope, String
+from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import FutureFields
 
 from .base import AIEvalXBlock
@@ -20,6 +21,8 @@ from .utils import (
 from .backends.factory import BackendFactory
 
 logger = logging.getLogger(__name__)
+
+resource_loader = ResourceLoader(__name__)
 
 USER_RESPONSE = "USER_RESPONSE"
 AI_EVALUATION = "AI_EVALUATION"
@@ -116,7 +119,18 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         The primary view of the CodingAIEvalXBlock, shown to students
         when viewing courses.
         """
+        return self._render_preview()
+
+    def _render_preview(self, context=None, is_studio: bool = False):
+        """
+        Shared preview rendering between student and author views.
+        """
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
+
+        # When rendering the student preview in studio, load studio-specific style fixes.
+        if is_studio:
+            frag.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
+
         frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coding.js"))
 
         monaco_html = self.loader.render_django_template(
@@ -160,7 +174,12 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         """
         Render the React Studio editor for Coding.
         """
-        fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
+        # Ideally we shouldn't need to define any HTML as the React App StudioUI should take care of everything.
+        # However, the Studio Runtime for the XBlock looks for certain elements in the DOM to render it's wrapper.
+        #
+        # So, "editor-with-buttons" is defined to prevent the footer nativations from showing up.
+        fragment = Fragment('<div data-ai-eval-react-root="true" class="editor-with-buttons is-active"></div>')
+        fragment.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
         fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coding.studio.js"))
         fragment.initialize_js(
             "CodingAIEvalXBlockStudio",
@@ -193,7 +212,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
             )
             return fragment
 
-        return self.student_view(context=context)
+        return self._render_preview(context=context, is_studio=True)
 
     def _get_code_execution_backend_config(self):
         """Return code execution backend config from Django settings, or None if absent."""

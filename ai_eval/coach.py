@@ -13,6 +13,7 @@ from jinja2.sandbox import SandboxedEnvironment
 from xblock.core import XBlock
 from xblock.exceptions import JsonHandlerError
 from xblock.fields import Boolean, Dict, Integer, List, Scope, String
+from xblock.utils.resources import ResourceLoader
 from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
 
@@ -21,6 +22,8 @@ from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 
+
+resource_loader = ResourceLoader(__name__)
 
 SAMPLE_CHARACTER_PROMPT = textwrap.dedent("""
     You are {{ character_data.name }}.
@@ -139,6 +142,8 @@ class CoachAIEvalXBlock(AIEvalXBlock):
     two simulated characters.
 
     """
+
+    has_author_view = True
 
     _jinja_env = SandboxedEnvironment(
         undefined=jinja2.StrictUndefined,
@@ -402,7 +407,12 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def studio_view(self, context=None):
         """Render the React Studio editor for Coaching."""
-        fragment = Fragment('<div data-ai-eval-react-root="true"></div>')
+        # Ideally we shouldn't need to define any HTML as the React App StudioUI should take care of everything.
+        # However, the Studio Runtime for the XBlock looks for certain elements in the DOM to render it's wrapper.
+        #
+        # So, "editor-with-buttons" is defined to prevent the footer nativations from showing up.
+        fragment = Fragment('<div data-ai-eval-react-root="true" class="editor-with-buttons is-active"></div>')
+        fragment.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
         fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.studio.js"))
         fragment.initialize_js(
             "CoachAIEvalXBlockStudio",
@@ -942,12 +952,29 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
     def student_view(self, context=None):
         """
-        The primary view of the CoachAIEvalXBlock, shown to students
+        The primary view of this block, shown to students
         when viewing courses.
+        """
+        return self._render_preview(is_studio=False)
+
+    def author_view(self, context=None):
+        """
+        The preview shown in studio.
+        """
+        return self._render_preview(is_studio=True)
+
+    def _render_preview(self, is_studio: bool):
+        """
+        Shared preview rendering between student and author views.
         """
         active_session = self._get_active_session()
         characters = list(map(self._get_character_data, range(2)))
         frag = Fragment('<div data-ai-eval-react-root="true"></div>')
+
+        # When rendering the student preview in studio, load studio-specific style fixes.
+        if is_studio:
+            frag.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
+
         frag.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/coaching.js"))
         js_data = self._build_view_payload(
             view="student",
