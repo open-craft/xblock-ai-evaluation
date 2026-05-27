@@ -18,6 +18,7 @@ export interface ShortAnswerStudentMeta {
   allow_reset: boolean;
   character_image: string;
   max_responses: number;
+  title: string;
   question: string;
   hide_question: boolean;
 }
@@ -40,6 +41,7 @@ export interface ShortAnswerStudioState {
   attachment_urls: string[];
   character_image: string;
   display_name: string;
+  show_display_name: boolean;
   evaluation_prompt: string;
   max_responses: number | string | null;
   model: string;

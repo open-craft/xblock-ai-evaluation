@@ -62,6 +62,7 @@ def shortanswer_block_data():
     """Fixture for short answer block test data."""
     return {
         "display_name": "Short answer with AI Evaluation",
+        "show_display_name": False,
         "model": SupportedModels.GPT4O.value,
         "model_api_key": "test-key",
         "model_api_url": "",
@@ -223,6 +224,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "messages": shortanswer_block_data["sessions"][-1],
         },
         "meta": {
+            "title": "",
             "question": shortanswer_block_data["question"],
             "max_responses": shortanswer_block_data["max_responses"],
             "allow_reset": shortanswer_block_data["allow_reset"],
@@ -968,6 +970,7 @@ def test_shortanswer_studio_submit_success(shortanswer_block_data):
                 block,
                 {
                     "display_name": "Updated title",
+                    "show_display_name": False,
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
@@ -1005,6 +1008,7 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
                 block,
                 {
                     "display_name": "Updated title",
+                    "show_display_name": False,
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
@@ -1049,6 +1053,7 @@ def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_
     assert response["validation_errors"] == {
         "model_api_key": ["Missing field in Studio payload."],
         "model_api_url": ["Missing field in Studio payload."],
+        "show_display_name": ["Missing field in Studio payload."],
         "question": ["Missing field in Studio payload."],
         "evaluation_prompt": ["Missing field in Studio payload."],
         "max_responses": ["Missing field in Studio payload."],
@@ -1074,6 +1079,7 @@ def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
                 block,
                 {
                     "display_name": "Updated title",
+                    "show_display_name": False,
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
