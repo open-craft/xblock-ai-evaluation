@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Col, Collapsible, Icon, Row } from "@openedx/paragon";
+import { Button, Col, Collapsible, Form, Icon, Row } from "@openedx/paragon";
 import { useIntl } from "react-intl";
 
 import { getErrorMessage } from "../shared/request";
@@ -12,15 +12,6 @@ function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
     return count + (message.source === "user" ? 1 : 0);
   }, 0);
-}
-
-function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
-  if (!textarea) {
-    return;
-  }
-
-  textarea.style.height = "0px";
-  textarea.style.height = String(textarea.scrollHeight) + "px";
 }
 
 function QuestionPanel({
@@ -179,12 +170,12 @@ function MessageComposer({
           </Button>
         ) : null}
         <div className="chat-input-wrapper">
-          <textarea
+          <Form.Control
             ref={textareaRef}
-            className={"chat-user-input" + (disabled ? " disabled" : "")}
             rows={1}
             disabled={disabled}
-            aria-disabled={disabled}
+            as="textarea"
+            autoResize
             placeholder={intl.formatMessage({
               id: "shortanswer.student.placeholder",
               defaultMessage: "Type your answer here. Ctrl+Enter to send, Shift+Enter for new line.",
@@ -249,10 +240,6 @@ export default function ShortAnswerStudentApp({
   useEffect(() => {
     setMessages(initialMessages);
   }, [initialMessages]);
-
-  useEffect(() => {
-    autoResizeTextarea(textareaRef.current);
-  }, [draft]);
 
   useEffect(() => {
     if (historyRef.current) {
