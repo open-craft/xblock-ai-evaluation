@@ -124,12 +124,8 @@
 .chat-input-wrapper textarea {
   background: var(--shortanswer-input-bg);
   border: 1px solid var(--shortanswer-input-border);
-  border-radius: var(--shortanswer-input-radius);
+  border-radius: calc(var(--pgn-typography-form-input-line-height-base) * var(--shortanswer-submit-font-size));
   box-shadow: var(--shortanswer-input-shadow);
-  flex: 1 1 auto;
-  line-height: 1.45;
-  min-height: 44px;
-  overflow: auto;
   max-height: 200px;
   padding: var(--shortanswer-input-padding-y) 44px var(--shortanswer-input-padding-y) var(--shortanswer-input-padding-x);
   resize: none !important;
@@ -143,7 +139,7 @@
 
 .chat-send-button {
   position: absolute !important;
-  right: 6px;
+  right: 14px;
   bottom: 6px;
   width: 32px;
   height: 32px;
@@ -152,7 +148,8 @@
   padding: 0;
 }
 
-.chat-submit-row .disabled {
+.chat-submit-row .disabled,
+.chat-submit-row :disabled {
   opacity: 0.65;
   cursor: not-allowed !important;
 }
