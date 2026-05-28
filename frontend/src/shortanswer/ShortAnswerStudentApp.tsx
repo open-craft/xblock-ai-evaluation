@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Col, Collapsible, Form, Icon, Row } from "@openedx/paragon";
 import { useIntl } from "react-intl";
+import { v4 as uuidv4 } from 'uuid';
 
 import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
@@ -15,19 +16,25 @@ function countUserMessages(messages: ShortAnswerMessage[]) {
   }, 0);
 }
 
-function QuestionPanel({
-  title,
-  questionHtml,
-  questionRef,
-}: {
+interface QuestionPanelProps {
   title: string;
   questionHtml: string;
   questionRef: React.RefObject<HTMLDivElement>;
-}) {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+}
+
+function QuestionPanel(
+  { title, questionHtml, questionRef, isOpen, setIsOpen }: QuestionPanelProps
+) {
   return (
     <>
       {title && <h4 className="text-secondary-500">{title}</h4>}
-      <Collapsible.Advanced defaultOpen ref={questionRef} className="shortanswer-question">
+      <Collapsible.Advanced
+        open={isOpen}
+        onToggle={(isOpen: boolean) => setIsOpen(isOpen)}
+        ref={questionRef} className="shortanswer-question"
+      >
         <Collapsible.Trigger>
           <Row>
             <Col xs={1} className="pr-2 ml-n5">
@@ -134,6 +141,7 @@ function MessageComposer({
   onReset,
   onSubmit,
   textareaRef,
+  textareaKey,
 }: {
   allowReset: boolean;
   canReset: boolean;
@@ -145,6 +153,7 @@ function MessageComposer({
   onReset: () => void;
   onSubmit: () => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
+  textareaKey: string;
 }) {
   const intl = useIntl();
   const sendLabel = intl.formatMessage({
@@ -159,7 +168,7 @@ function MessageComposer({
           <Button
             type="button"
             variant="outline-secondary"
-            className="rounded-pill"
+            className="reset-btn rounded-pill"
             disabled={!canReset}
             aria-disabled={!canReset}
             onClick={onReset}
@@ -172,6 +181,7 @@ function MessageComposer({
         ) : null}
         <div className="chat-input-wrapper">
           <Form.Control
+            key={textareaKey}
             ref={textareaRef}
             rows={1}
             disabled={disabled}
@@ -231,6 +241,9 @@ export default function ShortAnswerStudentApp({
   const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;
   const canReset = allowReset && !pending && userMessageCount > 0;
   const controlsDisabled = pending || userMessageCount >= maxResponses;
+  // question panel should only default to open if user has not already send a message
+  const [questionPanelIsOpen, setQuestionPanelIsOpen] = React.useState(userMessageCount == 0 ? true : false);
+  const [textareaKey, setTextareaKey] = useState("chat-input-textarea-initial-key");
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -276,6 +289,12 @@ export default function ShortAnswerStudentApp({
       return;
     }
 
+    // Collapse the question panel when sending the first message,
+    // and only the first message to avoid this being annoying.
+    if (messages.length == 0) {
+      setQuestionPanelIsOpen(false);
+    }
+
     const userInput = draft;
     const nextMessages = messages.concat({
       source: "user",
@@ -283,7 +302,13 @@ export default function ShortAnswerStudentApp({
     });
 
     setMessages(nextMessages);
+
     setDraft("");
+
+    // This is a hacky workaround for the issue where the textarea doesn't auto-resize when the value is set externally.
+    // Changing the element key forces the textarea to re-render, and thus resize.
+    setTextareaKey(uuidv4());
+
     setPending(true);
     setStatusMessage(
       intl.formatMessage({
@@ -358,6 +383,9 @@ export default function ShortAnswerStudentApp({
       if (textareaRef.current) {
         textareaRef.current.focus();
       }
+
+      // After reset, re-open the question panel for convenience.
+      setQuestionPanelIsOpen(true);
     } catch (error: unknown) {
       const fallbackError = intl.formatMessage({
         id: "shortanswer.student.requestErrorAlert",
@@ -380,7 +408,7 @@ export default function ShortAnswerStudentApp({
     <section className="shortanswer-react-app" data-block-kind="shortanswer" data-view={payload.view}>
       <div className="shortanswer_block">
         {!hideQuestion && (
-          <QuestionPanel title={payload.meta.title} questionHtml={questionHtml} questionRef={questionRef} />
+          <QuestionPanel isOpen={questionPanelIsOpen} setIsOpen={setQuestionPanelIsOpen} title={payload.meta.title} questionHtml={questionHtml} questionRef={questionRef} />
         )}
 
         {payload.meta.character_image ? (
@@ -429,6 +457,7 @@ export default function ShortAnswerStudentApp({
             onReset={resetConversation}
             onSubmit={submitAnswer}
             textareaRef={textareaRef}
+            textareaKey={textareaKey}
           />
         </div>
       </div>
