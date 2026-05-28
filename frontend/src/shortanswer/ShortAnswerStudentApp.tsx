@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Col, Collapsible, Form, Icon, Row } from "@openedx/paragon";
 import { useIntl } from "react-intl";
+import { v4 as uuidv4 } from 'uuid';
 
 import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
@@ -140,6 +141,7 @@ function MessageComposer({
   onReset,
   onSubmit,
   textareaRef,
+  textareaKey,
 }: {
   allowReset: boolean;
   canReset: boolean;
@@ -151,6 +153,7 @@ function MessageComposer({
   onReset: () => void;
   onSubmit: () => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
+  textareaKey: string;
 }) {
   const intl = useIntl();
   const sendLabel = intl.formatMessage({
@@ -178,6 +181,7 @@ function MessageComposer({
         ) : null}
         <div className="chat-input-wrapper">
           <Form.Control
+            key={textareaKey}
             ref={textareaRef}
             rows={1}
             disabled={disabled}
@@ -239,6 +243,7 @@ export default function ShortAnswerStudentApp({
   const controlsDisabled = pending || userMessageCount >= maxResponses;
   // question panel should only default to open if user has not already send a message
   const [questionPanelIsOpen, setQuestionPanelIsOpen] = React.useState(userMessageCount == 0 ? true : false);
+  const [textareaKey, setTextareaKey] = useState("chat-input-textarea-initial-key");
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -297,7 +302,13 @@ export default function ShortAnswerStudentApp({
     });
 
     setMessages(nextMessages);
+
     setDraft("");
+
+    // This is a hacky workaround for the issue where the textarea doesn't auto-resize when the value is set externally.
+    // Changing the element key forces the textarea to re-render, and thus resize.
+    setTextareaKey(uuidv4());
+
     setPending(true);
     setStatusMessage(
       intl.formatMessage({
@@ -446,6 +457,7 @@ export default function ShortAnswerStudentApp({
             onReset={resetConversation}
             onSubmit={submitAnswer}
             textareaRef={textareaRef}
+            textareaKey={textareaKey}
           />
         </div>
       </div>
