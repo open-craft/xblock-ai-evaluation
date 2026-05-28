@@ -168,7 +168,7 @@ function MessageComposer({
           <Button
             type="button"
             variant="outline-secondary"
-            className="rounded-pill"
+            className="reset-btn rounded-pill"
             disabled={!canReset}
             aria-disabled={!canReset}
             onClick={onReset}

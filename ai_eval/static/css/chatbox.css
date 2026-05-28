@@ -113,6 +113,10 @@
   padding-top: var(--shortanswer-bubble-padding-y);
 }
 
+.chat-submit-row .reset-btn {
+    height: fit-content; /* ensure the reset button doesn't grow tall along with the multi-line textarea */
+}
+
 .chat-input-wrapper {
   flex: 1 1 auto;
   position: relative;
