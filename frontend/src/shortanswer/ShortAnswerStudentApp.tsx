@@ -6,7 +6,8 @@ import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
-import { ArrowUpward, AutoAwesome, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/paragon/icons";
+import { ArrowUpward, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/paragon/icons";
+import { PoweredByAI } from "../shared/PoweredByAI";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
@@ -198,13 +199,7 @@ function MessageComposer({
           </Button>
         </div>
       </div>
-      <div className="chat-powered-by">
-        <Icon src={AutoAwesome} size="sm" />
-        {intl.formatMessage({
-          id: "shortanswer.student.poweredBy",
-          defaultMessage: "Powered by AI",
-        })}
-      </div>
+      <PoweredByAI />
     </React.Fragment>
   );
 }

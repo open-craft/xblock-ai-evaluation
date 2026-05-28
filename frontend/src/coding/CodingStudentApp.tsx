@@ -13,6 +13,7 @@ import {
   WAIT_TIME_MS,
 } from "./api";
 import { CodingStudentPayload } from "./types";
+import { PoweredByAI } from "../shared/PoweredByAI";
 
 const HTML_CSS = "HTML/CSS";
 const HTML_PLACEHOLDER =
@@ -625,6 +626,8 @@ export default function CodingStudentApp({
           stdout={stdout}
         />
       </div>
+
+      <PoweredByAI />
     </section>
   );
 }

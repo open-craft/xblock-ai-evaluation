@@ -21,7 +21,6 @@
   --shortanswer-spacing-md-sm: var(--pgn-spacing-spacer-2-5, 0.75rem);
   --shortanswer-bubble-padding-y: var(--pgn-spacing-form-control-gutter, 0.625rem);
   --shortanswer-history-padding-x: calc(var(--pgn-spacing-spacer-base, 1em) * 2);
-  --shortanswer-submit-margin-bottom: var(--pgn-spacing-spacer-base, 1em);
   --shortanswer-submit-font-size: var(--pgn-typography-font-size-base, 16px);
   --shortanswer-input-padding-y: var(--pgn-spacing-input-btn-padding-y, 0.7rem);
   --shortanswer-input-padding-x: var(--pgn-spacing-input-btn-padding-x, 0.9rem);
@@ -110,7 +109,6 @@
 .chat-submit-row {
   display: flex;
   gap: var(--shortanswer-spacing-md-sm);
-  margin-bottom: var(--shortanswer-submit-margin-bottom);
   font-size: var(--shortanswer-submit-font-size);
   padding-top: var(--shortanswer-bubble-padding-y);
 }
@@ -211,17 +209,6 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.chat-powered-by {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.25rem;
-  font-size: 1rem;
-  color: var(--pgn-color-gray-500, #707070);
-  padding: 0 var(--shortanswer-bubble-padding-y);
-  margin-top: 0.25rem;
 }
 
 .chat-instructions {
