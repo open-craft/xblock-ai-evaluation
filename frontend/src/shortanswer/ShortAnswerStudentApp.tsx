@@ -15,19 +15,25 @@ function countUserMessages(messages: ShortAnswerMessage[]) {
   }, 0);
 }
 
-function QuestionPanel({
-  title,
-  questionHtml,
-  questionRef,
-}: {
+interface QuestionPanelProps {
   title: string;
   questionHtml: string;
   questionRef: React.RefObject<HTMLDivElement>;
-}) {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+}
+
+function QuestionPanel(
+  { title, questionHtml, questionRef, isOpen, setIsOpen }: QuestionPanelProps
+) {
   return (
     <>
       {title && <h4 className="text-secondary-500">{title}</h4>}
-      <Collapsible.Advanced defaultOpen ref={questionRef} className="shortanswer-question">
+      <Collapsible.Advanced
+        open={isOpen}
+        onToggle={(isOpen: boolean) => setIsOpen(isOpen)}
+        ref={questionRef} className="shortanswer-question"
+      >
         <Collapsible.Trigger>
           <Row>
             <Col xs={1} className="pr-2 ml-n5">
@@ -231,6 +237,8 @@ export default function ShortAnswerStudentApp({
   const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;
   const canReset = allowReset && !pending && userMessageCount > 0;
   const controlsDisabled = pending || userMessageCount >= maxResponses;
+  // question panel should only default to open if user has not already send a message
+  const [questionPanelIsOpen, setQuestionPanelIsOpen] = React.useState(userMessageCount == 0 ? true : false);
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -274,6 +282,12 @@ export default function ShortAnswerStudentApp({
   async function submitAnswer() {
     if (!canSubmit) {
       return;
+    }
+
+    // Collapse the question panel when sending the first message,
+    // and only the first message to avoid this being annoying.
+    if (messages.length == 0) {
+      setQuestionPanelIsOpen(false);
     }
 
     const userInput = draft;
@@ -358,6 +372,9 @@ export default function ShortAnswerStudentApp({
       if (textareaRef.current) {
         textareaRef.current.focus();
       }
+
+      // After reset, re-open the question panel for convenience.
+      setQuestionPanelIsOpen(true);
     } catch (error: unknown) {
       const fallbackError = intl.formatMessage({
         id: "shortanswer.student.requestErrorAlert",
@@ -380,7 +397,7 @@ export default function ShortAnswerStudentApp({
     <section className="shortanswer-react-app" data-block-kind="shortanswer" data-view={payload.view}>
       <div className="shortanswer_block">
         {!hideQuestion && (
-          <QuestionPanel title={payload.meta.title} questionHtml={questionHtml} questionRef={questionRef} />
+          <QuestionPanel isOpen={questionPanelIsOpen} setIsOpen={setQuestionPanelIsOpen} title={payload.meta.title} questionHtml={questionHtml} questionRef={questionRef} />
         )}
 
         {payload.meta.character_image ? (
