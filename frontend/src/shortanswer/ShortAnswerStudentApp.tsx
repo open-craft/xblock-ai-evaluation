@@ -27,6 +27,15 @@ interface QuestionPanelProps {
 function QuestionPanel(
   { title, questionHtml, questionRef, isOpen, setIsOpen }: QuestionPanelProps
 ) {
+
+  // Extract the first element out of the question html
+  // to display it as the preview on the Collapsible.
+  const tmpWrapper = document.createElement('div');
+  tmpWrapper.innerHTML = questionHtml;
+  const truncatedQuestionHtml = tmpWrapper.firstElementChild?.outerHTML;
+  tmpWrapper.firstElementChild?.remove();
+  const remainingQuestionHtml = tmpWrapper.innerHTML;
+
   return (
     <>
       {title && <h4 className="text-secondary-500">{title}</h4>}
@@ -45,24 +54,20 @@ function QuestionPanel(
                   <Icon className="ml-auto" src={KeyboardArrowUp} />
                 </Collapsible.Visible>
             </Col>
-            <Col xs={11} className="pl-0">
-              <div
-                className="question-text-truncated"
-                dangerouslySetInnerHTML={{ __html: questionHtml }}
-              />
-            </Col>
+            <Col
+              xs={11} className="pl-0 font-weight-bold"
+              dangerouslySetInnerHTML={{ __html: truncatedQuestionHtml }}
+            />
           </Row>
         </Collapsible.Trigger>
 
         <Collapsible.Body>
           <Row>
             <Col xs={1} className="pr-2 ml-n5"></Col>
-            <Col xs={11} className="pl-0">
-              <div
-                className="question-text"
-                dangerouslySetInnerHTML={{ __html: questionHtml }}
-              />
-            </Col>
+            <Col
+              xs={11} className="pl-0"
+              dangerouslySetInnerHTML={{ __html: remainingQuestionHtml }}
+            />
           </Row>
           </Collapsible.Body>
       </Collapsible.Advanced>
