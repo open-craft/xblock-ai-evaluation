@@ -47,19 +47,6 @@
     margin-bottom: calc(var(--pgn-spacing-spacer-base) * 2);
 }
 
-/* hack to use the Paragon Collapsible for displaying the first paragraph on closed, and show the remaining on open */
-.shortanswer-question .question-text-truncated > :first-child,
-.shortanswer-question .question-text > :first-child
-{
-    font-weight: bold;
-}
-.shortanswer-question .question-text-truncated > :not(:first-child) {
-    display: none;
-}
-.shortanswer-question .question-text > :first-child {
-    display: none;
-}
-
 .shortanswer_image {
   float: left;
   margin-right: 4rem;
