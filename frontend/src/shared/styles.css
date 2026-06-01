@@ -1,13 +1,46 @@
 /* use root and host selectors to work both in and out of the shadow dom,
  * for if we toggle use of the shadow dom later */
 :root, :host {
-  --ai-eval-react-spacing-sm: 0.5rem;
-  --ai-eval-react-spacing-md: 1rem;
-  --ai-eval-react-border-color: #d0d0d0;
-  --ai-eval-react-surface-color: #ffffff;
-  --ai-eval-react-muted-color: #5c5c5c;
-  --ai-eval-react-radius: 0.5rem;
-  --ai-eval-body-font: var(--pgn-typography-font-family-base);
+  @property --ai-eval-react-spacing-sm {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0.5rem;
+  }
+  @property --ai-eval-react-spacing-md {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 1rem;
+  }
+  @property --ai-eval-react-border-color {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: #d0d0d0;
+  }
+  @property --ai-eval-react-surface-color {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: #ffffff;
+  }
+  @property --ai-eval-react-muted-color {
+    syntax: "<color>";
+    inherits: true;
+    initial-value: #5c5c5c;
+  }
+  @property --ai-eval-react-radius {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0.5rem;
+  }
+  @property --ai-eval-body-font {
+    syntax: "*";
+    inherits: true;
+    initial-value: var(--pgn-typography-font-family-base);
+  }
+  @property --ai-eval-vertical-padding {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 0;
+  }
 }
 
 .ai-eval-react-shell {
@@ -21,6 +54,8 @@
   p, label {
     font-family: var(--pgn-typography-font-family-base);
   }
+  padding-top: var(--ai-eval-vertical-padding);
+  padding-bottom: var(--ai-eval-vertical-padding);
 }
 
 .ai-eval-react-shell > :first-child {
