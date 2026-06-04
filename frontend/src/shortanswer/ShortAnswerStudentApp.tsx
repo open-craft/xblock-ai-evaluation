@@ -312,6 +312,7 @@ export default function ShortAnswerStudentApp({
 
     // This is a hacky workaround for the issue where the textarea doesn't auto-resize when the value is set externally.
     // Changing the element key forces the textarea to re-render, and thus resize.
+    // https://github.com/openedx/paragon/issues/4319
     setTextareaKey(uuidv4());
 
     setPending(true);
