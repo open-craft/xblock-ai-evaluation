@@ -14,6 +14,6 @@ module.exports = {
     }],
   },
   transformIgnorePatterns: [
-    "/node_modules/(?!(@openedx/paragon|@openedx/paragon/icons|dompurify|marked)/)",
+    "/node_modules/(?!(@openedx/paragon|@openedx/paragon/icons|dompurify|marked|uuid)/)",
   ],
 };
