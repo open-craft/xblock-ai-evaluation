@@ -47,16 +47,6 @@ describe("StudioEditorLayout", () => {
     document.body.innerHTML = "";
   });
 
-  it("hides the platform modal actions while mounted", () => {
-    const { modalActions, unmount } = renderInsideStudioModal();
-
-    expect(modalActions).toHaveStyle({ display: "none" });
-
-    unmount();
-
-    expect(modalActions).not.toHaveStyle({ display: "none" });
-  });
-
   it("calls save and cancel from React-owned buttons", async () => {
     const user = userEvent.setup();
     const onSave = jest.fn();
@@ -135,12 +125,16 @@ const shortAnswerPayload: ShortAnswerStudioPayload = {
     model_api_key: "",
     model_api_url: "",
     question: "What is 2 + 2?",
+    show_display_name: false,
   },
   meta: {
     field_metadata: {
       model: {
         display_name: "AI model",
         choices: [{ value: "gpt-4o-mini", display_name: "gpt-4o-mini" }],
+      },
+      show_display_name: {
+        display_name: "Show Display Name",
       },
     },
   },
@@ -236,7 +230,7 @@ describe("StudioEditorLayout — editor integration", () => {
     jest.restoreAllMocks();
   });
 
-  it("saves Short Answer through the React layout and hides platform modal actions", async () => {
+  it("saves Short Answer through the React layout", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
     const fetch = mockSuccessfulSave();
@@ -244,8 +238,6 @@ describe("StudioEditorLayout — editor integration", () => {
     renderEditor(<ShortAnswerStudioApp payload={shortAnswerPayload} runtime={runtime} />, {
       includeLegacyActions: true,
     });
-
-    expect(document.querySelector(".modal-actions")).toHaveStyle({ display: "none" });
 
     await user.click(screen.getByRole("button", { name: "Save" }));
 

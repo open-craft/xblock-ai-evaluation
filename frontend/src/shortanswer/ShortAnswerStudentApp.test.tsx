@@ -184,4 +184,110 @@ describe("ShortAnswerStudentApp", () => {
       expect(resetButton).toBeUndefined();
     });
   });
+
+  describe("test collapsible question information", () => {
+    it("question information collapses when first message sent", async () => {
+      mockSendAnswer.mockResolvedValue("response");
+      const user = userEvent.setup();
+
+      const payload = makePayload();
+      payload.meta.question = `
+collapsible question
+
+This is paragraph one.
+
+And this is paragraph two.`;
+
+      render(<ShortAnswerStudentApp payload={payload} />);
+
+      const collapsibleTrigger = screen.getByRole("button", { name: /collapsible question/i });
+      // should be open by default for new conversations
+      expect(collapsibleTrigger.getAttribute('aria-expanded')).toBe("true");
+
+      const textarea = screen.getByRole("textbox");
+      await user.type(textarea, "my answer");
+
+      const submitButton = screen.getByRole("button", { name: /submit/i });
+      await user.click(submitButton);
+
+      expect(screen.getByText("my answer")).toBeInTheDocument();
+      expect(collapsibleTrigger.getAttribute('aria-expanded')).toBe("false");
+    });
+
+    it("question information does not collapse when more messages sent", async () => {
+      mockSendAnswer.mockResolvedValue("response");
+      const user = userEvent.setup();
+
+      const payload = makePayload({
+        initial_state: {
+          messages: [
+            { source: "user", content: "four" },
+            { source: "llm", content: "Correct!" },
+          ],
+        },
+      });
+      payload.meta.question = `
+collapsible question
+
+This is paragraph one.
+
+And this is paragraph two.`;
+
+      render(<ShortAnswerStudentApp payload={payload} />);
+
+      // collapsible question text should be collapsed by default when there is already a conversation in progress
+      const collapsibleTrigger = screen.getByRole("button", { name: /collapsible question/i });
+      expect(collapsibleTrigger.getAttribute('aria-expanded')).toBe("false");
+
+      // manually expand it
+      await user.click(collapsibleTrigger);
+      expect(collapsibleTrigger.getAttribute('aria-expanded')).toBe("true");
+
+      const textarea = screen.getByRole("textbox");
+      await user.type(textarea, "my answer");
+
+      const submitButton = screen.getByRole("button", { name: /submit/i });
+      await user.click(submitButton);
+
+      expect(screen.getByText("my answer")).toBeInTheDocument();
+      // collapsible should not get auto-closed, when messages are sent (other than the first message in the conversation)
+      expect(collapsibleTrigger.getAttribute('aria-expanded')).toBe("true");
+    });
+
+    it("question information expands after reset", async () => {
+      mockResetChat.mockResolvedValue({});
+      const user = userEvent.setup();
+
+      const payload = makePayload({
+        initial_state: {
+          messages: [
+            { source: "user", content: "old message" },
+            { source: "llm", content: "old reply" },
+          ],
+        },
+      });
+      payload.meta.question = `
+collapsible question
+
+This is paragraph one.
+
+And this is paragraph two.`;
+
+      render(<ShortAnswerStudentApp payload={payload} />);
+
+      const collapsibleTrigger = screen.getByRole("button", { name: /collapsible question/i });
+      expect(collapsibleTrigger.getAttribute('aria-expanded')).toBe("false");
+
+      expect(screen.getByText("old message")).toBeInTheDocument();
+
+      const resetButton = screen.getByRole("button", { name: /reset chat/i });
+      await user.click(resetButton);
+
+      await waitFor(() => {
+        expect(screen.queryByText("old message")).not.toBeInTheDocument();
+        // should auto-expand after reset
+        expect(collapsibleTrigger.getAttribute('aria-expanded')).toBe("true");
+      });
+    });
+  });
 });

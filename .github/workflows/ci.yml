@@ -1,4 +1,4 @@
-name: Python CI
+name: Tests
 
 on:
   push:
@@ -13,12 +13,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
-    runs-on: ${{ matrix.os }}
+  backend-tests:
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
         python-version: [3.11, 3.12]
         toxenv: [django42, quality]
 
@@ -40,3 +39,32 @@ jobs:
       env:
         TOXENV: ${{ matrix.toxenv }}
       run: tox
+
+  frontend-tests:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: install dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: typecheck
+        working-directory: ./frontend
+        run: npm run typecheck
+
+      - name: build
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: test
+        working-directory: ./frontend
+        run: npm run test
