@@ -9,6 +9,7 @@ import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
 import { ArrowUpward, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/paragon/icons";
 import { PoweredByAI } from "../shared/PoweredByAI";
+import { TypingIndicator } from "../shared/TypingIndicator";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
@@ -114,15 +115,7 @@ function MessageList({
           </div>
         );
       })}
-      <div className="chat-message-container chat-spinner-container">
-        {pending ? (
-          <div className="mb-5 chat-message message-spinner" aria-hidden="true">
-            <div className="bounce1" />
-            <div className="bounce2" />
-            <div className="bounce3" />
-          </div>
-        ) : null}
-      </div>
+      {pending && <TypingIndicator />}
     </div>
   );
 }
