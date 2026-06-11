@@ -13,6 +13,7 @@ import {
   CoachingStudentPayload,
 } from "./types";
 import { PoweredByAI } from "../shared/PoweredByAI";
+import { TypingIndicator } from "../shared/TypingIndicator";
 
 type PaneKey = "workspace" | "coach";
 type CoachMode = "chat" | "report" | "review";
@@ -746,13 +747,7 @@ export default function CoachingStudentApp({
                 );
               })}
             </div>
-            {busyByPane.workspace ? (
-              <div className="coach-spinner" aria-hidden="true" style={{ display: "block" }}>
-                <span />
-                <span />
-                <span />
-              </div>
-            ) : null}
+            {busyByPane.workspace && <TypingIndicator />}
           </div>
 
           <div className="sr-only coach-status coach-status--workspace" role="status" aria-live="polite">
@@ -865,13 +860,7 @@ export default function CoachingStudentApp({
                 );
               })}
             </div>
-            {busyByPane.coach ? (
-              <div className="coach-spinner" aria-hidden="true" style={{ display: "block" }}>
-                <span />
-                <span />
-                <span />
-              </div>
-            ) : null}
+            {busyByPane.coach && <TypingIndicator />}
           </div>
 
           <div className="sr-only coach-status coach-status--coach" role="status" aria-live="polite">
