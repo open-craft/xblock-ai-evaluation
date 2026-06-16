@@ -14,7 +14,7 @@ from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
 
 from .compat import get_site_configuration_value
-from .supported_models import SupportedModels
+from .supported_models import SupportedModels, resolve_model
 from .llm import get_llm_response, get_llm_service
 
 
@@ -190,7 +190,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """Build model configuration key name for site/global settings lookups."""
         # For custom models, use the model name directly; for supported models, use the enum name
         try:
-            model_name = SupportedModels(model).name
+            model_name = SupportedModels(resolve_model(model)).name
         except ValueError:
             model_name = model.replace("/", "_").replace("-", "_").upper()
 
@@ -535,6 +535,17 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
         self._clear_cached_studio_warnings()
 
+    @property
+    def effective_model(self) -> str:
+        """
+        The model identifier to use at runtime.
+
+        Resolves any provider-retired/renamed model saved on the block to its
+        current replacement, so activities configured with a legacy model keep
+        working without editing course content.
+        """
+        return resolve_model(self.model)
+
     def get_llm_response(self, messages, tag: str | None = None):
         """
         Call the shared LLM entrypoint and return only the response text.
@@ -547,7 +558,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                 prior_thread_id = None
 
         text, new_thread_id = get_llm_response(
-            self.model,
+            self.effective_model,
             self.get_model_api_key(),
 
             list(messages), self.get_model_api_url(),
