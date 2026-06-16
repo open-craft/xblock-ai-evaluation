@@ -886,7 +886,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
         def _generate():
             yield {"role": "system", "content": prompt}
-            if self.model == SupportedModels.CLAUDE_SONNET.value:
+            if self.effective_model == SupportedModels.CLAUDE_SONNET.value:
                 # Claude needs a dummy user reply before the first assistant reply.
                 yield {"role": "user", "content": "."}
 
@@ -1241,7 +1241,7 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
         def _evaluator_messages():
             yield {"role": "system", "content": prompt}
-            if self.model == SupportedModels.CLAUDE_SONNET.value:
+            if self.effective_model == SupportedModels.CLAUDE_SONNET.value:
                 yield {"role": "user", "content": "."}
 
         message = self.get_llm_response(

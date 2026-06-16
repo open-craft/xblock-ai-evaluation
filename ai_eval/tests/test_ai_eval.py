@@ -20,7 +20,7 @@ from ai_eval import (
     ShortAnswerAIEvalXBlock,
 )
 from ai_eval.base import AIEvalXBlock
-from ai_eval.supported_models import SupportedModels
+from ai_eval.supported_models import SupportedModels, resolve_model
 from ai_eval.llm_services import CustomLLMService
 from ai_eval.backends.factory import BackendFactory
 from ai_eval.backends.judge0 import Judge0Backend
@@ -1770,3 +1770,60 @@ def test_coding_studio_lock_payload_unsets_judge0_lock_flag_without_runtime_key(
             patch("ai_eval.base.get_site_configuration_value", return_value=None):
         payload = block._studio_lock_metadata()
         assert payload["lock_judge0_api_key"] is False
+
+
+# Legacy model compatibility shim: activities saved with a provider-retired model id
+# (Anthropic's claude-sonnet-4-20250514) keep working by resolving to the replacement
+# (claude-sonnet-4-6) at runtime, with no course-content edits.
+LEGACY_CLAUDE = "claude-sonnet-4-20250514"
+
+
+def test_resolve_model_maps_legacy_to_replacement():
+    """resolve_model should map the retired id, and pass through everything else."""
+    assert resolve_model(LEGACY_CLAUDE) == "claude-sonnet-4-6"
+    assert resolve_model("claude-sonnet-4-6") == "claude-sonnet-4-6"
+    assert resolve_model(SupportedModels.GPT4O.value) == SupportedModels.GPT4O.value
+    assert resolve_model("some/custom-model") == "some/custom-model"
+
+
+def test_effective_model_resolves_legacy_value(shortanswer_block_data):
+    """A block saved with the legacy Claude id should resolve to the replacement."""
+    legacy = ShortAnswerAIEvalXBlock(
+        ToyRuntime(), DictFieldData({**shortanswer_block_data, "model": LEGACY_CLAUDE}), None
+    )
+    current = ShortAnswerAIEvalXBlock(
+        ToyRuntime(), DictFieldData({**shortanswer_block_data, "model": "claude-sonnet-4-6"}), None
+    )
+    assert legacy.effective_model == "claude-sonnet-4-6"
+    assert current.effective_model == "claude-sonnet-4-6"
+
+
+def test_get_llm_response_calls_provider_with_resolved_model(shortanswer_block_data):
+    """The provider call must use the resolved id, not the retired one stored on the block."""
+    block = ShortAnswerAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**shortanswer_block_data, "model": LEGACY_CLAUDE, "model_api_key": "k"}),
+        None,
+    )
+    with patch("ai_eval.base.get_llm_response", return_value=("ok", None)) as mock_llm, \
+            patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        block.get_llm_response([{"role": "user", "content": "hi"}])
+    assert mock_llm.call_args.args[0] == "claude-sonnet-4-6"
+
+
+def test_model_config_key_resolves_legacy_value():
+    """Per-model API-key config lookups for a legacy id reuse the CLAUDE_SONNET key name."""
+    assert (
+        AIEvalXBlock._get_model_config_key(LEGACY_CLAUDE, "api_key") == "CLAUDE_SONNET_API_KEY"
+    )
+    assert (
+        AIEvalXBlock._get_model_config_key("claude-sonnet-4-6", "api_key") == "CLAUDE_SONNET_API_KEY"
+    )
+
+
+def test_coach_legacy_model_still_matches_claude_branch(coach_block_data):
+    """The Coach dummy-user-turn branch must still fire for legacy-configured blocks."""
+    block = CoachAIEvalXBlock(
+        ToyRuntime(), DictFieldData({**coach_block_data, "model": LEGACY_CLAUDE}), None
+    )
+    assert block.effective_model == SupportedModels.CLAUDE_SONNET.value
