@@ -1780,8 +1780,8 @@ LEGACY_CLAUDE = "claude-sonnet-4-20250514"
 
 def test_resolve_model_maps_legacy_to_replacement():
     """resolve_model should map the retired id, and pass through everything else."""
-    assert resolve_model(LEGACY_CLAUDE) == "claude-sonnet-4-6"
-    assert resolve_model("claude-sonnet-4-6") == "claude-sonnet-4-6"
+    assert resolve_model(LEGACY_CLAUDE) == SupportedModels.CLAUDE_SONNET.value
+    assert resolve_model(SupportedModels.CLAUDE_SONNET.value) == SupportedModels.CLAUDE_SONNET.value
     assert resolve_model(SupportedModels.GPT4O.value) == SupportedModels.GPT4O.value
     assert resolve_model("some/custom-model") == "some/custom-model"
 
@@ -1792,10 +1792,12 @@ def test_effective_model_resolves_legacy_value(shortanswer_block_data):
         ToyRuntime(), DictFieldData({**shortanswer_block_data, "model": LEGACY_CLAUDE}), None
     )
     current = ShortAnswerAIEvalXBlock(
-        ToyRuntime(), DictFieldData({**shortanswer_block_data, "model": "claude-sonnet-4-6"}), None
+        ToyRuntime(),
+        DictFieldData({**shortanswer_block_data, "model": SupportedModels.CLAUDE_SONNET.value}),
+        None,
     )
-    assert legacy.effective_model == "claude-sonnet-4-6"
-    assert current.effective_model == "claude-sonnet-4-6"
+    assert legacy.effective_model == SupportedModels.CLAUDE_SONNET.value
+    assert current.effective_model == SupportedModels.CLAUDE_SONNET.value
 
 
 def test_get_llm_response_calls_provider_with_resolved_model(shortanswer_block_data):
@@ -1808,7 +1810,7 @@ def test_get_llm_response_calls_provider_with_resolved_model(shortanswer_block_d
     with patch("ai_eval.base.get_llm_response", return_value=("ok", None)) as mock_llm, \
             patch("ai_eval.base.get_site_configuration_value", return_value=None):
         block.get_llm_response([{"role": "user", "content": "hi"}])
-    assert mock_llm.call_args.args[0] == "claude-sonnet-4-6"
+    assert mock_llm.call_args.args[0] == SupportedModels.CLAUDE_SONNET.value
 
 
 def test_model_config_key_resolves_legacy_value():
@@ -1817,7 +1819,8 @@ def test_model_config_key_resolves_legacy_value():
         AIEvalXBlock._get_model_config_key(LEGACY_CLAUDE, "api_key") == "CLAUDE_SONNET_API_KEY"
     )
     assert (
-        AIEvalXBlock._get_model_config_key("claude-sonnet-4-6", "api_key") == "CLAUDE_SONNET_API_KEY"
+        AIEvalXBlock._get_model_config_key(SupportedModels.CLAUDE_SONNET.value, "api_key")
+        == "CLAUDE_SONNET_API_KEY"
     )
 
 

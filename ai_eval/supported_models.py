@@ -25,7 +25,7 @@ class SupportedModels(Enum):
 # the value is resolved to its replacement at the point of use (the provider
 # call and the per-model API-key lookup), so no course content needs editing.
 LEGACY_MODEL_ALIASES = {
-    "claude-sonnet-4-20250514": "claude-sonnet-4-6",
+    "claude-sonnet-4-20250514": SupportedModels.CLAUDE_SONNET.value,
 }
 
 
