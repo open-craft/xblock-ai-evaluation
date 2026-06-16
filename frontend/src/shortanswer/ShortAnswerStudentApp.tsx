@@ -331,10 +331,6 @@ export default function ShortAnswerStudentApp({
           defaultMessage: "Assistant response ready.",
         }),
       );
-
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-      }
     } catch (error: unknown) {
       const fallbackError = intl.formatMessage({
         id: "shortanswer.student.requestErrorAlert",
