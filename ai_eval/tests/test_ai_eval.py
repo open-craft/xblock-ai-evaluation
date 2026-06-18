@@ -1778,6 +1778,13 @@ def test_coding_studio_lock_payload_unsets_judge0_lock_flag_without_runtime_key(
 LEGACY_CLAUDE = "claude-sonnet-4-20250514"
 
 
+def _fake_site_config(values):
+    """Build a get_site_configuration_value replacement backed by a {config_key: value} dict."""
+    def _fake(_block_settings_key, config_key):
+        return values.get(config_key)
+    return _fake
+
+
 def test_resolve_model_maps_legacy_to_replacement():
     """resolve_model should map the retired id, and pass through everything else."""
     assert resolve_model(LEGACY_CLAUDE) == SupportedModels.CLAUDE_SONNET.value
@@ -1786,7 +1793,7 @@ def test_resolve_model_maps_legacy_to_replacement():
     assert resolve_model("some/custom-model") == "some/custom-model"
 
 
-def test_effective_model_resolves_legacy_value(shortanswer_block_data):
+def test_resolved_model_maps_legacy_value(shortanswer_block_data):
     """A block saved with the legacy Claude id should resolve to the replacement."""
     legacy = ShortAnswerAIEvalXBlock(
         ToyRuntime(), DictFieldData({**shortanswer_block_data, "model": LEGACY_CLAUDE}), None
@@ -1796,8 +1803,8 @@ def test_effective_model_resolves_legacy_value(shortanswer_block_data):
         DictFieldData({**shortanswer_block_data, "model": SupportedModels.CLAUDE_SONNET.value}),
         None,
     )
-    assert legacy.effective_model == SupportedModels.CLAUDE_SONNET.value
-    assert current.effective_model == SupportedModels.CLAUDE_SONNET.value
+    assert legacy.resolved_model == SupportedModels.CLAUDE_SONNET.value
+    assert current.resolved_model == SupportedModels.CLAUDE_SONNET.value
 
 
 def test_get_llm_response_calls_provider_with_resolved_model(shortanswer_block_data):
@@ -1813,20 +1820,90 @@ def test_get_llm_response_calls_provider_with_resolved_model(shortanswer_block_d
     assert mock_llm.call_args.args[0] == SupportedModels.CLAUDE_SONNET.value
 
 
-def test_model_config_key_resolves_legacy_value():
+def test_model_config_key_resolves_legacy_value(shortanswer_block_data):
     """Per-model API-key config lookups for a legacy id reuse the CLAUDE_SONNET key name."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    assert block._get_model_config_key(LEGACY_CLAUDE, "api_key") == "CLAUDE_SONNET_API_KEY"
     assert (
-        AIEvalXBlock._get_model_config_key(LEGACY_CLAUDE, "api_key") == "CLAUDE_SONNET_API_KEY"
-    )
-    assert (
-        AIEvalXBlock._get_model_config_key(SupportedModels.CLAUDE_SONNET.value, "api_key")
+        block._get_model_config_key(SupportedModels.CLAUDE_SONNET.value, "api_key")
         == "CLAUDE_SONNET_API_KEY"
     )
 
 
 def test_coach_legacy_model_still_matches_claude_branch(coach_block_data):
-    """The Coach dummy-user-turn branch must still fire for legacy-configured blocks."""
+    """The Coach dummy-user-turn branch (slot-based) must still fire for legacy-configured blocks."""
     block = CoachAIEvalXBlock(
         ToyRuntime(), DictFieldData({**coach_block_data, "model": LEGACY_CLAUDE}), None
     )
-    assert block.effective_model == SupportedModels.CLAUDE_SONNET.value
+    assert block._model_slot() == SupportedModels.CLAUDE_SONNET.name
+
+
+def test_coach_claude_branch_fires_for_overridden_claude_model(coach_block_data):
+    """An operator override of the Claude slot must still be detected as the Claude slot."""
+    block = CoachAIEvalXBlock(
+        ToyRuntime(), DictFieldData({**coach_block_data, "model": "claude-sonnet-4-7"}), None
+    )
+    with patch(
+        "ai_eval.supported_models.get_site_configuration_value",
+        side_effect=_fake_site_config({"CLAUDE_SONNET_MODEL": "claude-sonnet-4-7"}),
+    ):
+        assert block._model_slot() == SupportedModels.CLAUDE_SONNET.name
+
+
+def test_effective_supported_models_applies_site_override(shortanswer_block_data):
+    """A <NAME>_MODEL site setting replaces that slot's value in the model list/dropdown."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    with patch(
+        "ai_eval.supported_models.get_site_configuration_value",
+        side_effect=_fake_site_config({"CLAUDE_SONNET_MODEL": "claude-sonnet-4-7"}),
+    ):
+        models = block._effective_supported_models()
+    assert "claude-sonnet-4-7" in models                       # override is offered
+    assert SupportedModels.CLAUDE_SONNET.value not in models    # default is superseded
+    assert SupportedModels.GPT4O.value in models                # untouched slots keep defaults
+
+
+def test_overridden_model_keeps_stable_api_key_slot(shortanswer_block_data):
+    """An overridden model id still maps back to its slot's API-key config key."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    with patch(
+        "ai_eval.supported_models.get_site_configuration_value",
+        side_effect=_fake_site_config({"CLAUDE_SONNET_MODEL": "claude-sonnet-4-7"}),
+    ):
+        assert block._get_model_config_key("claude-sonnet-4-7", "api_key") == "CLAUDE_SONNET_API_KEY"
+
+
+def test_deprecated_models_setting_resolves_at_runtime(shortanswer_block_data):
+    """A DEPRECATED_MODELS entry maps a saved id to its replacement with no code change."""
+    block = ShortAnswerAIEvalXBlock(
+        ToyRuntime(), DictFieldData({**shortanswer_block_data, "model": "retired-model-x"}), None
+    )
+    with patch(
+        "ai_eval.supported_models.get_site_configuration_value",
+        side_effect=_fake_site_config({"DEPRECATED_MODELS": {"retired-model-x": "gpt-4o"}}),
+    ):
+        assert block.resolved_model == "gpt-4o"
+
+
+def test_override_cannot_hijack_another_slots_default_api_key(shortanswer_block_data):
+    """An override equal to another slot's default id must not steal that slot's API-key key."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    with patch(
+        "ai_eval.supported_models.get_site_configuration_value",
+        side_effect=_fake_site_config({"GPT4O_MINI_MODEL": SupportedModels.GPT4O.value}),
+    ):
+        # "gpt-4o" is GPT4O's default; defaults win, so it maps to GPT4O, not GPT4O_MINI.
+        assert block._get_model_config_key(SupportedModels.GPT4O.value, "api_key") == "GPT4O_API_KEY"
+
+
+def test_model_maps_are_cached_per_instance(shortanswer_block_data):
+    """Effective-model/alias maps are computed once; repeat reads don't re-hit site config."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    with patch("ai_eval.supported_models.get_site_configuration_value", return_value=None) as mock_cfg:
+        _ = block.resolved_model             # builds + caches the maps
+        reads_after_first = mock_cfg.call_count
+        assert reads_after_first > 0          # it really did read site config once
+        _ = block.resolved_model             # served from cache
+        block._effective_supported_models()  # served from cache
+        block._get_model_config_key(SupportedModels.GPT4O.value, "api_key")
+        assert mock_cfg.call_count == reads_after_first  # no additional site-config reads
