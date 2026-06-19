@@ -46,7 +46,11 @@ def resolve_model(model: str, aliases: dict | None = None) -> str:
     """
     if aliases is None:
         aliases = LEGACY_MODEL_ALIASES
-    return aliases.get(model, model)
+    seen = set()
+    while model in aliases and model not in seen:
+        seen.add(model)
+        model = aliases[model]
+    return model
 
 
 def _slot_model(member: "SupportedModels") -> str:

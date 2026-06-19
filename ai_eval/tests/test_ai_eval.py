@@ -1793,6 +1793,23 @@ def test_resolve_model_maps_legacy_to_replacement():
     assert resolve_model("some/custom-model") == "some/custom-model"
 
 
+def test_resolve_model_follows_alias_chain():
+    """A chained alias (code default -> operator replacement) resolves to the end of the chain."""
+    # e.g. code: claude-sonnet-4-20250514 -> claude-sonnet-4-6;
+    #      operator DEPRECATED_MODELS:     claude-sonnet-4-6 -> claude-sonnet-4-10
+    aliases = {
+        LEGACY_CLAUDE: SupportedModels.CLAUDE_SONNET.value,
+        SupportedModels.CLAUDE_SONNET.value: "claude-sonnet-4-10",
+    }
+    assert resolve_model(LEGACY_CLAUDE, aliases) == "claude-sonnet-4-10"
+    assert resolve_model(SupportedModels.CLAUDE_SONNET.value, aliases) == "claude-sonnet-4-10"
+
+
+def test_resolve_model_terminates_on_cycle():
+    """A misconfigured alias cycle must not loop forever."""
+    assert resolve_model("A", {"A": "B", "B": "A"}) in {"A", "B"}
+
+
 def test_resolved_model_maps_legacy_value(shortanswer_block_data):
     """A block saved with the legacy Claude id should resolve to the replacement."""
     legacy = ShortAnswerAIEvalXBlock(
