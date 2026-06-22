@@ -83,6 +83,66 @@ Studio behavior:
   - `USE_CUSTOM_LLM_SERVICE` is enabled.
   This lock is model-specific: changing the selected model can enable/disable the field based on that model's configured key.
 
+### Choosing which AI models are available
+
+When authoring an AI Eval XBlock, the author selects an AI model from a dropdown of built-in models.
+An administrator can change which model is offered, and keep activities working when a provider retires a model,
+using **Site Configuration** (`Django admin > SiteConfigurations`) under the `ai_eval` namespace.
+
+#### Override the model offered for a slot
+
+Set `<SLOT>_MODEL` to the model id you want the dropdown to offer for that slot. The available
+slots and their default models are:
+
+| Site Configuration key | Default model        |
+| ---------------------- | -------------------- |
+| `GPT4O_MODEL`          | `gpt-4o`             |
+| `GPT4O_MINI_MODEL`     | `gpt-4o-mini`        |
+| `GEMINI_PRO_MODEL`     | `gemini/gemini-pro`  |
+| `CLAUDE_SONNET_MODEL`  | `claude-sonnet-4-6`  |
+| `LLAMA_MODEL`          | `ollama/llama2`      |
+
+Only add the slots you want to change; the others keep their defaults. For example, to offer a
+newer Claude model:
+
+```json
+{
+  "ai_eval": {
+    "CLAUDE_SONNET_MODEL": "claude-sonnet-4-7"
+  }
+}
+```
+
+Authors editing an activity will then see `claude-sonnet-4-7` in the model dropdown.
+
+#### Configure replacements for deprecated models
+
+When a provider retires a model, activities already configured with that model id would stop
+working. To redirect them to a replacement without editing each course, set `DEPRECATED_MODELS`
+to a mapping of `retired model id` → `replacement model id`. It is applied automatically at
+runtime, so existing activities keep working:
+
+```json
+{
+  "ai_eval": {
+    "DEPRECATED_MODELS": {
+      "claude-sonnet-4-20250514": "claude-sonnet-4-6"
+    }
+  }
+}
+```
+
+Usually you set both together — point the slot at the new model and redirect the old id to it:
+
+```json
+{
+  "ai_eval": {
+    "CLAUDE_SONNET_MODEL": "claude-sonnet-4-7",
+    "DEPRECATED_MODELS": { "claude-sonnet-4-6": "claude-sonnet-4-7" }
+  }
+}
+```
+
 ### Custom LLM Service (advanced)
 
 The XBlocks can optionally route all LLM interactions through a custom LLM service instead of the default provider.

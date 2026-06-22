@@ -14,8 +14,9 @@ from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
 
 from .compat import get_site_configuration_value
-from .supported_models import SupportedModels, resolve_model
+from .supported_models import SupportedModels, model_maps, resolve_model
 from .llm import get_llm_response, get_llm_service
+from .llm_services import DefaultLLMService
 
 
 logger = logging.getLogger(__name__)
@@ -24,18 +25,22 @@ logger = logging.getLogger(__name__)
 def _get_model_choices(block):
     """
     Return the dropdown entries for the `model` field.
-    If the remote service fails, fall back to SupportedModels.list().
+
+    The service supplies the list: the default service returns the effective model
+    id per supported slot (the operator's ``<NAME>_MODEL`` override, else the code
+    default); a custom LLM service returns its own catalog. If a custom service
+    returns nothing we fall back to the effective defaults.
     """
+    # pylint: disable=protected-access
     available_models = []
 
     try:
-        llm_service = get_llm_service()
-        available_models = llm_service.get_available_models()
+        available_models = get_llm_service().get_available_models()
 
-        # Ensure we have models, fallback if empty
+        # Ensure we have models, fallback if empty (custom service returned nothing)
         if not available_models:
             logger.warning("Custom service returned empty models list, using defaults")
-            available_models = SupportedModels.list()
+            available_models = block._effective_supported_models()
             # Record a warning for Studio validation
             try:
                 # Cache a short-lived warning keyed by usage_id to be surfaced during validation
@@ -46,8 +51,8 @@ def _get_model_choices(block):
                         cache_key,
                         _(
                             "Custom LLM service did not return any models. Showing default models instead. "
-                            "Check custom service availability/configuration and try again, or configure API keys "
-                            "for the default models."
+                            "Check custom service availability/configuration and try again, or configure "
+                            "API keys for the default models."
                         ),
                         timeout=120,
                     )
@@ -60,6 +65,8 @@ def _get_model_choices(block):
             f"Failed to populate model choices dynamically; falling back to default models. Error: {e}",
             exc_info=True,
         )
+        # Last-resort fallback must not touch site config (it may be what failed):
+        # use the static enum list so the dropdown always populates.
         available_models = SupportedModels.list()
 
     PLACEHOLDER = {"display_name": "— Select a model —", "value": ""}
@@ -181,20 +188,60 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
         if value := getattr(obj, field_name, None):
             return str(value)
-        if value := get_site_configuration_value(self.block_settings_key, config_key):
+        return self._get_ai_eval_setting(config_key)
+
+    def _get_ai_eval_setting(self, key: str):
+        """
+        Read a raw `ai_eval` setting: site configuration first, then global Django settings.
+
+        Single source for the site->global precedence shared by API keys, model
+        overrides, and the deprecated-model map.
+        """
+        if value := get_site_configuration_value(self.block_settings_key, key):
             return value
-        return self._get_settings().get(config_key)
+        return self._get_settings().get(key)
 
-    @staticmethod
-    def _get_model_config_key(model: str, config_parameter: str) -> str:
+    def _ai_eval_model_maps(self) -> dict:
+        """
+        Compute the maps that drive model overrides and alias resolution,
+        so Studio renders and per-request lookups don't re-read site configuration for every slot.
+        """
+        cached = self.__dict__.get("_ai_eval_model_maps_cache")
+        if cached is not None:
+            return cached
+
+        maps = model_maps()
+        self.__dict__["_ai_eval_model_maps_cache"] = maps
+        return maps
+
+    def _resolve_model(self, model: str) -> str:
+        """Resolve a possibly-retired model id to its replacement (the single config-aware entry point)."""
+        return resolve_model(model, self._ai_eval_model_maps()["aliases"])
+
+    def _model_slot(self, model: str | None = None) -> str | None:
+        """
+        Return the enum slot name (e.g. ``CLAUDE_SONNET``) a model id maps to, else None.
+
+        Resolves retired ids and honors ``<NAME>_MODEL`` overrides, so provider-specific
+        handling keyed on a slot keeps working when the slot's model id is overridden.
+        Defaults to this block's stored ``model``.
+        """
+        model = self.model if model is None else model
+        return self._ai_eval_model_maps()["slot_by_id"].get(self._resolve_model(model))
+
+    def _effective_supported_models(self) -> list[str]:
+        """Current model id for every supported slot, with operator overrides applied."""
+        return list(self._ai_eval_model_maps()["effective"])
+
+    def _get_model_config_key(self, model: str, config_parameter: str) -> str:
         """Build model configuration key name for site/global settings lookups."""
-        # For custom models, use the model name directly; for supported models, use the enum name
-        try:
-            model_name = SupportedModels(resolve_model(model)).name
-        except ValueError:
-            model_name = model.replace("/", "_").replace("-", "_").upper()
-
-        return f"{model_name}_{config_parameter.upper()}"
+        # Resolve a retired id to its replacement, then map to the stable slot name.
+        # Custom/unknown models fall back to a sanitized form of the id itself.
+        resolved = self._resolve_model(model)
+        slot_name = self._ai_eval_model_maps()["slot_by_id"].get(resolved)
+        if slot_name is None:
+            slot_name = resolved.replace("/", "_").replace("-", "_").upper()
+        return f"{slot_name}_{config_parameter.upper()}"
 
     def _get_site_or_global_config_value(
         self,
@@ -216,9 +263,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             return None
 
         config_key = self._get_model_config_key(model, config_parameter)
-        if value := get_site_configuration_value(self.block_settings_key, config_key):
-            return value
-        return self._get_settings().get(config_key)
+        return self._get_ai_eval_setting(config_key)
 
     @staticmethod
     def _is_truthy(value) -> bool:
@@ -256,7 +301,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         Return a map of model name -> whether an API key is configured site/global.
         """
-        models = list(SupportedModels.list())
+        models = list(self._effective_supported_models())
         if self.model and self.model not in models:
             models.append(self.model)
 
@@ -379,8 +424,6 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         Return structured field errors and warnings for Studio saves.
         """
-        from .llm_services import DefaultLLMService  # pylint: disable=import-outside-toplevel
-
         validation_errors: dict[str, list[str]] = {}
         validation_warnings: list[str] = []
         llm_service = get_llm_service()
@@ -417,7 +460,10 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                     _("Model API key is mandatory, if not set globally by your administrator."),
                 )
 
-            if data.model == SupportedModels.LLAMA.value and not self.get_model_api_url(data):
+            # Slot-aware so an overridden Llama model id still validates correctly.
+            is_llama = self._model_slot(data.model) == SupportedModels.LLAMA.name
+
+            if is_llama and not self.get_model_api_url(data):
                 self._add_studio_validation_error(
                     validation_errors,
                     "model_api_url",
@@ -427,7 +473,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                     ),
                 )
 
-            if data.model != SupportedModels.LLAMA.value and data.model_api_url:
+            if not is_llama and data.model_api_url:
                 self._add_studio_validation_error(
                     validation_errors,
                     "model_api_url",
@@ -536,15 +582,16 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         self._clear_cached_studio_warnings()
 
     @property
-    def effective_model(self) -> str:
+    def resolved_model(self) -> str:
         """
         The model identifier to use at runtime.
 
-        Resolves any provider-retired/renamed model saved on the block to its
-        current replacement, so activities configured with a legacy model keep
-        working without editing course content.
+        Resolves any retired/renamed model saved on the block to its current
+        replacement (code defaults plus the ``DEPRECATED_MODELS`` setting), so
+        activities configured with a legacy model keep working without editing
+        course content.
         """
-        return resolve_model(self.model)
+        return self._resolve_model(self.model)
 
     def get_llm_response(self, messages, tag: str | None = None):
         """
@@ -558,7 +605,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
                 prior_thread_id = None
 
         text, new_thread_id = get_llm_response(
-            self.effective_model,
+            self.resolved_model,
             self.get_model_api_key(),
 
             list(messages), self.get_model_api_url(),

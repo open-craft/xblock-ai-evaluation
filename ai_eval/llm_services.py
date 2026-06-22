@@ -5,7 +5,7 @@ import time
 import requests
 
 from litellm import completion
-from .supported_models import SupportedModels
+from .supported_models import effective_supported_models
 from .compat import get_site_configuration_value
 from .utils import DEFAULT_HTTP_TIMEOUT
 
@@ -90,7 +90,8 @@ class DefaultLLMService(LLMServiceBase):
             raise
 
     def get_available_models(self):
-        return [str(m.value) for m in SupportedModels]
+        # Effective per-slot model ids, with operator <NAME>_MODEL site-config overrides applied.
+        return effective_supported_models()
 
     def supports_threads(self) -> bool:  # pragma: nocover - default is stateless
         return False
