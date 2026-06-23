@@ -350,7 +350,7 @@ export default function ShortAnswerStudentApp({
       });
 
       setMessages(messages);
-      setDraft(userInput);
+      setDraft((current) => current || userInput);
       setPending(false);
       setStatusMessage(
         intl.formatMessage({
