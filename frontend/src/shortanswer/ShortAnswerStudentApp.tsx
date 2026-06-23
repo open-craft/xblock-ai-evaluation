@@ -135,11 +135,9 @@ function MessageComposer({
   disabled,
   draft,
   onChange,
-  onKeyDown,
   onReset,
   onSubmit,
   textareaRef,
-  textareaKey,
 }: {
   allowReset: boolean;
   canReset: boolean;
@@ -147,11 +145,9 @@ function MessageComposer({
   disabled: boolean;
   draft: string;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onReset: () => void;
   onSubmit: () => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
-  textareaKey: string;
 }) {
   const intl = useIntl();
   const sendLabel = intl.formatMessage({
@@ -179,7 +175,6 @@ function MessageComposer({
         ) : null}
         <div className="chat-input-wrapper">
           <Form.Control
-            key={textareaKey}
             ref={textareaRef}
             rows={1}
             disabled={disabled}
@@ -192,7 +187,12 @@ function MessageComposer({
             maxLength={1000}
             value={draft}
             onChange={onChange}
-            onKeyDown={onKeyDown}
+            onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                onSubmit();
+              }
+            }}
           />
           <Button
             type="button"
@@ -201,6 +201,10 @@ function MessageComposer({
             disabled={!canSubmit}
             aria-disabled={!canSubmit}
             aria-label={sendLabel}
+            onMouseDown={(e: React.MouseEvent<HTMLButtonElement>) => {
+              // Prevent the button from being focused when clicked.
+              e.preventDefault();
+            }}
             onClick={onSubmit}
           >
             <Icon src={ArrowUpward} />
@@ -238,10 +242,9 @@ export default function ShortAnswerStudentApp({
   const hideQuestion = Boolean(payload.meta.hide_question);
   const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;
   const canReset = allowReset && !pending && userMessageCount > 0;
-  const controlsDisabled = pending || userMessageCount >= maxResponses;
+  const controlsDisabled = userMessageCount >= maxResponses;
   // question panel should only default to open if user has not already send a message
   const [questionPanelIsOpen, setQuestionPanelIsOpen] = React.useState(userMessageCount == 0 ? true : false);
-  const [textareaKey, setTextareaKey] = useState("chat-input-textarea-initial-key");
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -304,9 +307,18 @@ export default function ShortAnswerStudentApp({
     setDraft("");
 
     // This is a hacky workaround for the issue where the textarea doesn't auto-resize when the value is set externally.
-    // Changing the element key forces the textarea to re-render, and thus resize.
     // https://github.com/openedx/paragon/issues/4319
-    setTextareaKey(uuidv4());
+    // Force resize on next tick so scrollHeight is updated, mimicking the textarea's
+    // handleResize event.
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        // @ts-ignore
+        el.style.height = `${el.initialHeight || 0}px`;
+        // @ts-ignore
+        el.style.height = `${el.scrollHeight + (el.offsets || 0)}px`;
+      }
+    });
 
     setPending(true);
     setStatusMessage(
@@ -331,10 +343,6 @@ export default function ShortAnswerStudentApp({
           defaultMessage: "Assistant response ready.",
         }),
       );
-
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-      }
     } catch (error: unknown) {
       const fallbackError = intl.formatMessage({
         id: "shortanswer.student.requestErrorAlert",
@@ -342,7 +350,7 @@ export default function ShortAnswerStudentApp({
       });
 
       setMessages(messages);
-      setDraft(userInput);
+      setDraft((current) => current || userInput);
       setPending(false);
       setStatusMessage(
         intl.formatMessage({
@@ -447,16 +455,9 @@ export default function ShortAnswerStudentApp({
             onChange={(event) => {
               setDraft(event.target.value);
             }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                event.preventDefault();
-                submitAnswer();
-              }
-            }}
             onReset={resetConversation}
             onSubmit={submitAnswer}
             textareaRef={textareaRef}
-            textareaKey={textareaKey}
           />
         </div>
       </div>
