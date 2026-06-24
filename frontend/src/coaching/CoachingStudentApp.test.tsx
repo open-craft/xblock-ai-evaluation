@@ -15,9 +15,10 @@ function makePayload(overrides?: Partial<CoachingStudentPayload>): CoachingStude
   return {
     view: "student",
     handler_urls: {
-      get_character_response: "/handler/get_character_response",
-      get_evaluator_response: "/handler/get_evaluator_response",
-      reset_all: "/handler/reset_all",
+        get_character_response: "/handler/get_character_response",
+        get_evaluator_response: "/handler/get_evaluator_response",
+        reset_all: "/handler/reset_all",
+        download_pdf: "/handler/download_pdf",
     },
     initial_state: {
       chat_histories: [[], []],
@@ -52,6 +53,9 @@ function makePayload(overrides?: Partial<CoachingStudentPayload>): CoachingStude
         workspace: "Main",
         coach: "Coach",
       },
+      pdf_download_allowed: false,
+      pdf_download_title: "",
+      pdf_download_description: ""
     },
     mfe_config_api: "/mfe_config",
     style_urls: [],

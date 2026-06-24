@@ -130,3 +130,13 @@
     }
 }
 
+.pdf-download-section {
+    background-color: #FBFBFB;
+    border: 1px solid #B1B1B1;
+    border-radius: 4px;
+    margin-top: 2rem;
+    /* `.ai-eval-paragon .row` is overridden somewhere with negative margins, so correct it here */
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+}
+

@@ -25,6 +25,7 @@ import {
   CodingStudioPayload,
   CodingStudioState,
 } from "./types";
+import { StudioDownloadPDFField } from "../shared/StudioDownloadPDF";
 
 const codingSchema = Yup.object({
   display_name: Yup.string().ensure(),
@@ -37,6 +38,9 @@ const codingSchema = Yup.object({
   model_api_url: Yup.string().ensure(),
   question: Yup.string().ensure()
     .required("Question field is mandatory"),
+  pdf_download_allowed: Yup.boolean(),
+  pdf_download_title: Yup.string().ensure(),
+  pdf_download_description: Yup.string().ensure(),
 });
 
 function CodingSettingsForm({
@@ -196,6 +200,12 @@ function CodingSettingsForm({
         <FieldErrors errors={validationErrors.language} />
         <FieldHelp metadata={fieldMetadata.language} />
       </Form.Group>
+
+      <StudioDownloadPDFField
+        onChange={onChange}
+        errors={{allowed: validationErrors.pdf_download_allowed, title: validationErrors.pdf_download_title, description: validationErrors.pdf_download_description}}
+        values={{allowed: values.pdf_download_allowed, title: values.pdf_download_title, description: values.pdf_download_description}}
+      />
     </Form>
   );
 }

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>{{ info.title }} - {% if student.email %}{{ student.email }}{% else %}{{ student.name }}{% endif %} - transcript</title>
+        <meta charset="utf-8">
+        <meta name="generator" content="https://github.com/open-craft/xblock-ai-evaluation/">
+        <meta name="dcterms.created" content="{{ time.isoformat() }}">
+        <meta name="description" content="PDF transcript of a student submission to an AI Evaluation XBlock">
+    </head>
+    <body>
+        <header>
+            {% if branding.logo %}<img class="logo" alt="logo image" src="{{ branding.logo }}">{% endif %}
+            <span class="title">{{ info.title }}</span>
+            <span class="details"><time datetime="{{ time.isoformat() }}">{{ time | pretty_time }}</time> | {% if student.email %}<a href="mailto:{{ student.email }}">{{ student.email }}</a>{% else %}{{ student.name }}{% endif %}</span>
+        </header>
+
+        {% if location %}
+            <nav aria-label="Breadcrumb links">
+                <ol>
+                    <li><a href="{{ location.course_url }}">{{ location.course_name }}</a></li>
+                    <li><a href="{{ location.section_url }}">{{ location.section_name }}</a></li>
+                    <li><a href="{{ location.subsection_url }}">{{ location.subsection_name }}</a></li>
+                    <li><a href="{{ location.unit_url }}">{{ location.unit_name }}</a></li>
+                </ol>
+            </nav>
+        {% endif %}
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer></footer>
+    </body>
+</html>

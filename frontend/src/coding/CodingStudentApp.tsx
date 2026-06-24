@@ -14,6 +14,7 @@ import {
 } from "./api";
 import { CodingStudentPayload } from "./types";
 import { PoweredByAI } from "../shared/PoweredByAI";
+import { DownloadPDFSection } from "../shared/DownloadPDFSection";
 
 const HTML_CSS = "HTML/CSS";
 const HTML_PLACEHOLDER =
@@ -628,6 +629,8 @@ export default function CodingStudentApp({
       </div>
 
       <PoweredByAI />
+
+      {feedbackHtml && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
     </section>
   );
 }

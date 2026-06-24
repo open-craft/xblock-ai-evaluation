@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+    <h1>Transcript</h1>
+
+    {% for message in data.messages %}
+        <div class="chat-bubble shortanswer-{{ message.kind }}">
+            <div class="meta">
+                {% if message.avatar_url %}<img src="{{ message.avatar_url }}">{% endif %}
+                <span class="author">{{ message.name }}</span>
+                {% if message.time %}<time datetime="{{ message.time.isoformat() }}">{{ message.time | pretty_time }}</time>{% endif %}
+            </div>
+            <div class="content">
+                {{ message.content | safe }}
+            </div>
+        </div>
+    {% endfor %}
+{% endblock %}

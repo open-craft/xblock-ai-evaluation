@@ -35,6 +35,10 @@ setup(
         "celery",
         "chardet",
         "litellm",
+        "weasyprint<69",  # v69 does weird things with emoji rendering https://github.com/Kozea/WeasyPrint/issues/2806
+        "mistune",
+        "nh3",
+        "Pygments",
     ],
     entry_points={
         "xblock.v1": [

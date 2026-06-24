@@ -24,6 +24,7 @@ import {
   ShortAnswerStudioState,
   StudioLockMetadata,
 } from "./types";
+import { StudioDownloadPDFField } from "../shared/StudioDownloadPDF";
 
 const shortAnswerSchema = Yup.object({
   allow_reset: Yup.boolean()
@@ -58,6 +59,9 @@ const shortAnswerSchema = Yup.object({
   hide_question: Yup.boolean()
     .transform((_value: unknown, original: unknown) => Boolean(original))
     .default(false),
+  pdf_download_allowed: Yup.boolean(),
+  pdf_download_title: Yup.string().ensure(),
+  pdf_download_description: Yup.string().ensure(),
 });
 
 function normalizeAttachmentUrls(value: unknown) {
@@ -84,6 +88,9 @@ function buildSubmitPayload(values: ShortAnswerStudioState) {
     allow_reset: Boolean(values.allow_reset),
     character_image: values.character_image || "",
     attachment_urls: normalizeAttachmentUrls(values.attachment_urls),
+    pdf_download_allowed: values.pdf_download_allowed,
+    pdf_download_title: values.pdf_download_title,
+    pdf_download_description: values.pdf_download_description,
   };
 }
 
@@ -343,6 +350,12 @@ function ShortAnswerSettingsForm({
         onChange={(nextValue) => {
           onChange("attachment_urls", nextValue);
         }}
+      />
+
+      <StudioDownloadPDFField
+        onChange={onChange}
+        errors={{allowed: validationErrors.pdf_download_allowed, title: validationErrors.pdf_download_title, description: validationErrors.pdf_download_description}}
+        values={{allowed: values.pdf_download_allowed, title: values.pdf_download_title, description: values.pdf_download_description}}
       />
     </Form>
   );

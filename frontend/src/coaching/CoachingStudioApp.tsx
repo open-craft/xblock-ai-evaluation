@@ -92,6 +92,9 @@ const coachingSchema = Yup.object({
       return true;
     }),
   workspace_title: Yup.string().ensure(),
+  pdf_download_allowed: Yup.boolean(),
+  pdf_download_title: Yup.string().ensure(),
+  pdf_download_description: Yup.string().ensure(),
 });
 
 function updateListItemAtIndex(items: CoachingListItem[], index: number, nextValue: string) {
@@ -167,6 +170,9 @@ function buildSubmitPayload(values: CoachingStudioState) {
     model_api_url: values.model_api_url || "",
     scenario_data: values.scenario_data || {},
     workspace_title: values.workspace_title || "",
+    pdf_download_allowed: values.pdf_download_allowed,
+    pdf_download_title: values.pdf_download_title,
+    pdf_download_description: values.pdf_download_description,
   };
 }
 
@@ -402,6 +408,8 @@ function BooleanChoiceField({
   metadata,
   onChange,
   value,
+  trueLabel,
+  falseLabel,
 }: {
   description?: string;
   errors?: string[];
@@ -409,6 +417,8 @@ function BooleanChoiceField({
   metadata?: StudioFieldMetadata;
   onChange: (nextValue: boolean) => void;
   value: boolean;
+  trueLabel: string;
+  falseLabel: string;
 }) {
   const label = getFieldLabel(metadata, fieldName);
 
@@ -430,8 +440,8 @@ function BooleanChoiceField({
           value={String(value)}
           isInline
         >
-          <Form.Radio value="true">Yes</Form.Radio>
-          <Form.Radio value="false">No</Form.Radio>
+          <Form.Radio value="true">{trueLabel}</Form.Radio>
+          <Form.Radio value="false">{falseLabel}</Form.Radio>
         </Form.RadioSet>
       </div>
       <FieldErrors errors={errors} />
@@ -692,6 +702,8 @@ function GeneralSection({
         />
         <BooleanChoiceField
           fieldName="allow_reset"
+          trueLabel="Yes"
+          falseLabel="No"
           metadata={{
             ...fieldMetadata.allow_reset,
             display_name: "Activity Reset",
@@ -703,6 +715,47 @@ function GeneralSection({
             onChange("allow_reset", nextValue);
           }}
         />
+        {/* NOTE: below is a reimplementation of the StudioDownloadPDFField, to fit better with the styles of this editor */}
+        <BooleanChoiceField
+          trueLabel="Allow"
+          falseLabel="Disallow"
+          fieldName="pdf_download_allowed"
+          metadata={{
+            display_name: "PDF Download",
+          }}
+          description="Allow learners to download a PDF of their work"
+          value={values.pdf_download_allowed}
+          errors={validationErrors.pdf_download_allowed}
+          onChange={(nextValue) => {
+            onChange("pdf_download_allowed", nextValue);
+          }}
+        />
+        {values.pdf_download_allowed &&
+          <>
+            <TextInputField
+              fieldName="pdf_download_title"
+              metadata={{
+                display_name: "Download Section Title",
+              }}
+              value={values.pdf_download_title}
+              errors={validationErrors.pdf_download_title}
+              onChange={(nextValue) => {
+                onChange("pdf_download_title", nextValue);
+              }}
+            />
+            <TextInputField
+              fieldName="pdf_download_description"
+              metadata={{
+                display_name: "Download Description (optional)",
+              }}
+              value={values.pdf_download_description}
+              errors={validationErrors.pdf_download_description}
+              onChange={(nextValue) => {
+                onChange("pdf_download_description", nextValue);
+              }}
+            />
+          </>
+        }
       </SectionCard>
     </div>
   );
