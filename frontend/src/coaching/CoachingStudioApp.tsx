@@ -23,10 +23,13 @@ import {
   getBlacklistItems,
   getScenarioEditorModel,
   getScenarioListItems,
+  getUrlListItems,
   sanitizeBlacklistValue,
+  sanitizeUrlList,
   updateBlacklistItems,
   updateScenarioDataValue,
   updateScenarioListItems,
+  updateUrlListItems,
 } from "./coachingStudioAdapters";
 import {
   COACHING_STUDIO_SECTIONS,
@@ -60,9 +63,15 @@ const coachingSchema = Yup.object({
   character_2_name: Yup.string().ensure(),
   character_2_prompt: Yup.string().ensure(),
   character_2_role: Yup.string().ensure(),
+  coach_attachment_urls: Yup.mixed()
+    .transform((value: unknown) => (Array.isArray(value) ? value : []))
+    .default(() => []),
   coach_initial_message: Yup.string().ensure(),
   coach_title: Yup.string().ensure(),
   display_name: Yup.string().ensure(),
+  evaluator_attachment_urls: Yup.mixed()
+    .transform((value: unknown) => (Array.isArray(value) ? value : []))
+    .default(() => []),
   evaluator_prompt: Yup.string().ensure(),
   initial_message: Yup.string().ensure(),
   intro_text: Yup.string().ensure(),
@@ -91,6 +100,9 @@ const coachingSchema = Yup.object({
       }
       return true;
     }),
+  workspace_attachment_urls: Yup.mixed()
+    .transform((value: unknown) => (Array.isArray(value) ? value : []))
+    .default(() => []),
   workspace_title: Yup.string().ensure(),
   pdf_download_allowed: Yup.boolean(),
   pdf_download_title: Yup.string().ensure(),
@@ -104,7 +116,8 @@ function updateListItemAtIndex(items: CoachingListItem[], index: number, nextVal
 }
 
 function appendListItem(items: CoachingListItem[]) {
-  return [...items, { value: "" }];
+  const displayItems = items.length > 0 ? items : [{ value: "" }];
+  return [...displayItems, { value: "" }];
 }
 
 function removeListItemAtIndex(items: CoachingListItem[], index: number) {
@@ -124,6 +137,9 @@ function buildFrontendValidationErrors(values: CoachingStudioState): CoachingStu
   const learningObjectives = getScenarioListItems(values.scenario_data, "learning_objectives");
   const evaluationCriteria = getScenarioListItems(values.scenario_data, "evaluation_criteria");
   const blacklistItems = getBlacklistItems(values.blacklist);
+  const workspaceAttachments = getUrlListItems(values.workspace_attachment_urls);
+  const coachAttachments = getUrlListItems(values.coach_attachment_urls);
+  const evaluatorAttachments = getUrlListItems(values.evaluator_attachment_urls);
 
   if (hasInvalidRows(learningObjectives)) {
     validationErrors.scenario_learning_objectives = [
@@ -143,6 +159,24 @@ function buildFrontendValidationErrors(values: CoachingStudioState): CoachingStu
     ];
   }
 
+  if (hasInvalidRows(workspaceAttachments)) {
+    validationErrors.workspace_attachment_urls = [
+      "Resolve the invalid attachment URL rows below.",
+    ];
+  }
+
+  if (hasInvalidRows(coachAttachments)) {
+    validationErrors.coach_attachment_urls = [
+      "Resolve the invalid attachment URL rows below.",
+    ];
+  }
+
+  if (hasInvalidRows(evaluatorAttachments)) {
+    validationErrors.evaluator_attachment_urls = [
+      "Resolve the invalid attachment URL rows below.",
+    ];
+  }
+
   return validationErrors;
 }
 
@@ -158,9 +192,11 @@ function buildSubmitPayload(values: CoachingStudioState) {
     character_2_name: values.character_2_name || "",
     character_2_prompt: values.character_2_prompt || "",
     character_2_role: values.character_2_role || "",
+    coach_attachment_urls: sanitizeUrlList(values.coach_attachment_urls),
     coach_initial_message: values.coach_initial_message || "",
     coach_title: values.coach_title || "",
     display_name: values.display_name || "",
+    evaluator_attachment_urls: sanitizeUrlList(values.evaluator_attachment_urls),
     evaluator_prompt: values.evaluator_prompt || "",
     initial_message: values.initial_message || "",
     intro_text: values.intro_text || "",
@@ -169,6 +205,7 @@ function buildSubmitPayload(values: CoachingStudioState) {
     model_api_key: values.model_api_key || "",
     model_api_url: values.model_api_url || "",
     scenario_data: values.scenario_data || {},
+    workspace_attachment_urls: sanitizeUrlList(values.workspace_attachment_urls),
     workspace_title: values.workspace_title || "",
     pdf_download_allowed: values.pdf_download_allowed,
     pdf_download_title: values.pdf_download_title,
@@ -505,18 +542,20 @@ function ListField({
                         onChangeItem(index, event.target.value);
                       }}
                     />
-                    {canRemove ? (
-                      <Button
-                        className="coaching-studio-list-remove"
-                        variant="link"
-                        aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
-                        onClick={() => {
-                          onRemoveItem(index);
-                        }}
-                      >
-                        <span aria-hidden="true">×</span>
-                      </Button>
-                    ) : null}
+                    <Button
+                      className="coaching-studio-list-remove"
+                      variant="link"
+                      aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
+                      disabled={!canRemove}
+                      onClick={() => {
+                        if (!canRemove) {
+                          return;
+                        }
+                        onRemoveItem(index);
+                      }}
+                    >
+                      <span aria-hidden="true">×</span>
+                    </Button>
                   </div>
                   <FieldErrors errors={item.error ? [item.error] : undefined} />
                 </div>
@@ -887,6 +926,7 @@ function EvaluationSection({
   values: CoachingStudioState;
 }) {
   const evaluationCriteria = getScenarioListItems(values.scenario_data, "evaluation_criteria");
+  const evaluatorAttachments = getUrlListItems(values.evaluator_attachment_urls);
 
   return (
     <div className="coaching-studio-section-stack">
@@ -950,6 +990,33 @@ function EvaluationSection({
           }}
         />
       </SectionCard>
+      <SectionCard>
+        <ListField
+          fieldName="evaluator_attachment_urls"
+          label="Attachment URLs"
+          description="Plain-text files shared with the evaluator only."
+          items={evaluatorAttachments}
+          errors={validationErrors.evaluator_attachment_urls}
+          addLabel="+ Add URL"
+          placeholder="https://example.com/notes.txt"
+          onAdd={() => {
+            onChange("evaluator_attachment_urls", updateUrlListItems(appendListItem(evaluatorAttachments)));
+          }}
+          onChangeItem={(index, nextValue) => {
+            const nextItems =
+              evaluatorAttachments.length > 0
+                ? updateListItemAtIndex(evaluatorAttachments, index, nextValue)
+                : [{ value: nextValue }];
+            onChange("evaluator_attachment_urls", updateUrlListItems(nextItems));
+          }}
+          onRemoveItem={(index) => {
+            onChange(
+              "evaluator_attachment_urls",
+              updateUrlListItems(removeListItemAtIndex(evaluatorAttachments, index)),
+            );
+          }}
+        />
+      </SectionCard>
     </div>
   );
 }
@@ -965,6 +1032,8 @@ function WorkspaceSection({
   validationErrors: CoachingStudioValidationErrors;
   values: CoachingStudioState;
 }) {
+  const workspaceAttachments = getUrlListItems(values.workspace_attachment_urls);
+
   return (
     <div className="coaching-studio-section-stack">
       <SectionCard>
@@ -1054,6 +1123,33 @@ function WorkspaceSection({
           }}
         />
       </SectionCard>
+      <SectionCard>
+        <ListField
+          fieldName="workspace_attachment_urls"
+          label="Attachment URLs"
+          description="Plain-text files shared with the main character, coach, and evaluator."
+          items={workspaceAttachments}
+          errors={validationErrors.workspace_attachment_urls}
+          addLabel="+ Add URL"
+          placeholder="https://example.com/notes.txt"
+          onAdd={() => {
+            onChange("workspace_attachment_urls", updateUrlListItems(appendListItem(workspaceAttachments)));
+          }}
+          onChangeItem={(index, nextValue) => {
+            const nextItems =
+              workspaceAttachments.length > 0
+                ? updateListItemAtIndex(workspaceAttachments, index, nextValue)
+                : [{ value: nextValue }];
+            onChange("workspace_attachment_urls", updateUrlListItems(nextItems));
+          }}
+          onRemoveItem={(index) => {
+            onChange(
+              "workspace_attachment_urls",
+              updateUrlListItems(removeListItemAtIndex(workspaceAttachments, index)),
+            );
+          }}
+        />
+      </SectionCard>
     </div>
   );
 }
@@ -1069,6 +1165,8 @@ function CoachChatSection({
   validationErrors: CoachingStudioValidationErrors;
   values: CoachingStudioState;
 }) {
+  const coachAttachments = getUrlListItems(values.coach_attachment_urls);
+
   return (
     <div className="coaching-studio-section-stack">
       <SectionCard>
@@ -1155,6 +1253,33 @@ function CoachChatSection({
           rows={16}
           onChange={(nextValue) => {
             onChange("character_2_prompt", nextValue);
+          }}
+        />
+      </SectionCard>
+      <SectionCard>
+        <ListField
+          fieldName="coach_attachment_urls"
+          label="Attachment URLs"
+          description="Plain-text files shared with the coach and evaluator (not the main character)."
+          items={coachAttachments}
+          errors={validationErrors.coach_attachment_urls}
+          addLabel="+ Add URL"
+          placeholder="https://example.com/notes.txt"
+          onAdd={() => {
+            onChange("coach_attachment_urls", updateUrlListItems(appendListItem(coachAttachments)));
+          }}
+          onChangeItem={(index, nextValue) => {
+            const nextItems =
+              coachAttachments.length > 0
+                ? updateListItemAtIndex(coachAttachments, index, nextValue)
+                : [{ value: nextValue }];
+            onChange("coach_attachment_urls", updateUrlListItems(nextItems));
+          }}
+          onRemoveItem={(index) => {
+            onChange(
+              "coach_attachment_urls",
+              updateUrlListItems(removeListItemAtIndex(coachAttachments, index)),
+            );
           }}
         />
       </SectionCard>

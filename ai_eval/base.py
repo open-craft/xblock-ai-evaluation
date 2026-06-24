@@ -1,9 +1,15 @@
 """Base Xblock with AI evaluation."""
 from typing import Any, Self
 
+import hashlib
 import logging
+import urllib.parse
+import urllib.request
 from importlib.resources import files
+from multiprocessing.dummy import Pool
+from xml.sax import saxutils
 
+import chardet
 from django.conf import settings
 from django.core.cache import cache
 from django.utils.text import slugify
@@ -150,6 +156,10 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     block_settings_key = "ai_eval"
 
+    ATTACHMENT_PARALLEL_DOWNLOADS = 5
+    ATTACHMENT_CACHE_TTL = 600
+    ATTACHMENT_CACHE_MAX_BYTES = 900_000
+
     def _replace_current_session(self, session_data):
         """
         Replace the current session entry so XBlock dirty-tracking persists it.
@@ -175,6 +185,62 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
         return files("ai_eval").joinpath(path).read_text(encoding="utf8")
+
+    def _download_attachment(self, url, refresh=False):
+        """
+        Return the decoded text of a single attachment URL, caching the result.
+
+        The decoded text (not the raw bytes) is cached keyed by URL only, so a cache
+        hit skips both the network fetch and the ``chardet`` detection/decoding. Pass
+        ``refresh=True`` to bypass the cache and force a fresh download (used by Studio
+        validation so it proves the URL is currently reachable); the fresh fetch still
+        repopulates the cache, warming it for the next learner request.
+        """
+        key = "ai_eval:attachment:" + hashlib.sha256(url.encode("utf-8")).hexdigest()
+        if not refresh:
+            cached = cache.get(key)
+            if cached is not None:
+                return cached
+        with urllib.request.urlopen(url) as f:
+            data = f.read()
+        text = data.decode(chardet.detect(data)["encoding"])
+        # memcached silently drops values over ~1MB, which would turn every request into
+        # a cache miss without any error. Skip caching very large files instead.
+        if len(text.encode("utf-8")) <= self.ATTACHMENT_CACHE_MAX_BYTES:
+            cache.set(key, text, self.ATTACHMENT_CACHE_TTL)
+        return text
+
+    def _filename_for_url(self, url):
+        """Return the trailing path segment of a URL, used as the attachment filename."""
+        return urllib.parse.urlparse(url).path.split('/')[-1]
+
+    def _get_attachments(self, attachment_urls, refresh=False):
+        """Download every URL in parallel and return ``[(filename, contents), ...]``."""
+        with Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS) as pool:
+            contents = pool.map(
+                lambda u: self._download_attachment(u, refresh=refresh), attachment_urls
+            )
+            filenames = map(self._filename_for_url, attachment_urls)
+            return list(zip(filenames, contents))
+
+    def _render_attachments_xml(self, attachment_urls):
+        """
+        Download the URLs and return ``(xml_block, hash_inputs)``.
+
+        ``xml_block`` is the newline-joined ``<attachment>`` blocks to splice into a
+        prompt; ``hash_inputs`` is the per-file ``"{filename}|{contents}"`` strings a
+        caller may fold into a cache/thread tag.
+        """
+        blocks, hash_inputs = [], []
+        for filename, contents in self._get_attachments(attachment_urls):
+            blocks.append(
+                "<attachment><filename>{}</filename>"
+                "<contents>{}</contents></attachment>".format(
+                    saxutils.escape(filename), saxutils.escape(contents)
+                )
+            )
+            hash_inputs.append(f"{filename}|{contents}")
+        return "\n".join(blocks), hash_inputs
 
     def _get_model_config_value(self, config_parameter: str, obj: Self = None) -> str | None:
         """

@@ -331,6 +331,27 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         default=["AI assistant"],
     )
 
+    workspace_attachment_urls = List(
+        display_name=_("Workspace attachment URLs"),
+        help=_("Plain-text files made available to the main character, coach, and evaluator."),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
+    coach_attachment_urls = List(
+        display_name=_("Coach attachment URLs"),
+        help=_("Plain-text files made available to the coach and the evaluator (not the main character)."),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
+    evaluator_attachment_urls = List(
+        display_name=_("Evaluation attachment URLs"),
+        help=_("Plain-text files made available to the evaluator only."),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
     finished = Boolean(
         scope=Scope.user_state,
         default=False,
@@ -406,6 +427,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "blacklist",
         "max_attempts",
         "allow_reset",
+        "workspace_attachment_urls",
+        "coach_attachment_urls",
+        "evaluator_attachment_urls",
     )
 
     def studio_view(self, context=None):
@@ -629,6 +653,22 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 str(e),
             )
 
+        # Validate each attachment list is reachable. refresh=True bypasses the cache so a
+        # now-broken URL surfaces as a field error; the fresh fetch warms the cache too.
+        for field_name in (
+            "workspace_attachment_urls",
+            "coach_attachment_urls",
+            "evaluator_attachment_urls",
+        ):
+            try:
+                self._get_attachments(getattr(data, field_name), refresh=True)
+            except Exception:  # pylint: disable=broad-exception-caught
+                self._add_studio_validation_error(
+                    validation_errors,
+                    field_name,
+                    _("Error downloading attachments"),
+                )
+
         return validation_errors, validation_warnings
 
     def validate_field_data(self, validation, data):
@@ -845,6 +885,22 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "finished": session["finished"],
         }
 
+    def _attachments_for(self, audience):
+        """
+        Return the attachment URLs visible to an audience, cascading most- to least-shared.
+
+        ``audience`` is ``'workspace'`` (main character, ``character_index == 0``),
+        ``'coach'`` (``character_index == 1``), or ``'evaluator'``. Visibility cascades
+        upward: workspace files are seen by everyone, coach files add the coach and
+        evaluator, and evaluator files are seen by the evaluator only.
+        """
+        urls = list(self.workspace_attachment_urls)
+        if audience in ("coach", "evaluator"):
+            urls += list(self.coach_attachment_urls)
+        if audience == "evaluator":
+            urls += list(self.evaluator_attachment_urls)
+        return urls
+
     def _messages_for_character(self, character_index, user_input=None):
         """
         Build LLM message payload for the requested character.
@@ -880,6 +936,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             scenario_data=self.scenario_data,
             character_data=self._get_character_data(character_index),
         )
+
+        audience = "workspace" if character_index == 0 else "coach"
+        attachments_xml, _hash_inputs = self._render_attachments_xml(self._attachments_for(audience))
+        if attachments_xml:
+            prompt += "\n\n" + attachments_xml
         blacklist_instruction = self._build_blacklist_instruction()
         if blacklist_instruction:
             prompt += "\n\n" + blacklist_instruction
@@ -934,6 +995,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         _update_hash(self.character_2_prompt)
         _update_hash(self.evaluator_prompt)
         _update_hash(json.dumps(self._get_blacklist_terms(), ensure_ascii=True))
+        # Hash the attachment URLs (not their downloaded contents) so add/remove/reorder
+        # invalidates the cached provider thread without forcing an extra download here.
+        # Caveat: changing the file content at a stable URL won't invalidate the thread.
+        for url in (
+            list(self.workspace_attachment_urls)
+            + list(self.coach_attachment_urls)
+            + list(self.evaluator_attachment_urls)
+        ):
+            _update_hash(url)
 
         prompt_hash = prompt_hasher.hexdigest()
         context = context or "workspace"
@@ -1233,6 +1303,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self.evaluator_prompt,
             scenario_data=scenario_data,
         )
+        attachments_xml, _hash_inputs = self._render_attachments_xml(self._attachments_for("evaluator"))
+        if attachments_xml:
+            prompt += "\n\n" + attachments_xml
         blacklist_instruction = self._build_blacklist_instruction()
         if blacklist_instruction:
             prompt += "\n\n" + blacklist_instruction

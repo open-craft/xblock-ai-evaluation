@@ -173,3 +173,33 @@ export function sanitizeBlacklistValue(blacklist: string[] | undefined): string[
     return typeof value === "string" && value.trim() !== "";
   });
 }
+
+export function getUrlListItems(values: string[] | undefined): CoachingListItem[] {
+  if (!values) {
+    return [];
+  }
+
+  return (values as unknown[]).map((value) => {
+    if (typeof value === "string") {
+      return createValidListItem(value);
+    }
+
+    return createInvalidListItem(value, "Saved attachment URL must be text.");
+  });
+}
+
+export function updateUrlListItems(nextItems: CoachingListItem[]): string[] {
+  return nextItems.map((item) => {
+    return (item.preserveRawValue ? item.rawValue : item.value) as string;
+  });
+}
+
+export function sanitizeUrlList(values: string[] | undefined): string[] {
+  if (!values) {
+    return [];
+  }
+
+  return (values as unknown[]).filter((value): value is string => {
+    return typeof value === "string" && value.trim() !== "";
+  });
+}
