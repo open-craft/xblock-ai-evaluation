@@ -116,8 +116,7 @@ function updateListItemAtIndex(items: CoachingListItem[], index: number, nextVal
 }
 
 function appendListItem(items: CoachingListItem[]) {
-  const displayItems = items.length > 0 ? items : [{ value: "" }];
-  return [...displayItems, { value: "" }];
+  return [...items, { value: "" }];
 }
 
 function removeListItemAtIndex(items: CoachingListItem[], index: number) {
@@ -513,8 +512,6 @@ function ListField({
   placeholder?: string;
   showLabel?: boolean;
 }) {
-  const displayItems = items.length > 0 ? items : [{ value: "" }];
-
   return (
     <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
       <div className="coaching-studio-field-header">
@@ -528,9 +525,7 @@ function ListField({
       <div className="coaching-studio-field-control">
         <div className="coaching-studio-list-field">
           <div className="coaching-studio-list-rows">
-            {displayItems.map((item, index) => {
-              const canRemove = items.length > 0;
-
+            {items.map((item, index) => {
               return (
                 <div className="coaching-studio-list-row-group" key={fieldName + "-" + String(index)}>
                   <div className="coaching-studio-list-row">
@@ -546,11 +541,7 @@ function ListField({
                       className="coaching-studio-list-remove"
                       variant="link"
                       aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
-                      disabled={!canRemove}
                       onClick={() => {
-                        if (!canRemove) {
-                          return;
-                        }
                         onRemoveItem(index);
                       }}
                     >
