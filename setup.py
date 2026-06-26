@@ -23,7 +23,7 @@ def package_data(pkg, roots):
 
 setup(
     name="xblock-ai-eval",
-    version="0.3.4",
+    version="0.4.0",
     description="XBlocks to write short text and code entries with AI-driven evaluation",
     license="Apache 2.0",
     packages=find_packages(
