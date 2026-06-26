@@ -5,6 +5,7 @@ import hashlib
 import logging
 import urllib.parse
 import urllib.request
+import codecs
 from importlib.resources import files
 from multiprocessing.dummy import Pool
 from xml.sax import saxutils
@@ -22,6 +23,7 @@ from xblock.utils.studio_editable import StudioEditableXBlockMixin
 from xblock.validation import ValidationMessage
 
 from .compat import get_site_configuration_value, get_pdf_location_nav
+from .utils import DEFAULT_HTTP_TIMEOUT
 from .pdf_generator import generate_pdf, Metadata, CoachedData, CodingData, ShortAnswerData, Branding, Student, Info
 from .llm import get_llm_response, get_llm_service
 from .llm_services import DefaultLLMService
@@ -201,9 +203,16 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             cached = cache.get(key)
             if cached is not None:
                 return cached
-        with urllib.request.urlopen(url) as f:
+        # timeout: avoid hanging indefinitely on unreachable hosts
+        with urllib.request.urlopen(url, timeout=DEFAULT_HTTP_TIMEOUT) as f:
             data = f.read()
-        text = data.decode(chardet.detect(data)["encoding"])
+        # chardet can return None or an unrecognised encoding; validate and fallback
+        encoding = chardet.detect(data).get("encoding")
+        try:
+            codecs.lookup(encoding)
+        except (LookupError, TypeError):
+            encoding = "utf-8"
+        text = data.decode(encoding, errors="replace")
         # memcached silently drops values over ~1MB, which would turn every request into
         # a cache miss without any error. Skip caching very large files instead.
         if len(text.encode("utf-8")) <= self.ATTACHMENT_CACHE_MAX_BYTES:
@@ -216,11 +225,22 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
     def _get_attachments(self, attachment_urls, refresh=False):
         """Download every URL in parallel and return ``[(filename, contents), ...]``."""
+        normalized = [url.strip() for url in (attachment_urls or []) if url and url.strip()]
+
+        if not normalized:
+            return []
+
+        # Wrap so Pool.map preserves batch parallelism but annotates failures
+        # with the URL that caused them.
+        def _try_download(url):
+            try:
+                return self._download_attachment(url, refresh=refresh)
+            except Exception as e:
+                raise Exception(f'Error downloading "{url}": {e}') from e
+
         with Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS) as pool:
-            contents = pool.map(
-                lambda u: self._download_attachment(u, refresh=refresh), attachment_urls
-            )
-            filenames = map(self._filename_for_url, attachment_urls)
+            contents = pool.map(_try_download, normalized)
+            filenames = map(self._filename_for_url, normalized)
             return list(zip(filenames, contents))
 
     def _render_attachments_xml(self, attachment_urls):
@@ -234,10 +254,8 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         blocks, hash_inputs = [], []
         for filename, contents in self._get_attachments(attachment_urls):
             blocks.append(
-                "<attachment><filename>{}</filename>"
-                "<contents>{}</contents></attachment>".format(
-                    saxutils.escape(filename), saxutils.escape(contents)
-                )
+                f"<attachment><filename>{saxutils.escape(filename)}</filename>"
+                f"<contents>{saxutils.escape(contents)}</contents></attachment>"
             )
             hash_inputs.append(f"{filename}|{contents}")
         return "\n".join(blocks), hash_inputs

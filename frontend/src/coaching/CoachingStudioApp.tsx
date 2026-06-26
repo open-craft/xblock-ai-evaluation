@@ -25,11 +25,10 @@ import {
   getScenarioListItems,
   getUrlListItems,
   sanitizeBlacklistValue,
+  coachingItemsToStrings,
   sanitizeUrlList,
-  updateBlacklistItems,
   updateScenarioDataValue,
   updateScenarioListItems,
-  updateUrlListItems,
 } from "./coachingStudioAdapters";
 import {
   COACHING_STUDIO_SECTIONS,
@@ -589,6 +588,53 @@ function SectionCard({
   );
 }
 
+// Shared helper so the three audience URL lists (workspace/coach/evaluator)
+// are wired identically — same add/change/remove behavior, only the field
+// name, description, and error key vary.
+function AttachmentUrlListField({
+  fieldName,
+  description,
+  items,
+  errors,
+  onChange,
+}: {
+  fieldName: string;
+  description: string;
+  items: CoachingListItem[];
+  errors?: string[];
+  onChange: (fieldName: string, nextValue: unknown) => void;
+}) {
+  return (
+    <SectionCard>
+      <ListField
+        fieldName={fieldName}
+        label="Attachment URLs"
+        description={description}
+        items={items}
+        errors={errors}
+        addLabel="+ Add URL"
+        placeholder="https://example.com/notes.txt"
+        onAdd={() => {
+          onChange(fieldName, coachingItemsToStrings(appendListItem(items)));
+        }}
+        onChangeItem={(index, nextValue) => {
+          const nextItems =
+            items.length > 0
+              ? updateListItemAtIndex(items, index, nextValue)
+              : [{ value: nextValue }];
+          onChange(fieldName, coachingItemsToStrings(nextItems));
+        }}
+        onRemoveItem={(index) => {
+          onChange(
+            fieldName,
+            coachingItemsToStrings(removeListItemAtIndex(items, index)),
+          );
+        }}
+      />
+    </SectionCard>
+  );
+}
+
 function SectionFieldErrors({ errors }: { errors?: string[] }) {
   const intl = useIntl();
 
@@ -981,33 +1027,13 @@ function EvaluationSection({
           }}
         />
       </SectionCard>
-      <SectionCard>
-        <ListField
-          fieldName="evaluator_attachment_urls"
-          label="Attachment URLs"
-          description="Plain-text files shared with the evaluator only."
-          items={evaluatorAttachments}
-          errors={validationErrors.evaluator_attachment_urls}
-          addLabel="+ Add URL"
-          placeholder="https://example.com/notes.txt"
-          onAdd={() => {
-            onChange("evaluator_attachment_urls", updateUrlListItems(appendListItem(evaluatorAttachments)));
-          }}
-          onChangeItem={(index, nextValue) => {
-            const nextItems =
-              evaluatorAttachments.length > 0
-                ? updateListItemAtIndex(evaluatorAttachments, index, nextValue)
-                : [{ value: nextValue }];
-            onChange("evaluator_attachment_urls", updateUrlListItems(nextItems));
-          }}
-          onRemoveItem={(index) => {
-            onChange(
-              "evaluator_attachment_urls",
-              updateUrlListItems(removeListItemAtIndex(evaluatorAttachments, index)),
-            );
-          }}
-        />
-      </SectionCard>
+      <AttachmentUrlListField
+        fieldName="evaluator_attachment_urls"
+        description="Plain-text files shared with the evaluator only."
+        items={evaluatorAttachments}
+        errors={validationErrors.evaluator_attachment_urls}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -1114,33 +1140,13 @@ function WorkspaceSection({
           }}
         />
       </SectionCard>
-      <SectionCard>
-        <ListField
-          fieldName="workspace_attachment_urls"
-          label="Attachment URLs"
-          description="Plain-text files shared with the main character, coach, and evaluator."
-          items={workspaceAttachments}
-          errors={validationErrors.workspace_attachment_urls}
-          addLabel="+ Add URL"
-          placeholder="https://example.com/notes.txt"
-          onAdd={() => {
-            onChange("workspace_attachment_urls", updateUrlListItems(appendListItem(workspaceAttachments)));
-          }}
-          onChangeItem={(index, nextValue) => {
-            const nextItems =
-              workspaceAttachments.length > 0
-                ? updateListItemAtIndex(workspaceAttachments, index, nextValue)
-                : [{ value: nextValue }];
-            onChange("workspace_attachment_urls", updateUrlListItems(nextItems));
-          }}
-          onRemoveItem={(index) => {
-            onChange(
-              "workspace_attachment_urls",
-              updateUrlListItems(removeListItemAtIndex(workspaceAttachments, index)),
-            );
-          }}
-        />
-      </SectionCard>
+      <AttachmentUrlListField
+        fieldName="workspace_attachment_urls"
+        description="Plain-text files shared with the main character, coach, and evaluator."
+        items={workspaceAttachments}
+        errors={validationErrors.workspace_attachment_urls}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -1247,33 +1253,13 @@ function CoachChatSection({
           }}
         />
       </SectionCard>
-      <SectionCard>
-        <ListField
-          fieldName="coach_attachment_urls"
-          label="Attachment URLs"
-          description="Plain-text files shared with the coach and evaluator (not the main character)."
-          items={coachAttachments}
-          errors={validationErrors.coach_attachment_urls}
-          addLabel="+ Add URL"
-          placeholder="https://example.com/notes.txt"
-          onAdd={() => {
-            onChange("coach_attachment_urls", updateUrlListItems(appendListItem(coachAttachments)));
-          }}
-          onChangeItem={(index, nextValue) => {
-            const nextItems =
-              coachAttachments.length > 0
-                ? updateListItemAtIndex(coachAttachments, index, nextValue)
-                : [{ value: nextValue }];
-            onChange("coach_attachment_urls", updateUrlListItems(nextItems));
-          }}
-          onRemoveItem={(index) => {
-            onChange(
-              "coach_attachment_urls",
-              updateUrlListItems(removeListItemAtIndex(coachAttachments, index)),
-            );
-          }}
-        />
-      </SectionCard>
+      <AttachmentUrlListField
+        fieldName="coach_attachment_urls"
+        description="Plain-text files shared with the coach and evaluator (not the main character)."
+        items={coachAttachments}
+        errors={validationErrors.coach_attachment_urls}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -1303,19 +1289,19 @@ function AdvancedSection({
           addLabel="+ Add blocked phrase"
           placeholder="Blocked word or phrase"
           onAdd={() => {
-            onChange("blacklist", updateBlacklistItems(appendListItem(blacklistItems)));
+            onChange("blacklist", coachingItemsToStrings(appendListItem(blacklistItems)));
           }}
           onChangeItem={(index, nextValue) => {
             const nextItems =
               blacklistItems.length > 0
                 ? updateListItemAtIndex(blacklistItems, index, nextValue)
                 : [{ value: nextValue }];
-            onChange("blacklist", updateBlacklistItems(nextItems));
+            onChange("blacklist", coachingItemsToStrings(nextItems));
           }}
           onRemoveItem={(index) => {
             onChange(
               "blacklist",
-              updateBlacklistItems(removeListItemAtIndex(blacklistItems, index)),
+              coachingItemsToStrings(removeListItemAtIndex(blacklistItems, index)),
             );
           }}
         />

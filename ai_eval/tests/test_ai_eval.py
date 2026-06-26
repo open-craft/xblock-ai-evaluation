@@ -1603,7 +1603,9 @@ def test_coach_studio_validation_flags_unreachable_attachment(coach_block_data):
         )
 
     assert response["success"] is False
-    assert response["validation_errors"]["coach_attachment_urls"] == ["Error downloading attachments"]
+    assert response["validation_errors"]["coach_attachment_urls"] == [
+        "download failed",
+    ]
     assert "workspace_attachment_urls" not in response["validation_errors"]
     assert "evaluator_attachment_urls" not in response["validation_errors"]
 

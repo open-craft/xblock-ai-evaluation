@@ -653,20 +653,20 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 str(e),
             )
 
-        # Validate each attachment list is reachable. refresh=True bypasses the cache so a
-        # now-broken URL surfaces as a field error; the fresh fetch warms the cache too.
+        # _get_attachments normalises entries, then batch-downloads per field so it
+        # keeps parallelism and reports the failing URL on errors.
         for field_name in (
             "workspace_attachment_urls",
             "coach_attachment_urls",
             "evaluator_attachment_urls",
         ):
             try:
-                self._get_attachments(getattr(data, field_name), refresh=True)
-            except Exception:  # pylint: disable=broad-exception-caught
+                self._get_attachments(getattr(data, field_name, []), refresh=True)
+            except Exception as exc:  # pylint: disable=broad-exception-caught
                 self._add_studio_validation_error(
                     validation_errors,
                     field_name,
-                    _("Error downloading attachments"),
+                    str(exc),
                 )
 
         return validation_errors, validation_warnings
