@@ -33,6 +33,18 @@ from .supported_models import SupportedModels, model_maps, resolve_model
 logger = logging.getLogger(__name__)
 
 
+class AttachmentDownloadError(Exception):
+    """Raised when an attachment URL cannot be downloaded.
+
+    Carries the offending ``url`` so callers can build a user-facing message
+    without parsing the exception text; the underlying cause is chained.
+    """
+
+    def __init__(self, url, cause):
+        self.url = url
+        super().__init__(f'Error downloading "{url}": {cause}')
+
+
 def _get_model_choices(block):
     """
     Return the dropdown entries for the `model` field.
@@ -236,7 +248,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
             try:
                 return self._download_attachment(url, refresh=refresh)
             except Exception as e:
-                raise Exception(f'Error downloading "{url}": {e}') from e
+                raise AttachmentDownloadError(url, e) from e
 
         with Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS) as pool:
             contents = pool.map(_try_download, normalized)

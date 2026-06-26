@@ -1582,12 +1582,14 @@ def test_coach_studio_validation_flags_unreachable_attachment(coach_block_data):
     """A bad URL in any attachment list surfaces a per-field Studio error."""
     block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
 
-    def _fail_for_coach(urls, refresh=False):  # pylint: disable=unused-argument
-        if "http://example.com/bad.txt" in urls:
+    # Mock the network call, not _get_attachments, so the real download/error
+    # wrapping path runs and we assert the actual author-facing message.
+    def _fail_for_bad_url(url, refresh=False):  # pylint: disable=unused-argument
+        if url == "http://example.com/bad.txt":
             raise Exception("download failed")
-        return []
+        return "contents"
 
-    block._get_attachments = Mock(side_effect=_fail_for_coach)
+    block._download_attachment = Mock(side_effect=_fail_for_bad_url)
     mock_service = Mock()
     mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
 
@@ -1604,7 +1606,7 @@ def test_coach_studio_validation_flags_unreachable_attachment(coach_block_data):
 
     assert response["success"] is False
     assert response["validation_errors"]["coach_attachment_urls"] == [
-        "download failed",
+        'Error downloading attachment "http://example.com/bad.txt"',
     ]
     assert "workspace_attachment_urls" not in response["validation_errors"]
     assert "evaluator_attachment_urls" not in response["validation_errors"]

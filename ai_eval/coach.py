@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import re
 import textwrap
 import typing
@@ -18,13 +19,15 @@ from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
 from webob import Response
 
-from .base import AIEvalXBlock
+from .base import AIEvalXBlock, AttachmentDownloadError
 from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
 from .utils import now, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
 
+
+logger = logging.getLogger(__name__)
 
 resource_loader = ResourceLoader(__name__)
 
@@ -662,11 +665,21 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         ):
             try:
                 self._get_attachments(getattr(data, field_name, []), refresh=True)
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except AttachmentDownloadError as exc:
+                # Log the chained cause for debugging, but show the author only a
+                # translatable message naming the failing URL (not the raw error).
+                logger.warning("Attachment download failed for %s: %s", field_name, exc)
                 self._add_studio_validation_error(
                     validation_errors,
                     field_name,
-                    str(exc),
+                    _('Error downloading attachment "{url}"').format(url=exc.url),
+                )
+            except Exception:  # pylint: disable=broad-exception-caught
+                logger.exception("Attachment validation failed for %s", field_name)
+                self._add_studio_validation_error(
+                    validation_errors,
+                    field_name,
+                    _("Error downloading attachments"),
                 )
 
         return validation_errors, validation_warnings
