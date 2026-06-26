@@ -93,9 +93,11 @@ export interface CoachingStudioState {
   character_2_name: string;
   character_2_prompt: string;
   character_2_role: string;
+  coach_attachment_urls: string[];
   coach_initial_message: string;
   coach_title: string;
   display_name: string;
+  evaluator_attachment_urls: string[];
   evaluator_prompt: string;
   initial_message: string;
   intro_text: string;
@@ -104,6 +106,7 @@ export interface CoachingStudioState {
   model_api_key: string;
   model_api_url: string;
   scenario_data: ScenarioData;
+  workspace_attachment_urls: string[];
   workspace_title: string;
   pdf_download_allowed: boolean;
   pdf_download_title: string;

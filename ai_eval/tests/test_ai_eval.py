@@ -3,6 +3,7 @@ Testing module.
 """
 # pylint: disable=redefined-outer-name,protected-access
 
+import hashlib
 import io
 import json
 import urllib.request
@@ -11,6 +12,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 import time_machine
+from django.core.cache import cache
 from xblock.exceptions import JsonHandlerError
 from xblock.field_data import DictFieldData
 from xblock.test.toy_runtime import ToyRuntime as _ToyRuntime
@@ -968,6 +970,9 @@ def test_coach_studio_submit_rejects_incomplete_payload(coach_block_data):
         "pdf_download_allowed": ["Missing field in Studio payload."],
         "pdf_download_description": ["Missing field in Studio payload."],
         "pdf_download_title": ["Missing field in Studio payload."],
+        "workspace_attachment_urls": ["Missing field in Studio payload."],
+        "coach_attachment_urls": ["Missing field in Studio payload."],
+        "evaluator_attachment_urls": ["Missing field in Studio payload."],
     }
 
 
@@ -1420,10 +1425,191 @@ def test_shortanswer_attachments(shortanswer_block_data):
 
 def test_shortanswer_attachments_encoding(shortanswer_block_data):
     """Test attachments for ShortAnswerAIEvalXBlock."""
+    cache.clear()
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     urllib.request.urlopen = Mock(return_value=io.BytesIO("á".encode('latin-1')))
     contents = block._download_attachment("http://example.com/1.txt")
     assert contents == "á"
+
+
+def _mock_urlopen_bytes(payload: bytes):
+    """Return a urlopen mock whose context manager reads back ``payload``."""
+    mock_open = Mock()
+    mock_open.return_value.__enter__ = Mock(return_value=Mock(read=Mock(return_value=payload)))
+    mock_open.return_value.__exit__ = Mock(return_value=False)
+    return mock_open
+
+
+def test_download_attachment_caches_across_calls(shortanswer_block_data):
+    """A second read of the same URL is served from cache without re-downloading."""
+    cache.clear()
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    url = "http://example.com/cached.txt"
+
+    with patch("ai_eval.base.urllib.request.urlopen", _mock_urlopen_bytes(b"hello world")) as mock_open:
+        first = block._get_attachments([url])
+        second = block._get_attachments([url])
+
+    assert first == second == [("cached.txt", "hello world")]
+    assert mock_open.call_count == 1
+
+
+def test_download_attachment_refresh_bypasses_cache(shortanswer_block_data):
+    """refresh=True forces a fresh download and repopulates the cache entry."""
+    cache.clear()
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    url = "http://example.com/refresh.txt"
+
+    with patch("ai_eval.base.urllib.request.urlopen", _mock_urlopen_bytes(b"hello world")) as mock_open:
+        block._download_attachment(url)            # miss -> download
+        block._download_attachment(url)            # hit  -> no download
+        block._download_attachment(url, refresh=True)  # bypass -> download again
+
+    assert mock_open.call_count == 2
+
+
+def test_download_attachment_skips_caching_oversized_values(shortanswer_block_data):
+    """Values over ATTACHMENT_CACHE_MAX_BYTES are fetched every time, never cached."""
+    cache.clear()
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block.ATTACHMENT_CACHE_MAX_BYTES = 5  # "hello world" is larger than this
+    url = "http://example.com/big.txt"
+
+    with patch("ai_eval.base.urllib.request.urlopen", _mock_urlopen_bytes(b"hello world")) as mock_open:
+        block._download_attachment(url)
+        block._download_attachment(url)
+
+    assert mock_open.call_count == 2
+    assert cache.get(
+        "ai_eval:attachment:" + hashlib.sha256(url.encode("utf-8")).hexdigest()
+    ) is None
+
+
+def _coach_block_with_attachments(coach_block_data, **overrides):
+    """Build a Coaching block whose attachment downloads echo a per-URL token."""
+    data = {
+        **coach_block_data,
+        "workspace_attachment_urls": ["http://example.com/workspace.txt"],
+        "coach_attachment_urls": ["http://example.com/coach.txt"],
+        "evaluator_attachment_urls": ["http://example.com/eval.txt"],
+        **overrides,
+    }
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    block._download_attachment = Mock(side_effect=lambda url, refresh=False: f"BODY[{url}]")
+    return block
+
+
+def test_coach_attachments_for_cascade(coach_block_data):
+    """Visibility cascades upward: workspace ⊆ coach ⊆ evaluator."""
+    block = _coach_block_with_attachments(coach_block_data)
+
+    assert block._attachments_for("workspace") == ["http://example.com/workspace.txt"]
+    assert block._attachments_for("coach") == [
+        "http://example.com/workspace.txt",
+        "http://example.com/coach.txt",
+    ]
+    assert block._attachments_for("evaluator") == [
+        "http://example.com/workspace.txt",
+        "http://example.com/coach.txt",
+        "http://example.com/eval.txt",
+    ]
+
+
+def _system_prompt(messages):
+    """Return the system message content from an LLM message iterable."""
+    return next(message for message in messages if message["role"] == "system")["content"]
+
+
+def test_coach_attachments_injected_per_audience(coach_block_data):
+    """Each agent's prompt sees exactly the attachments its audience is allowed."""
+    block = _coach_block_with_attachments(coach_block_data)
+
+    workspace_prompt = _system_prompt(block._messages_for_character(0, "hi"))
+    assert "<filename>workspace.txt</filename>" in workspace_prompt
+    assert "coach.txt" not in workspace_prompt
+    assert "eval.txt" not in workspace_prompt
+
+    coach_prompt = _system_prompt(block._messages_for_character(1, "hi"))
+    assert "<filename>workspace.txt</filename>" in coach_prompt
+    assert "<filename>coach.txt</filename>" in coach_prompt
+    assert "eval.txt" not in coach_prompt
+
+
+@patch("ai_eval.coach.get_llm_service", return_value=Mock())
+@patch.object(CoachAIEvalXBlock, "_render_final_report", return_value="<article>report</article>")
+def test_coach_evaluator_prompt_sees_all_attachments(
+    _mock_render_report,
+    _mock_get_llm_service,
+    coach_block_data,
+):
+    """The evaluator prompt sees workspace, coach, and evaluator attachments."""
+    session = _empty_coach_session()
+    session["workspace_history"] = [{
+        "character_index": 0,
+        "user_message": "final answer",
+        "character_message": "reply",
+    }]
+    block = _coach_block_with_attachments(coach_block_data, sessions=[session])
+
+    captured = {}
+
+    def _capture(messages, tag=None):  # pylint: disable=unused-argument
+        captured["prompt"] = _system_prompt(messages)
+        return "# Evaluation Report"
+
+    block.get_llm_response = Mock(side_effect=_capture)
+    block.get_evaluator_response.__wrapped__(block, data={})
+
+    prompt = captured["prompt"]
+    assert "<filename>workspace.txt</filename>" in prompt
+    assert "<filename>coach.txt</filename>" in prompt
+    assert "<filename>eval.txt</filename>" in prompt
+
+
+def test_coach_thread_tag_changes_with_attachment_urls(coach_block_data):
+    """Changing an attachment URL invalidates the cached provider thread tag."""
+    with patch("ai_eval.coach.get_llm_service", return_value=Mock()):
+        base_block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(dict(coach_block_data)), None)
+        tagged_block = CoachAIEvalXBlock(
+            ToyRuntime(),
+            DictFieldData({**coach_block_data, "workspace_attachment_urls": ["http://example.com/new.txt"]}),
+            None,
+        )
+        assert base_block._get_thread_tag("character0") != tagged_block._get_thread_tag("character0")
+
+
+def test_coach_studio_validation_flags_unreachable_attachment(coach_block_data):
+    """A bad URL in any attachment list surfaces a per-field Studio error."""
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+
+    # Mock the network call, not _get_attachments, so the real download/error
+    # wrapping path runs and we assert the actual author-facing message.
+    def _fail_for_bad_url(url, refresh=False):  # pylint: disable=unused-argument
+        if url == "http://example.com/bad.txt":
+            raise Exception("download failed")
+        return "contents"
+
+    block._download_attachment = Mock(side_effect=_fail_for_bad_url)
+    mock_service = Mock()
+    mock_service.get_available_models.return_value = [SupportedModels.GPT4O.value]
+
+    with patch("ai_eval.base.get_llm_service", return_value=mock_service), \
+         patch("ai_eval.coach.get_llm_service", return_value=mock_service), \
+         patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        response = block.studio_submit.__wrapped__(
+            block,
+            {
+                field_name: getattr(block, field_name)
+                for field_name in block.editable_fields
+            } | {"coach_attachment_urls": ["http://example.com/bad.txt"]},
+        )
+
+    assert response["success"] is False
+    assert response["validation_errors"]["coach_attachment_urls"] == [
+        'Error downloading attachment "http://example.com/bad.txt"',
+    ]
+    assert "workspace_attachment_urls" not in response["validation_errors"]
+    assert "evaluator_attachment_urls" not in response["validation_errors"]
 
 
 def test_custom_llm_models_dict_response_parsed():

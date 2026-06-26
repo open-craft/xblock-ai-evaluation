@@ -3,12 +3,6 @@
 import logging
 import hashlib
 import json
-import urllib.parse
-import urllib.request
-from multiprocessing.dummy import Pool
-from xml.sax import saxutils
-
-import chardet
 
 from django.utils.translation import gettext_noop as _
 from web_fragments.fragment import Fragment
@@ -37,8 +31,6 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     """
 
     has_author_view = True
-
-    ATTACHMENT_PARALLEL_DOWNLOADS = 5
 
     display_name = String(
         display_name=_("Display Name"),
@@ -191,7 +183,9 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             )
 
         try:
-            self._get_attachments(data.attachment_urls)
+            # refresh=True bypasses the cache so validation proves the URLs are
+            # actually reachable; the fresh fetch also warms the cache for learners.
+            self._get_attachments(data.attachment_urls, refresh=True)
         except Exception:  # pylint: disable=broad-exception-caught
             self._add_studio_validation_error(
                 validation_errors,
@@ -335,40 +329,15 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             meta=self._studio_payload_meta(),
         )
 
-    def _download_attachment(self, url):
-        with urllib.request.urlopen(url) as f:
-            data = f.read()
-            encoding = chardet.detect(data)['encoding']
-            return data.decode(encoding)
-
-    def _filename_for_url(self, url):
-        return urllib.parse.urlparse(url).path.split('/')[-1]
-
-    def _get_attachments(self, attachment_urls):
-        with Pool(self.ATTACHMENT_PARALLEL_DOWNLOADS) as pool:
-            attachments = pool.map(self._download_attachment, attachment_urls)
-            filenames = map(self._filename_for_url, attachment_urls)
-            return list(zip(filenames, attachments))
-
     @XBlock.json_handler
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
         user_submission_time = now().isoformat()
 
-        attachments = []
-        attachment_hash_inputs = []
-        for filename, contents in self._get_attachments(self.attachment_urls):
-            # Build system prompt attachment section (HTML-like) as before
-            attachments.append(f"""
-                <attachment>
-                    <filename>{saxutils.escape(filename)}</filename>
-                    <contents>{saxutils.escape(contents)}</contents>
-                </attachment>
-            """)
-            # For tagging, hash filename + contents
-            attachment_hash_inputs.append(f"{filename}|{contents}")
-        attachments = '\n'.join(attachments)
+        # Download attachments once: the rendered XML feeds the system prompt and the
+        # per-file hash inputs feed the reuse tag below.
+        attachments, attachment_hash_inputs = self._render_attachments_xml(self.attachment_urls)
 
         # Compute a tag to identify compatible reuse across provider/model/prompt
         # Include evaluation prompt, question, and attachment content hashes

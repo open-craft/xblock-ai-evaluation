@@ -37,7 +37,7 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
     id: "evaluation",
     title: "Evaluation",
     description: "",
-    fieldNames: ["scenario_evaluation_criteria", "evaluator_prompt"],
+    fieldNames: ["scenario_evaluation_criteria", "evaluator_prompt", "evaluator_attachment_urls"],
   },
   {
     id: "workspace",
@@ -50,6 +50,7 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
       "initial_message",
       "character_1_prompt",
       "character_1_avatar",
+      "workspace_attachment_urls",
     ],
   },
   {
@@ -63,6 +64,7 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
       "coach_initial_message",
       "character_2_prompt",
       "character_2_avatar",
+      "coach_attachment_urls",
     ],
   },
   {

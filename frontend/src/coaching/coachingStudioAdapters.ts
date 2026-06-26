@@ -158,7 +158,8 @@ export function getBlacklistItems(blacklist: string[] | undefined): CoachingList
   });
 }
 
-export function updateBlacklistItems(nextItems: CoachingListItem[]): string[] {
+/** Map CoachingListItem[] back to plain strings, preserving raw values for invalid entries. */
+export function coachingItemsToStrings(nextItems: CoachingListItem[]): string[] {
   return nextItems.map((item) => {
     return (item.preserveRawValue ? item.rawValue : item.value) as string;
   });
@@ -172,4 +173,29 @@ export function sanitizeBlacklistValue(blacklist: string[] | undefined): string[
   return (blacklist as unknown[]).filter((value): value is string => {
     return typeof value === "string" && value.trim() !== "";
   });
+}
+
+export function getUrlListItems(values: string[] | undefined): CoachingListItem[] {
+  if (!values) {
+    return [];
+  }
+
+  return (values as unknown[]).map((value) => {
+    if (typeof value === "string") {
+      return createValidListItem(value);
+    }
+
+    return createInvalidListItem(value, "Saved attachment URL must be text.");
+  });
+}
+
+/** Trim whitespace from each URL and drop empty strings. */
+export function sanitizeUrlList(values: string[] | undefined): string[] {
+  if (!values) {
+    return [];
+  }
+
+  return values
+    .filter((value): value is string => typeof value === "string" && value.trim() !== "")
+    .map((value) => value.trim());
 }

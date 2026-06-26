@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import re
 import textwrap
 import typing
@@ -18,13 +19,15 @@ from xblock.utils.studio_editable import FutureFields
 from web_fragments.fragment import Fragment
 from webob import Response
 
-from .base import AIEvalXBlock
+from .base import AIEvalXBlock, AttachmentDownloadError
 from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
 from .utils import now, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
 
+
+logger = logging.getLogger(__name__)
 
 resource_loader = ResourceLoader(__name__)
 
@@ -331,6 +334,27 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         default=["AI assistant"],
     )
 
+    workspace_attachment_urls = List(
+        display_name=_("Workspace attachment URLs"),
+        help=_("Plain-text files made available to the main character, coach, and evaluator."),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
+    coach_attachment_urls = List(
+        display_name=_("Coach attachment URLs"),
+        help=_("Plain-text files made available to the coach and the evaluator (not the main character)."),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
+    evaluator_attachment_urls = List(
+        display_name=_("Evaluation attachment URLs"),
+        help=_("Plain-text files made available to the evaluator only."),
+        scope=Scope.settings,
+        resettable_editor=False,
+    )
+
     finished = Boolean(
         scope=Scope.user_state,
         default=False,
@@ -406,6 +430,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "blacklist",
         "max_attempts",
         "allow_reset",
+        "workspace_attachment_urls",
+        "coach_attachment_urls",
+        "evaluator_attachment_urls",
     )
 
     def studio_view(self, context=None):
@@ -629,6 +656,32 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 str(e),
             )
 
+        # _get_attachments normalises entries, then batch-downloads per field so it
+        # keeps parallelism and reports the failing URL on errors.
+        for field_name in (
+            "workspace_attachment_urls",
+            "coach_attachment_urls",
+            "evaluator_attachment_urls",
+        ):
+            try:
+                self._get_attachments(getattr(data, field_name, []), refresh=True)
+            except AttachmentDownloadError as exc:
+                # Log the chained cause for debugging, but show the author only a
+                # translatable message naming the failing URL (not the raw error).
+                logger.warning("Attachment download failed for %s: %s", field_name, exc)
+                self._add_studio_validation_error(
+                    validation_errors,
+                    field_name,
+                    _('Error downloading attachment "{url}"').format(url=exc.url),
+                )
+            except Exception:  # pylint: disable=broad-exception-caught
+                logger.exception("Attachment validation failed for %s", field_name)
+                self._add_studio_validation_error(
+                    validation_errors,
+                    field_name,
+                    _("Error downloading attachments"),
+                )
+
         return validation_errors, validation_warnings
 
     def validate_field_data(self, validation, data):
@@ -845,6 +898,22 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             "finished": session["finished"],
         }
 
+    def _attachments_for(self, audience):
+        """
+        Return the attachment URLs visible to an audience, cascading most- to least-shared.
+
+        ``audience`` is ``'workspace'`` (main character, ``character_index == 0``),
+        ``'coach'`` (``character_index == 1``), or ``'evaluator'``. Visibility cascades
+        upward: workspace files are seen by everyone, coach files add the coach and
+        evaluator, and evaluator files are seen by the evaluator only.
+        """
+        urls = list(self.workspace_attachment_urls)
+        if audience in ("coach", "evaluator"):
+            urls += list(self.coach_attachment_urls)
+        if audience == "evaluator":
+            urls += list(self.evaluator_attachment_urls)
+        return urls
+
     def _messages_for_character(self, character_index, user_input=None):
         """
         Build LLM message payload for the requested character.
@@ -880,6 +949,11 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             scenario_data=self.scenario_data,
             character_data=self._get_character_data(character_index),
         )
+
+        audience = "workspace" if character_index == 0 else "coach"
+        attachments_xml, _hash_inputs = self._render_attachments_xml(self._attachments_for(audience))
+        if attachments_xml:
+            prompt += "\n\n" + attachments_xml
         blacklist_instruction = self._build_blacklist_instruction()
         if blacklist_instruction:
             prompt += "\n\n" + blacklist_instruction
@@ -934,6 +1008,15 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         _update_hash(self.character_2_prompt)
         _update_hash(self.evaluator_prompt)
         _update_hash(json.dumps(self._get_blacklist_terms(), ensure_ascii=True))
+        # Hash the attachment URLs (not their downloaded contents) so add/remove/reorder
+        # invalidates the cached provider thread without forcing an extra download here.
+        # Caveat: changing the file content at a stable URL won't invalidate the thread.
+        for url in (
+            list(self.workspace_attachment_urls)
+            + list(self.coach_attachment_urls)
+            + list(self.evaluator_attachment_urls)
+        ):
+            _update_hash(url)
 
         prompt_hash = prompt_hasher.hexdigest()
         context = context or "workspace"
@@ -1233,6 +1316,9 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             self.evaluator_prompt,
             scenario_data=scenario_data,
         )
+        attachments_xml, _hash_inputs = self._render_attachments_xml(self._attachments_for("evaluator"))
+        if attachments_xml:
+            prompt += "\n\n" + attachments_xml
         blacklist_instruction = self._build_blacklist_instruction()
         if blacklist_instruction:
             prompt += "\n\n" + blacklist_instruction

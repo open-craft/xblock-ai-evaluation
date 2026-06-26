@@ -23,8 +23,10 @@ import {
   getBlacklistItems,
   getScenarioEditorModel,
   getScenarioListItems,
+  getUrlListItems,
   sanitizeBlacklistValue,
-  updateBlacklistItems,
+  coachingItemsToStrings,
+  sanitizeUrlList,
   updateScenarioDataValue,
   updateScenarioListItems,
 } from "./coachingStudioAdapters";
@@ -60,9 +62,15 @@ const coachingSchema = Yup.object({
   character_2_name: Yup.string().ensure(),
   character_2_prompt: Yup.string().ensure(),
   character_2_role: Yup.string().ensure(),
+  coach_attachment_urls: Yup.mixed()
+    .transform((value: unknown) => (Array.isArray(value) ? value : []))
+    .default(() => []),
   coach_initial_message: Yup.string().ensure(),
   coach_title: Yup.string().ensure(),
   display_name: Yup.string().ensure(),
+  evaluator_attachment_urls: Yup.mixed()
+    .transform((value: unknown) => (Array.isArray(value) ? value : []))
+    .default(() => []),
   evaluator_prompt: Yup.string().ensure(),
   initial_message: Yup.string().ensure(),
   intro_text: Yup.string().ensure(),
@@ -91,6 +99,9 @@ const coachingSchema = Yup.object({
       }
       return true;
     }),
+  workspace_attachment_urls: Yup.mixed()
+    .transform((value: unknown) => (Array.isArray(value) ? value : []))
+    .default(() => []),
   workspace_title: Yup.string().ensure(),
   pdf_download_allowed: Yup.boolean(),
   pdf_download_title: Yup.string().ensure(),
@@ -124,6 +135,9 @@ function buildFrontendValidationErrors(values: CoachingStudioState): CoachingStu
   const learningObjectives = getScenarioListItems(values.scenario_data, "learning_objectives");
   const evaluationCriteria = getScenarioListItems(values.scenario_data, "evaluation_criteria");
   const blacklistItems = getBlacklistItems(values.blacklist);
+  const workspaceAttachments = getUrlListItems(values.workspace_attachment_urls);
+  const coachAttachments = getUrlListItems(values.coach_attachment_urls);
+  const evaluatorAttachments = getUrlListItems(values.evaluator_attachment_urls);
 
   if (hasInvalidRows(learningObjectives)) {
     validationErrors.scenario_learning_objectives = [
@@ -143,6 +157,24 @@ function buildFrontendValidationErrors(values: CoachingStudioState): CoachingStu
     ];
   }
 
+  if (hasInvalidRows(workspaceAttachments)) {
+    validationErrors.workspace_attachment_urls = [
+      "Resolve the invalid attachment URL rows below.",
+    ];
+  }
+
+  if (hasInvalidRows(coachAttachments)) {
+    validationErrors.coach_attachment_urls = [
+      "Resolve the invalid attachment URL rows below.",
+    ];
+  }
+
+  if (hasInvalidRows(evaluatorAttachments)) {
+    validationErrors.evaluator_attachment_urls = [
+      "Resolve the invalid attachment URL rows below.",
+    ];
+  }
+
   return validationErrors;
 }
 
@@ -158,9 +190,11 @@ function buildSubmitPayload(values: CoachingStudioState) {
     character_2_name: values.character_2_name || "",
     character_2_prompt: values.character_2_prompt || "",
     character_2_role: values.character_2_role || "",
+    coach_attachment_urls: sanitizeUrlList(values.coach_attachment_urls),
     coach_initial_message: values.coach_initial_message || "",
     coach_title: values.coach_title || "",
     display_name: values.display_name || "",
+    evaluator_attachment_urls: sanitizeUrlList(values.evaluator_attachment_urls),
     evaluator_prompt: values.evaluator_prompt || "",
     initial_message: values.initial_message || "",
     intro_text: values.intro_text || "",
@@ -169,6 +203,7 @@ function buildSubmitPayload(values: CoachingStudioState) {
     model_api_key: values.model_api_key || "",
     model_api_url: values.model_api_url || "",
     scenario_data: values.scenario_data || {},
+    workspace_attachment_urls: sanitizeUrlList(values.workspace_attachment_urls),
     workspace_title: values.workspace_title || "",
     pdf_download_allowed: values.pdf_download_allowed,
     pdf_download_title: values.pdf_download_title,
@@ -476,8 +511,6 @@ function ListField({
   placeholder?: string;
   showLabel?: boolean;
 }) {
-  const displayItems = items.length > 0 ? items : [{ value: "" }];
-
   return (
     <Form.Group className="coaching-studio-field" isInvalid={Boolean(errors?.length)}>
       <div className="coaching-studio-field-header">
@@ -491,9 +524,7 @@ function ListField({
       <div className="coaching-studio-field-control">
         <div className="coaching-studio-list-field">
           <div className="coaching-studio-list-rows">
-            {displayItems.map((item, index) => {
-              const canRemove = items.length > 0;
-
+            {items.map((item, index) => {
               return (
                 <div className="coaching-studio-list-row-group" key={fieldName + "-" + String(index)}>
                   <div className="coaching-studio-list-row">
@@ -505,18 +536,16 @@ function ListField({
                         onChangeItem(index, event.target.value);
                       }}
                     />
-                    {canRemove ? (
-                      <Button
-                        className="coaching-studio-list-remove"
-                        variant="link"
-                        aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
-                        onClick={() => {
-                          onRemoveItem(index);
-                        }}
-                      >
-                        <span aria-hidden="true">×</span>
-                      </Button>
-                    ) : null}
+                    <Button
+                      className="coaching-studio-list-remove"
+                      variant="link"
+                      aria-label={`Remove ${label.toLowerCase()} ${String(index + 1)}`}
+                      onClick={() => {
+                        onRemoveItem(index);
+                      }}
+                    >
+                      <span aria-hidden="true">×</span>
+                    </Button>
                   </div>
                   <FieldErrors errors={item.error ? [item.error] : undefined} />
                 </div>
@@ -556,6 +585,53 @@ function SectionCard({
       ) : null}
       <div className="coaching-studio-card-body">{children}</div>
     </section>
+  );
+}
+
+// Shared helper so the three audience URL lists (workspace/coach/evaluator)
+// are wired identically — same add/change/remove behavior, only the field
+// name, description, and error key vary.
+function AttachmentUrlListField({
+  fieldName,
+  description,
+  items,
+  errors,
+  onChange,
+}: {
+  fieldName: string;
+  description: string;
+  items: CoachingListItem[];
+  errors?: string[];
+  onChange: (fieldName: string, nextValue: unknown) => void;
+}) {
+  return (
+    <SectionCard>
+      <ListField
+        fieldName={fieldName}
+        label="Attachment URLs"
+        description={description}
+        items={items}
+        errors={errors}
+        addLabel="+ Add URL"
+        placeholder="https://example.com/notes.txt"
+        onAdd={() => {
+          onChange(fieldName, coachingItemsToStrings(appendListItem(items)));
+        }}
+        onChangeItem={(index, nextValue) => {
+          const nextItems =
+            items.length > 0
+              ? updateListItemAtIndex(items, index, nextValue)
+              : [{ value: nextValue }];
+          onChange(fieldName, coachingItemsToStrings(nextItems));
+        }}
+        onRemoveItem={(index) => {
+          onChange(
+            fieldName,
+            coachingItemsToStrings(removeListItemAtIndex(items, index)),
+          );
+        }}
+      />
+    </SectionCard>
   );
 }
 
@@ -887,6 +963,7 @@ function EvaluationSection({
   values: CoachingStudioState;
 }) {
   const evaluationCriteria = getScenarioListItems(values.scenario_data, "evaluation_criteria");
+  const evaluatorAttachments = getUrlListItems(values.evaluator_attachment_urls);
 
   return (
     <div className="coaching-studio-section-stack">
@@ -950,6 +1027,13 @@ function EvaluationSection({
           }}
         />
       </SectionCard>
+      <AttachmentUrlListField
+        fieldName="evaluator_attachment_urls"
+        description="Plain-text files shared with the evaluator only."
+        items={evaluatorAttachments}
+        errors={validationErrors.evaluator_attachment_urls}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -965,6 +1049,8 @@ function WorkspaceSection({
   validationErrors: CoachingStudioValidationErrors;
   values: CoachingStudioState;
 }) {
+  const workspaceAttachments = getUrlListItems(values.workspace_attachment_urls);
+
   return (
     <div className="coaching-studio-section-stack">
       <SectionCard>
@@ -1054,6 +1140,13 @@ function WorkspaceSection({
           }}
         />
       </SectionCard>
+      <AttachmentUrlListField
+        fieldName="workspace_attachment_urls"
+        description="Plain-text files shared with the main character, coach, and evaluator."
+        items={workspaceAttachments}
+        errors={validationErrors.workspace_attachment_urls}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -1069,6 +1162,8 @@ function CoachChatSection({
   validationErrors: CoachingStudioValidationErrors;
   values: CoachingStudioState;
 }) {
+  const coachAttachments = getUrlListItems(values.coach_attachment_urls);
+
   return (
     <div className="coaching-studio-section-stack">
       <SectionCard>
@@ -1158,6 +1253,13 @@ function CoachChatSection({
           }}
         />
       </SectionCard>
+      <AttachmentUrlListField
+        fieldName="coach_attachment_urls"
+        description="Plain-text files shared with the coach and evaluator (not the main character)."
+        items={coachAttachments}
+        errors={validationErrors.coach_attachment_urls}
+        onChange={onChange}
+      />
     </div>
   );
 }
@@ -1187,19 +1289,19 @@ function AdvancedSection({
           addLabel="+ Add blocked phrase"
           placeholder="Blocked word or phrase"
           onAdd={() => {
-            onChange("blacklist", updateBlacklistItems(appendListItem(blacklistItems)));
+            onChange("blacklist", coachingItemsToStrings(appendListItem(blacklistItems)));
           }}
           onChangeItem={(index, nextValue) => {
             const nextItems =
               blacklistItems.length > 0
                 ? updateListItemAtIndex(blacklistItems, index, nextValue)
                 : [{ value: nextValue }];
-            onChange("blacklist", updateBlacklistItems(nextItems));
+            onChange("blacklist", coachingItemsToStrings(nextItems));
           }}
           onRemoveItem={(index) => {
             onChange(
               "blacklist",
-              updateBlacklistItems(removeListItemAtIndex(blacklistItems, index)),
+              coachingItemsToStrings(removeListItemAtIndex(blacklistItems, index)),
             );
           }}
         />
