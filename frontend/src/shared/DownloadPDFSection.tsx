@@ -9,11 +9,11 @@ interface DownloadPDFSectionProps {
 }
 
 export const DownloadPDFSection = ({pdfUrl, title, description}: DownloadPDFSectionProps) => (
-    <Row className='pdf-download-section p-3'>
+    <Row className='p-4.5 mx-0 rounded mt-4.5 border border-gray-400 bg-gray-200'>
         <Col>
-            <h3>{title}</h3>
+            <h5>{title}</h5>
             {description && <p>{description}</p>}
-            <Button target='_blank' href={pdfUrl}><Icon src={Download} /> Download</Button>
+            <Button variant="secondary" size="sm" target='_blank' href={pdfUrl}><Icon src={Download} className='mr-2' /> Download</Button>
         </Col>
     </Row>
 );
