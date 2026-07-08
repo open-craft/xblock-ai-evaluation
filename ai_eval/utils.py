@@ -2,6 +2,7 @@
 Utilities
 """
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, UTC
 
@@ -41,6 +42,16 @@ def markdown_to_safe_html(markdown_content: str) -> str:
     # Disable links and images, to avoid privacy or security issues
     # (eg. malicious links, large images causing a DOS attack).
     return nh3.clean(html_content, tags=nh3.ALLOWED_TAGS - {"a", "img"})
+
+
+def strip_html_tags(text: str) -> str:
+    """
+    Replace HTML/XML tags in ``text`` with spaces, for search indexing.
+
+    Markdown-edited fields (question, intro/initial messages) may embed inline
+    HTML; the search index should only contain the plain text.
+    """
+    return re.sub(r"<[^>]+>", " ", text or "")
 
 
 # Default timeout (in seconds) for outbound HTTP requests.

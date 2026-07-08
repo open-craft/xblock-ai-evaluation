@@ -24,7 +24,7 @@ from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
-from .utils import now, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
+from .utils import now, strip_html_tags, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
 
 
 logger = logging.getLogger(__name__)
@@ -1036,6 +1036,34 @@ class CoachAIEvalXBlock(AIEvalXBlock):
             for key, value in self.thread_map.items()
             if not key.endswith(suffixes)
         }
+
+    def index_dictionary(self):
+        """
+        Return the block content to be indexed for search.
+
+        Only learner-visible authored content is indexed: titles, intro text,
+        initial messages, and character names/roles.
+        """
+        xblock_body = super().index_dictionary()
+        index_body = {
+            "display_name": self.display_name,
+            # Markdown fields that may embed inline HTML; index plain text only.
+            "intro_text": strip_html_tags(self.intro_text),
+            "initial_message": strip_html_tags(self.initial_message),
+            "coach_initial_message": strip_html_tags(self.coach_initial_message),
+            "workspace_title": self.workspace_title or "",
+            "coach_title": self.coach_title or "",
+            "character_1_name": self.character_1_name or "",
+            "character_1_role": self.character_1_role or "",
+            "character_2_name": self.character_2_name or "",
+            "character_2_role": self.character_2_role or "",
+        }
+        if "content" in xblock_body:
+            xblock_body["content"].update(index_body)
+        else:
+            xblock_body["content"] = index_body
+        xblock_body["content_type"] = "AI Coach"
+        return xblock_body
 
     def student_view(self, context=None):
         """

@@ -23,6 +23,7 @@ from .utils import (
     SUPPORTED_LANGUAGE_MAP,
     LanguageLabels,
     now,
+    strip_html_tags,
 )
 from .backends.factory import BackendFactory
 from .pdf_generator import CodingData, CodingCode
@@ -121,6 +122,27 @@ class CodingAIEvalXBlock(AIEvalXBlock):
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
         return files("ai_eval").joinpath(path).read_text(encoding="utf8")
+
+    def index_dictionary(self):
+        """
+        Return the block content to be indexed for search.
+
+        Only learner-visible authored content is indexed: the display name,
+        the question, and the selected programming ``language`` value.
+        """
+        xblock_body = super().index_dictionary()
+        index_body = {
+            "display_name": self.display_name,
+            # Markdown field that may embed inline HTML; index plain text only.
+            "question": strip_html_tags(self.question),
+            "language": self.language or "",
+        }
+        if "content" in xblock_body:
+            xblock_body["content"].update(index_body)
+        else:
+            xblock_body["content"] = index_body
+        xblock_body["content_type"] = "AI Coding Evaluation"
+        return xblock_body
 
     def student_view(self, context=None):
         """

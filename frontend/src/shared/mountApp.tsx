@@ -25,26 +25,33 @@ interface ThemeUrls {
   };
 }
 
-const getThemes = async (mfe_config_api_url: string) => {
+const DEFAULT_CORE_CSS_URL = "https://cdn.jsdelivr.net/npm/@openedx/paragon@23/dist/core.min.css";
+const DEFAULT_THEME_CSS_URL = "https://cdn.jsdelivr.net/npm/@openedx/paragon@23/dist/light.min.css";
+
+// The MFE config endpoint only exists on the LMS. In Studio the page is served
+// from the CMS origin, so this cross-origin fetch is typically blocked by CORS.
+// Keep the timeout short and treat any failure as "use the default theme".
+const THEME_FETCH_TIMEOUT_MS = 3000;
+
+const getBrandOverrideUrls = async (mfe_config_api_url: string): Promise<string[]> => {
   let themeUrls: ThemeUrls | Record<string, never> = {};
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), THEME_FETCH_TIMEOUT_MS);
   try {
-    const response = await fetch(mfe_config_api_url);
+    const response = await fetch(mfe_config_api_url, { signal: controller.signal });
     const mfeConfig = await response.json();
     themeUrls = mfeConfig.PARAGON_THEME_URLS;
   } catch (error) {
-    console.error("Failed to fetch theme URLs:", error);
+    console.warn("Failed to fetch theme URLs; using the default Paragon theme:", error);
+    return [];
+  } finally {
+    window.clearTimeout(timeoutId);
   }
   const variant = themeUrls?.["default"]?.["light"];
-  const theme: string[] = [
-    "https://cdn.jsdelivr.net/npm/@openedx/paragon@23/dist/light.min.css",
+  return [
+    themeUrls?.["core"]?.["urls"]?.["brandOverride"],
     themeUrls?.["variants"]?.[variant]?.["urls"]?.["brandOverride"],
   ].filter(Boolean);
-  const core = [
-    "https://cdn.jsdelivr.net/npm/@openedx/paragon@23/dist/core.min.css",
-    themeUrls?.["core"]?.["urls"]?.["brandOverride"],
-  ].filter(Boolean);
-
-  return { core, theme };
 };
 
 function toDomElement(element: XBlockElementLike) {
@@ -73,15 +80,23 @@ const ENABLE_SHADOW_ROOT = true;
 // - Variables scoped to :host will work inside the Shadow DOM if the stylesheet
 //   is loaded inside the Shadow DOM. PR here: https://github.com/openedx/paragon/pull/4282
 // So we temporarily need to load the Paragon CSS both inside and outside the Shadow DOM.
-const buildRootNode = async (element: Element, styleUrls: string[], mfe_config_api: string) => {
+const attachStylesheet = (url: string, shadowRoot: ShadowRoot | null) => {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = url;
+  shadowRoot?.appendChild(link);
+  if (!document.head.querySelector(`link[href="${url}"]`)) {
+    document.head.appendChild(link.cloneNode());
+  }
+};
+
+const buildRootNode = (element: Element, styleUrls: string[], mfe_config_api: string) => {
   const rootElement = element.querySelector("[data-ai-eval-react-root]");
   if (rootElement == null) {
     throw new Error("No [data-ai-eval-react-root] element found");
   }
 
-  const { core, theme } = await getThemes(mfe_config_api);
-
-  let shadowRoot = null;
+  let shadowRoot: ShadowRoot | null = null;
   let root = rootElement;
   if (ENABLE_SHADOW_ROOT) {
     shadowRoot = rootElement.attachShadow({ mode: 'open' });
@@ -98,23 +113,17 @@ const buildRootNode = async (element: Element, styleUrls: string[], mfe_config_a
       document.head.appendChild(style);
     }
   });
-  core.forEach((url) => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = url;
-    shadowRoot?.appendChild(link);
-    if (!document.head.querySelector(`link[href="${url}"]`)) {
-      document.head.appendChild(link.cloneNode());
-    }
-  });
-  theme.forEach((url) => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = url;
-    shadowRoot?.appendChild(link);
-    if (!document.head.querySelector(`link[href="${url}"]`)) {
-      document.head.appendChild(link.cloneNode());
-    }
+
+  // Attach the default Paragon CSS immediately so the app can mount without
+  // waiting on the network. Brand overrides are applied when/if the MFE
+  // config fetch resolves; on failure the defaults simply remain in place.
+  attachStylesheet(DEFAULT_CORE_CSS_URL, shadowRoot);
+  attachStylesheet(DEFAULT_THEME_CSS_URL, shadowRoot);
+  getBrandOverrideUrls(mfe_config_api).then((brandOverrideUrls) => {
+    brandOverrideUrls.forEach((url) => attachStylesheet(url, shadowRoot));
+  }).catch(() => {
+    // Defensive: getBrandOverrideUrls handles its own errors, but a rejection
+    // here must never surface as an unhandled promise rejection.
   });
 
   return root;
@@ -124,7 +133,7 @@ export function makeXBlockInitializer<Props extends Record<string, unknown>>(
   Component: React.ComponentType<Props>,
   getProps: XBlockPropsFactory<Props>,
 ) {
-  return async function initializeXBlock(
+  return function initializeXBlock(
     runtime: XBlockRuntime,
     elementLike: XBlockElementLike,
     data: SharedPayload,
@@ -132,7 +141,7 @@ export function makeXBlockInitializer<Props extends Record<string, unknown>>(
     const props = getProps(runtime, elementLike, data || {});
 
     const element = toDomElement(elementLike);
-    const rootNode = await buildRootNode(element, data.style_urls, data.mfe_config_api);
+    const rootNode = buildRootNode(element, data.style_urls, data.mfe_config_api);
 
     ReactDOM.render(
       <SharedIntlProvider><Component {...props} /></SharedIntlProvider>,
