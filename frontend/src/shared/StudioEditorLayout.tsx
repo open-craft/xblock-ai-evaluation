@@ -29,9 +29,7 @@ export function StudioEditorLayout({
 
   return (
     <>
-      <div className="ai-eval-studio-scroll">
-        {children}
-      </div>
+      {children}
       <div className="ai-eval-studio-actions">
         <ActionRow>
           <Button
