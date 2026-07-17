@@ -17,7 +17,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 from .pdf_generator import ShortAnswerData, ShortAnswerMessage
-from .utils import now
+from .utils import now, strip_html_tags
 
 
 logger = logging.getLogger(__name__)
@@ -194,6 +194,25 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             )
 
         return validation_errors, validation_warnings
+
+    def index_dictionary(self):
+        """
+        Return the block content to be indexed for search.
+
+        Only learner-visible authored content is indexed.
+        """
+        xblock_body = super().index_dictionary()
+        index_body = {
+            "display_name": self.display_name,
+            # Markdown field that may embed inline HTML; index plain text only.
+            "question": strip_html_tags(self.question),
+        }
+        if "content" in xblock_body:
+            xblock_body["content"].update(index_body)
+        else:
+            xblock_body["content"] = index_body
+        xblock_body["content_type"] = "AI Short-Answer"
+        return xblock_body
 
     def student_view(self, context=None):
         """

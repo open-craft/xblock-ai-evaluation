@@ -2283,3 +2283,135 @@ def test_model_maps_are_cached_per_instance(shortanswer_block_data):
         block._effective_supported_models()  # served from cache
         block._get_model_config_key(SupportedModels.GPT4O.value, "api_key")
         assert mock_cfg.call_count == reads_after_first  # no additional site-config reads
+
+
+# --- index_dictionary (Studio / Meilisearch search indexing) ---
+
+
+def test_shortanswer_index_dictionary(shortanswer_block_data):
+    """Short Answer indexes only display name and question; secrets never leak."""
+    shortanswer_block_data.update({
+        "evaluation_prompt": "SECRET-RUBRIC do not leak",
+        "model_api_key": "SECRET-MODEL-KEY",
+        "question": "What is <b>gravity</b>?",
+        "sessions": [[{"source": "user", "content": "SECRET-USER-STATE"}]],
+    })
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+
+    result = block.index_dictionary()
+
+    assert result["content_type"] == "AI Short-Answer"
+    assert result["content"]["display_name"] == "Short answer with AI Evaluation"
+    # HTML embedded in the Markdown question is stripped for the index.
+    assert result["content"]["question"] == "What is  gravity ?"
+
+    serialized = str(result)
+    for secret in ("SECRET-RUBRIC", "SECRET-MODEL-KEY", "SECRET-USER-STATE", SupportedModels.GPT4O.value):
+        assert secret not in serialized
+
+
+def test_coding_index_dictionary(coding_block_data):
+    """Coding indexes display name, question, and selected language; secrets never leak."""
+    coding_block_data.update({
+        "evaluation_prompt": "SECRET-RUBRIC do not leak",
+        "model_api_key": "SECRET-MODEL-KEY",
+        "judge0_api_key": "SECRET-JUDGE0-KEY",
+        "sessions": [{
+            "USER_RESPONSE": "SECRET-USER-CODE",
+            "AI_EVALUATION": "SECRET-AI-EVALUATION",
+            "CODE_EXEC_RESULT": {"stdout": "SECRET-STDOUT", "stderr": ""},
+        }],
+    })
+    block = CodingAIEvalXBlock(ToyRuntime(), DictFieldData(coding_block_data), None)
+
+    result = block.index_dictionary()
+
+    assert result["content_type"] == "AI Coding Evaluation"
+    assert result["content"]["display_name"] == "Coding with AI Evaluation"
+    assert result["content"]["question"] == "ca va?"
+    # The single selected language value, not the SUPPORTED_LANGUAGE_MAP constant.
+    assert result["content"]["language"] == LanguageLabels.Python
+
+    serialized = str(result)
+    for secret in (
+        "SECRET-RUBRIC",
+        "SECRET-MODEL-KEY",
+        "SECRET-JUDGE0-KEY",
+        "SECRET-USER-CODE",
+        "SECRET-AI-EVALUATION",
+        "SECRET-STDOUT",
+        SupportedModels.GPT4O.value,
+    ):
+        assert secret not in serialized
+
+
+def test_coach_index_dictionary(coach_block_data):
+    """Coaching indexes titles, intro/initial messages, and character names/roles only."""
+    coach_block_data.update({
+        "evaluator_prompt": "SECRET-EVALUATOR-PROMPT",
+        "character_1_prompt": "SECRET-CHARACTER-1-PROMPT",
+        "character_2_prompt": "SECRET-CHARACTER-2-PROMPT",
+        "model_api_key": "SECRET-MODEL-KEY",
+        "scenario_data": {
+            "case_details": "SECRET-CASE-DETAILS",
+            "learning_objectives": ["SECRET-OBJECTIVE"],
+            "evaluation_criteria": [{"name": "SECRET-CRITERION"}],
+        },
+        "conversation_format": "SECRET-CONVERSATION-FORMAT",
+        "message_content_tag": "SECRET-CONTENT-TAG",
+        "blacklist": ["SECRET-BLACKLIST-TERM"],
+        "intro_text": "Welcome to the <em>clinic</em> case",
+        "initial_message": "Hello, I am the patient",
+        "coach_initial_message": "Hi, I am your coach",
+        "workspace_title": "Consultation",
+        "coach_title": "Your Coach",
+        "sessions": [{
+            "workspace_history": [{
+                "character_index": 0,
+                "user_message": "SECRET-LEARNER-MESSAGE",
+                "character_message": "SECRET-CHARACTER-MESSAGE",
+            }],
+            "coach_history": [],
+            "evaluation_fragments": [],
+            "attempts_used": 1,
+            "finished": True,
+            "final_submission": "SECRET-FINAL-SUBMISSION",
+            "final_evaluation_markdown": "SECRET-FINAL-EVALUATION",
+        }],
+    })
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+
+    result = block.index_dictionary()
+
+    assert result["content_type"] == "AI Coach"
+    assert result["content"]["display_name"] == "Coached AI Evaluation"
+    # HTML embedded in the Markdown intro is stripped for the index.
+    assert result["content"]["intro_text"] == "Welcome to the  clinic  case"
+    assert result["content"]["initial_message"] == "Hello, I am the patient"
+    assert result["content"]["coach_initial_message"] == "Hi, I am your coach"
+    assert result["content"]["workspace_title"] == "Consultation"
+    assert result["content"]["coach_title"] == "Your Coach"
+    assert result["content"]["character_1_name"] == "Patient"
+    assert result["content"]["character_1_role"] == "Patient"
+    assert result["content"]["character_2_name"] == "Coach"
+    assert result["content"]["character_2_role"] == "Coach"
+
+    serialized = str(result)
+    for secret in (
+        "SECRET-EVALUATOR-PROMPT",
+        "SECRET-CHARACTER-1-PROMPT",
+        "SECRET-CHARACTER-2-PROMPT",
+        "SECRET-MODEL-KEY",
+        "SECRET-CASE-DETAILS",
+        "SECRET-OBJECTIVE",
+        "SECRET-CRITERION",
+        "SECRET-CONVERSATION-FORMAT",
+        "SECRET-CONTENT-TAG",
+        "SECRET-BLACKLIST-TERM",
+        "SECRET-LEARNER-MESSAGE",
+        "SECRET-CHARACTER-MESSAGE",
+        "SECRET-FINAL-SUBMISSION",
+        "SECRET-FINAL-EVALUATION",
+        SupportedModels.GPT4O.value,
+    ):
+        assert secret not in serialized
