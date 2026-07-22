@@ -253,6 +253,7 @@ function ResultsPanel({
   feedbackTabId,
   feedbackTabRef,
   hasFeedbackNotification,
+  hasOutputNotification,
   hasStaleFeedback,
   onActivateTab,
   outputPanelId,
@@ -270,6 +271,7 @@ function ResultsPanel({
   feedbackTabId: string;
   feedbackTabRef: React.RefObject<HTMLButtonElement>;
   hasFeedbackNotification: boolean;
+  hasOutputNotification: boolean;
   hasStaleFeedback: boolean;
   language: string;
   onActivateTab: (tab: "output" | "feedback", focusTab?: boolean) => void;
@@ -299,10 +301,22 @@ function ResultsPanel({
         <button
           ref={outputTabRef}
           type="button"
-          className={"result-tab-btn" + (activeTab === "output" ? " active" : "")}
+          className={
+            "result-tab-btn" +
+            (activeTab === "output" ? " active" : "") +
+            (hasOutputNotification && activeTab !== "output" ? " result-tab-btn--notify" : "")
+          }
           id={outputTabId}
           role="tab"
           aria-controls={outputPanelId}
+          aria-label={
+            hasOutputNotification
+              ? intl.formatMessage({
+                  id: "coding.student.outputTabUpdated",
+                  defaultMessage: "Output (updated)",
+                })
+              : undefined
+          }
           aria-selected={activeTab === "output"}
           tabIndex={activeTab === "output" ? 0 : -1}
           onClick={() => {
@@ -403,6 +417,7 @@ export default function CodingStudentApp({
   const [statusMessage, setStatusMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"output" | "feedback">("output");
   const [hasFeedbackNotification, setHasFeedbackNotification] = useState(Boolean(initialFeedback));
+  const [hasOutputNotification, setHasOutputNotification] = useState(false);
   const [hasStaleFeedback, setHasStaleFeedback] = useState(false);
   const outputTabRef = useRef<HTMLButtonElement>(null);
   const feedbackTabRef = useRef<HTMLButtonElement>(null);
@@ -432,6 +447,8 @@ export default function CodingStudentApp({
     setActiveTab(tab);
     if (tab === "feedback") {
       setHasFeedbackNotification(false);
+    } else {
+      setHasOutputNotification(false);
     }
     if (focusTab) {
       window.setTimeout(() => {
@@ -471,6 +488,7 @@ export default function CodingStudentApp({
   function resetVisualState() {
     setFeedbackMarkdown("");
     setHasFeedbackNotification(false);
+    setHasOutputNotification(false);
     setHasStaleFeedback(false);
     setStdout("");
     setStderr("");
@@ -569,6 +587,7 @@ export default function CodingStudentApp({
       const result = await executeCode(code);
       setStdout(result.stdout);
       setStderr(result.stderr);
+      setHasOutputNotification(activeTab === "feedback");
       setHasStaleFeedback(Boolean(feedbackMarkdown));
       setStatusMessage(
         intl.formatMessage({
@@ -629,6 +648,7 @@ export default function CodingStudentApp({
         const result = await executeCode(code);
         setStdout(result.stdout);
         setStderr(result.stderr);
+        setHasOutputNotification(activeTab === "feedback");
         setStatusMessage(
           intl.formatMessage({
             id: "coding.student.executionComplete",
@@ -737,6 +757,7 @@ export default function CodingStudentApp({
           feedbackTabId={feedbackTabId}
           feedbackTabRef={feedbackTabRef}
           hasFeedbackNotification={hasFeedbackNotification}
+          hasOutputNotification={hasOutputNotification}
           hasStaleFeedback={hasStaleFeedback}
           language={language}
           onActivateTab={activateTab}

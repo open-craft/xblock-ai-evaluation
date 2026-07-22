@@ -135,11 +135,17 @@ describe("CodingStudentApp", () => {
       render(<CodingStudentApp payload={payload} usageId="test-usage" />);
       readyEditor("print('run')");
 
+      await user.click(screen.getByRole("tab", { name: /ai feedback/i }));
       await user.click(screen.getByRole("button", { name: /^run$/i }));
 
       await waitFor(() => expect(screen.getByText("run output")).toBeInTheDocument());
+      const outputTab = screen.getByRole("tab", { name: /output \(updated\)/i });
+      expect(outputTab).toHaveClass("result-tab-btn--notify");
       expect(api.fetchAiFeedback).not.toHaveBeenCalled();
       expect(screen.getByRole("tab", { name: /ai feedback.*may be stale/i })).toBeInTheDocument();
+
+      await user.click(outputTab);
+      expect(screen.getByRole("tab", { name: /^output$/i })).not.toHaveClass("result-tab-btn--notify");
     });
 
     it("hides Run for HTML/CSS and updates the preview live as editor content changes", async () => {
