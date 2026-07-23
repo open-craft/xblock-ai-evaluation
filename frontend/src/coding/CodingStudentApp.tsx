@@ -416,6 +416,7 @@ export default function CodingStudentApp({
   const pending = pendingAction !== null;
   const [statusMessage, setStatusMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"output" | "feedback">("output");
+  const activeTabRef = useRef(activeTab);
   const [hasFeedbackNotification, setHasFeedbackNotification] = useState(Boolean(initialFeedback));
   const [hasOutputNotification, setHasOutputNotification] = useState(false);
   const [hasStaleFeedback, setHasStaleFeedback] = useState(false);
@@ -445,6 +446,7 @@ export default function CodingStudentApp({
 
   function activateTab(tab: "output" | "feedback", focusTab?: boolean) {
     setActiveTab(tab);
+    activeTabRef.current = tab;
     if (tab === "feedback") {
       setHasFeedbackNotification(false);
     } else {
@@ -494,6 +496,7 @@ export default function CodingStudentApp({
     setStderr("");
     setPreviewHtml("");
     setActiveTab("output");
+    activeTabRef.current = "output";
   }
 
   async function getAiFeedback(stdout: string, stderr: string) {
@@ -504,7 +507,7 @@ export default function CodingStudentApp({
       stderr,
     );
     setFeedbackMarkdown(nextFeedback);
-    if (activeTab !== "feedback") {
+    if (activeTabRef.current !== "feedback") {
       setHasFeedbackNotification(Boolean(nextFeedback));
     }
     setStatusMessage(
@@ -587,7 +590,7 @@ export default function CodingStudentApp({
       const result = await executeCode(code);
       setStdout(result.stdout);
       setStderr(result.stderr);
-      setHasOutputNotification(activeTab === "feedback");
+      setHasOutputNotification(activeTabRef.current === "feedback");
       setHasStaleFeedback(Boolean(feedbackMarkdown));
       setStatusMessage(
         intl.formatMessage({
@@ -648,7 +651,7 @@ export default function CodingStudentApp({
         const result = await executeCode(code);
         setStdout(result.stdout);
         setStderr(result.stderr);
-        setHasOutputNotification(activeTab === "feedback");
+        setHasOutputNotification(activeTabRef.current === "feedback");
         setStatusMessage(
           intl.formatMessage({
             id: "coding.student.executionComplete",
