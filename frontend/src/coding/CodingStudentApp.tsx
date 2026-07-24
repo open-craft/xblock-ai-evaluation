@@ -59,15 +59,20 @@ function QuestionPanel({ questionHtml }: { questionHtml: string }) {
 }
 
 function ActionBar({
-  pending,
+  pendingAction,
   onReset,
+  onRun,
   onSubmit,
+  showRun,
 }: {
-  pending: boolean;
+  pendingAction: "run" | "submit" | "reset" | null;
   onReset: () => void;
+  onRun: () => void;
   onSubmit: () => void;
+  showRun: boolean;
 }) {
   const intl = useIntl();
+  const pending = pendingAction !== null;
 
   return (
     <div className="eval-ai-buttons">
@@ -83,6 +88,31 @@ function ActionBar({
           defaultMessage: "Reset",
         })}
       </button>
+      {showRun && (
+        <button
+          id="run-button"
+          type="button"
+          className={"eval-ai-button" + (pending ? " disabled-btn" : "")}
+          disabled={pending}
+          onClick={onRun}
+        >
+          {intl.formatMessage({
+            id: "coding.student.run",
+            defaultMessage: "Run",
+          })}
+          {pendingAction === "run" ? (
+            <Spinner
+              animation="border"
+              size="sm"
+              className="submit-loader"
+              screenReaderText={intl.formatMessage({
+                id: "coding.student.runningSpinner",
+                defaultMessage: "Running…",
+              })}
+            />
+          ) : null}
+        </button>
+      )}
       <button
         id="submit-button"
         type="button"
@@ -94,7 +124,7 @@ function ActionBar({
           id: "coding.student.submit",
           defaultMessage: "Submit Code",
         })}
-        {pending ? (
+        {pendingAction === "submit" ? (
           <Spinner
             animation="border"
             size="sm"
@@ -223,6 +253,8 @@ function ResultsPanel({
   feedbackTabId,
   feedbackTabRef,
   hasFeedbackNotification,
+  hasOutputNotification,
+  hasStaleFeedback,
   onActivateTab,
   outputPanelId,
   outputTabId,
@@ -239,6 +271,8 @@ function ResultsPanel({
   feedbackTabId: string;
   feedbackTabRef: React.RefObject<HTMLButtonElement>;
   hasFeedbackNotification: boolean;
+  hasOutputNotification: boolean;
+  hasStaleFeedback: boolean;
   language: string;
   onActivateTab: (tab: "output" | "feedback", focusTab?: boolean) => void;
   outputPanelId: string;
@@ -267,10 +301,22 @@ function ResultsPanel({
         <button
           ref={outputTabRef}
           type="button"
-          className={"result-tab-btn" + (activeTab === "output" ? " active" : "")}
+          className={
+            "result-tab-btn" +
+            (activeTab === "output" ? " active" : "") +
+            (hasOutputNotification && activeTab !== "output" ? " result-tab-btn--notify" : "")
+          }
           id={outputTabId}
           role="tab"
           aria-controls={outputPanelId}
+          aria-label={
+            hasOutputNotification
+              ? intl.formatMessage({
+                  id: "coding.student.outputTabUpdated",
+                  defaultMessage: "Output (updated)",
+                })
+              : undefined
+          }
           aria-selected={activeTab === "output"}
           tabIndex={activeTab === "output" ? 0 : -1}
           onClick={() => {
@@ -305,6 +351,14 @@ function ResultsPanel({
             id: "coding.student.feedbackTab",
             defaultMessage: "AI feedback",
           })}
+          {hasStaleFeedback ? (
+            <span>
+              {intl.formatMessage({
+                id: "coding.student.feedbackStale",
+                defaultMessage: " (may be stale)",
+              })}
+            </span>
+          ) : null}
         </button>
       </div>
 
@@ -358,10 +412,14 @@ export default function CodingStudentApp({
   const [stdout, setStdout] = useState(initialExecutionResult.stdout || "");
   const [stderr, setStderr] = useState(initialExecutionResult.stderr || "");
   const [previewHtml, setPreviewHtml] = useState("");
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"run" | "submit" | "reset" | null>(null);
+  const pending = pendingAction !== null;
   const [statusMessage, setStatusMessage] = useState("");
   const [activeTab, setActiveTab] = useState<"output" | "feedback">("output");
+  const activeTabRef = useRef(activeTab);
   const [hasFeedbackNotification, setHasFeedbackNotification] = useState(Boolean(initialFeedback));
+  const [hasOutputNotification, setHasOutputNotification] = useState(false);
+  const [hasStaleFeedback, setHasStaleFeedback] = useState(false);
   const outputTabRef = useRef<HTMLButtonElement>(null);
   const feedbackTabRef = useRef<HTMLButtonElement>(null);
   const outputTabId = "coding-output-tab-" + usageId;
@@ -388,8 +446,11 @@ export default function CodingStudentApp({
 
   function activateTab(tab: "output" | "feedback", focusTab?: boolean) {
     setActiveTab(tab);
+    activeTabRef.current = tab;
     if (tab === "feedback") {
       setHasFeedbackNotification(false);
+    } else {
+      setHasOutputNotification(false);
     }
     if (focusTab) {
       window.setTimeout(() => {
@@ -429,10 +490,13 @@ export default function CodingStudentApp({
   function resetVisualState() {
     setFeedbackMarkdown("");
     setHasFeedbackNotification(false);
+    setHasOutputNotification(false);
+    setHasStaleFeedback(false);
     setStdout("");
     setStderr("");
     setPreviewHtml("");
     setActiveTab("output");
+    activeTabRef.current = "output";
   }
 
   async function getAiFeedback(stdout: string, stderr: string) {
@@ -443,7 +507,7 @@ export default function CodingStudentApp({
       stderr,
     );
     setFeedbackMarkdown(nextFeedback);
-    if (activeTab !== "feedback") {
+    if (activeTabRef.current !== "feedback") {
       setHasFeedbackNotification(Boolean(nextFeedback));
     }
     setStatusMessage(
@@ -454,24 +518,108 @@ export default function CodingStudentApp({
     );
   }
 
+  async function executeCode(code: string) {
+    const submission = await submitCode(payload.handler_urls.submit_code_handler, code);
+    if (!submission.submission_id) {
+      throw new Error(
+        intl.formatMessage({
+          id: "coding.student.invalidSubmissionResponse",
+          defaultMessage: "Code submission failed. Please try again.",
+        }),
+      );
+    }
+    await wait(WAIT_TIME_MS * 2);
+    const result = await pollSubmissionResult(
+      payload.handler_urls.get_submission_result_handler,
+      submission.submission_id,
+    );
+    const output = [result.compile_output, result.stdout].join("\n").trim();
+    return { stdout: output, stderr: result.stderr || "" };
+  }
+
+  function getCodeOrFocus() {
+    const code = editorRef.current?.getValue() || "";
+    if (code.length) {
+      return code;
+    }
+    setStatusMessage(
+      intl.formatMessage({
+        id: "coding.student.enterCode",
+        defaultMessage: "Enter code before submitting.",
+      }),
+    );
+    try {
+      editorRef.current?.focus();
+    } catch (error) {
+      // ignore focus errors
+    }
+    return null;
+  }
+
+  async function handleRun() {
+    if (pending) {
+      return;
+    }
+
+    const code = getCodeOrFocus();
+    if (code === null) {
+      return;
+    }
+
+    setPendingAction("run");
+    if (language === HTML_CSS) {
+      setPreviewHtml(stripScriptTags(code));
+      setHasStaleFeedback(Boolean(feedbackMarkdown));
+      setStatusMessage(
+        intl.formatMessage({
+          id: "coding.student.previewUpdated",
+          defaultMessage: "Preview updated.",
+        }),
+      );
+      setPendingAction(null);
+      return;
+    }
+
+    setStatusMessage(
+      intl.formatMessage({
+        id: "coding.student.running",
+        defaultMessage: "Running code...",
+      }),
+    );
+    try {
+      const result = await executeCode(code);
+      setStdout(result.stdout);
+      setStderr(result.stderr);
+      setHasOutputNotification(activeTabRef.current === "feedback");
+      setHasStaleFeedback(Boolean(feedbackMarkdown));
+      setStatusMessage(
+        intl.formatMessage({
+          id: "coding.student.executionComplete",
+          defaultMessage: "Execution complete. Output tab updated.",
+        }),
+      );
+    } catch (error: unknown) {
+      const message = getErrorMessage(
+        error,
+        intl.formatMessage({
+          id: "coding.student.runError",
+          defaultMessage: "A problem occurred while running the code.",
+        }),
+      );
+      setStatusMessage(message);
+      window.alert(message);
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   async function handleSubmit() {
     if (pending) {
       return;
     }
 
-    const code = editorRef.current?.getValue() || "";
-    if (!code.length) {
-      setStatusMessage(
-        intl.formatMessage({
-          id: "coding.student.enterCode",
-          defaultMessage: "Enter code before submitting.",
-        }),
-      );
-      try {
-        editorRef.current?.focus();
-      } catch (error) {
-        // ignore focus errors
-      }
+    const code = getCodeOrFocus();
+    if (code === null) {
       return;
     }
 
@@ -482,7 +630,7 @@ export default function CodingStudentApp({
         defaultMessage: "Submitting code...",
       }),
     );
-    setPending(true);
+    setPendingAction("submit");
 
     try {
       if (language === HTML_CSS) {
@@ -494,37 +642,25 @@ export default function CodingStudentApp({
         );
         await getAiFeedback("", "");
       } else {
-        const submission = await submitCode(payload.handler_urls.submit_code_handler, code);
-        if (!submission.submission_id) {
-          throw new Error(
-            intl.formatMessage({
-              id: "coding.student.invalidSubmissionResponse",
-              defaultMessage: "Code submission failed. Please try again.",
-            }),
-          );
-        }
         setStatusMessage(
           intl.formatMessage({
             id: "coding.student.checkingResults",
             defaultMessage: "Code submitted. Checking execution results...",
           }),
         );
-        await wait(WAIT_TIME_MS * 2);
-        const result = await pollSubmissionResult(
-          payload.handler_urls.get_submission_result_handler,
-          submission.submission_id,
-        );
-        const output = [result.compile_output, result.stdout].join("\n").trim();
-        setStdout(output);
-        setStderr(result.stderr || "");
+        const result = await executeCode(code);
+        setStdout(result.stdout);
+        setStderr(result.stderr);
+        setHasOutputNotification(activeTabRef.current === "feedback");
         setStatusMessage(
           intl.formatMessage({
             id: "coding.student.executionComplete",
             defaultMessage: "Execution complete. Output tab updated.",
           }),
         );
-        await getAiFeedback(output, result.stderr || "");
+        await getAiFeedback(result.stdout, result.stderr);
       }
+      setHasStaleFeedback(false);
     } catch (error: unknown) {
       const fallbackMessage = intl.formatMessage({
         id: "coding.student.submitError",
@@ -534,7 +670,7 @@ export default function CodingStudentApp({
       setStatusMessage(message);
       window.alert(message);
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -543,7 +679,7 @@ export default function CodingStudentApp({
       return;
     }
 
-    setPending(true);
+    setPendingAction("reset");
     setStatusMessage(
       intl.formatMessage({
         id: "coding.student.resetting",
@@ -577,7 +713,7 @@ export default function CodingStudentApp({
       setStatusMessage(message);
       window.alert(message);
     } finally {
-      setPending(false);
+      setPendingAction(null);
     }
   }
 
@@ -587,9 +723,11 @@ export default function CodingStudentApp({
       <div className="coding-instructions" id={instructionsId}>
         <p>
           {intl.formatMessage({
-            id: "coding.student.instructions",
+            id: language === HTML_CSS ? "coding.student.htmlInstructions" : "coding.student.instructions",
             defaultMessage:
-              "Press Alt+F1 for editor accessibility help. Press Tab to move out of the editor and use the Submit Code button to run your program.",
+              language === HTML_CSS
+                ? "Press Alt+F1 for editor accessibility help. Press Tab to move out of the editor. The preview updates automatically as you edit your HTML and CSS. Use Submit Code to request AI feedback."
+                : "Press Alt+F1 for editor accessibility help. Press Tab to move out of the editor and use the Run button to test your program without submitting it. Use Submit Code to request AI feedback.",
           })}
         </p>
       </div>
@@ -606,7 +744,14 @@ export default function CodingStudentApp({
             onEditorReady={onEditorReady}
             usageId={usageId}
           />
-          <ActionBar pending={pending} onReset={handleReset} onSubmit={handleSubmit} />
+          {/* HTML/CSS already updates the preview live as editor content changes, so a Run button would be redundant */}
+          <ActionBar
+            pendingAction={pendingAction}
+            onReset={handleReset}
+            onRun={handleRun}
+            onSubmit={handleSubmit}
+            showRun={language !== HTML_CSS}
+          />
         </div>
 
         <ResultsPanel
@@ -615,6 +760,8 @@ export default function CodingStudentApp({
           feedbackTabId={feedbackTabId}
           feedbackTabRef={feedbackTabRef}
           hasFeedbackNotification={hasFeedbackNotification}
+          hasOutputNotification={hasOutputNotification}
+          hasStaleFeedback={hasStaleFeedback}
           language={language}
           onActivateTab={activateTab}
           outputPanelId={outputPanelId}
