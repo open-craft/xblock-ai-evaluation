@@ -2,7 +2,7 @@
 Utilities
 """
 
-import re
+import html
 from dataclasses import dataclass
 from datetime import datetime, UTC
 
@@ -45,13 +45,9 @@ def markdown_to_safe_html(markdown_content: str) -> str:
 
 
 def strip_html_tags(text: str) -> str:
-    """
-    Replace HTML/XML tags in ``text`` with spaces, for search indexing.
-
-    Markdown-edited fields (question, intro/initial messages) may embed inline
-    HTML; the search index should only contain the plain text.
-    """
-    return re.sub(r"<[^>]+>", " ", text or "")
+    """Reduce HTML to searchable plain text; script/style contents are dropped."""
+    text = (text or "").replace("<", " <")
+    return " ".join(html.unescape(nh3.clean(text, tags=set())).split())
 
 
 # Default timeout (in seconds) for outbound HTTP requests.
