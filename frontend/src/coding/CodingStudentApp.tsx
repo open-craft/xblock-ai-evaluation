@@ -717,6 +717,13 @@ export default function CodingStudentApp({
     }
   }
 
+  // The document is base64-encoded because its inline </script> tags would
+  // otherwise terminate the JSON init-args script tag in some runtimes.
+  const monacoHtml = useMemo(
+    () => new TextDecoder().decode(Uint8Array.from(atob(payload.meta.monaco_html_b64), (c) => c.charCodeAt(0))),
+    [payload.meta.monaco_html_b64],
+  );
+
   return (
     <section className="coding-react-app" data-block-kind="coding" data-view={payload.view}>
       <QuestionPanel questionHtml={questionHtml} />
@@ -740,7 +747,7 @@ export default function CodingStudentApp({
           <EditorPane
             ariaDescribedBy={instructionsId}
             language={language}
-            monacoHtml={payload.meta.monaco_html}
+            monacoHtml={monacoHtml}
             onEditorReady={onEditorReady}
             usageId={usageId}
           />

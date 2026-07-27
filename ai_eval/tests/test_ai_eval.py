@@ -5,6 +5,7 @@ Testing module.
 
 import hashlib
 import io
+import base64
 import json
 import urllib.request
 from types import SimpleNamespace
@@ -199,7 +200,7 @@ def test_coding_block_student_view(coding_block_data):
         "meta": {
             "question": coding_block_data["question"],
             "language": coding_block_data["language"],
-            "monaco_html": monaco_html,
+            "monaco_html_b64": base64.b64encode(monaco_html.encode("utf-8")).decode("ascii"),
             "pdf_download_allowed": True,
             "pdf_download_description": "",
             "pdf_download_title": "Download transcript",

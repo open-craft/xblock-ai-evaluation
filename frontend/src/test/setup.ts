@@ -25,3 +25,13 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: jest.fn(),
   })),
 });
+
+// jsdom does not provide TextDecoder/TextEncoder.
+import { TextDecoder, TextEncoder } from "util";
+
+if (typeof globalThis.TextDecoder === "undefined") {
+  (globalThis as Record<string, unknown>).TextDecoder = TextDecoder;
+}
+if (typeof globalThis.TextEncoder === "undefined") {
+  (globalThis as Record<string, unknown>).TextEncoder = TextEncoder;
+}
