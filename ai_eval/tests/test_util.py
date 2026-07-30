@@ -1,7 +1,7 @@
 """Tests for general utils."""
 import time_machine
 
-from ai_eval.utils import now, pretty_time, markdown_to_safe_html
+from ai_eval.utils import now, pretty_time, markdown_to_safe_html, strip_html_tags
 
 
 @time_machine.travel("2000-01-01T05:30Z", tick=False)
@@ -22,3 +22,13 @@ def test_markdown_to_safe_html():
     safe_output = '<h1>hello</h1>\n<p>who, me?</p>\n\n<p>hello <em>world</em></p>\n'
 
     assert markdown_to_safe_html(evil_input) == safe_output
+
+
+def test_strip_html_hardening():
+    """Script/style contents are dropped and markup edge cases are handled."""
+    assert strip_html_tags('<script src="x.js">secret()</script>visible') == "visible"
+    assert strip_html_tags("<style>.a{color:red}</style>styled") == "styled"
+    assert strip_html_tags('<img alt="a > b">text') == "text"
+    assert strip_html_tags("<p>foo</p><p>bar</p>") == "foo bar"
+    assert strip_html_tags("see https://example.com <!-- hidden -->") == "see https://example.com"
+    assert strip_html_tags(None) == ""

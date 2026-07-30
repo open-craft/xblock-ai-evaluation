@@ -21,7 +21,7 @@ export interface CodingStudentInitialState {
 
 export interface CodingStudentMeta {
   language: string;
-  monaco_html: string;
+  monaco_html_b64: string;
   question: string;
   pdf_download_allowed: boolean;
   pdf_download_title: string;

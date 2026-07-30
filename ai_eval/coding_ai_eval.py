@@ -1,5 +1,6 @@
 """Coding Xblock with AI evaluation."""
 
+import base64
 import json
 import logging
 from importlib.resources import files
@@ -191,7 +192,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
                 meta={
                     "question": self.question,
                     "language": self.language,
-                    "monaco_html": monaco_html,
+                    "monaco_html_b64": base64.b64encode(monaco_html.encode("utf-8")).decode("ascii"),
                     "pdf_download_allowed": self.pdf_download_allowed,
                     "pdf_download_title": self.pdf_download_title,
                     "pdf_download_description": self.pdf_download_description,

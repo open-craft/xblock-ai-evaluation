@@ -5,6 +5,7 @@ Testing module.
 
 import hashlib
 import io
+import base64
 import json
 import urllib.request
 from types import SimpleNamespace
@@ -199,7 +200,7 @@ def test_coding_block_student_view(coding_block_data):
         "meta": {
             "question": coding_block_data["question"],
             "language": coding_block_data["language"],
-            "monaco_html": monaco_html,
+            "monaco_html_b64": base64.b64encode(monaco_html.encode("utf-8")).decode("ascii"),
             "pdf_download_allowed": True,
             "pdf_download_description": "",
             "pdf_download_title": "Download transcript",
@@ -2303,7 +2304,7 @@ def test_shortanswer_index_dictionary(shortanswer_block_data):
     assert result["content_type"] == "AI Short-Answer"
     assert result["content"]["display_name"] == "Short answer with AI Evaluation"
     # HTML embedded in the Markdown question is stripped for the index.
-    assert result["content"]["question"] == "What is  gravity ?"
+    assert result["content"]["question"] == "What is gravity ?"
 
     serialized = str(result)
     for secret in ("SECRET-RUBRIC", "SECRET-MODEL-KEY", "SECRET-USER-STATE", SupportedModels.GPT4O.value):
@@ -2386,7 +2387,7 @@ def test_coach_index_dictionary(coach_block_data):
     assert result["content_type"] == "AI Coach"
     assert result["content"]["display_name"] == "Coached AI Evaluation"
     # HTML embedded in the Markdown intro is stripped for the index.
-    assert result["content"]["intro_text"] == "Welcome to the  clinic  case"
+    assert result["content"]["intro_text"] == "Welcome to the clinic case"
     assert result["content"]["initial_message"] == "Hello, I am the patient"
     assert result["content"]["coach_initial_message"] == "Hi, I am your coach"
     assert result["content"]["workspace_title"] == "Consultation"

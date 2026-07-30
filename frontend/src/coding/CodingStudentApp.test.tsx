@@ -46,7 +46,7 @@ function makePayload(overrides?: Partial<CodingStudentPayload>): CodingStudentPa
     },
     meta: {
       language: "Python (3.8.1)",
-      monaco_html: "",
+      monaco_html_b64: "",
       question: "Write a function that adds two numbers.",
       pdf_download_allowed: false,
       pdf_download_title: "",
