@@ -94,6 +94,7 @@ The system will check for these configurations in the following order:
     {
         "ai_eval": {
              "GPT4O_API_KEY": "your-openai-api-key",
+             "CLAUDE_SONNET_API_KEY": "your-anthropic-api-key",
              "LLAMA_API_URL": "https://your-llama-endpoint"
         }
     }
@@ -104,6 +105,7 @@ The system will check for these configurations in the following order:
    XBLOCK_SETTINGS = {
        "ai_eval": {
            "GPT4O_API_KEY": "your-openai-api-key",
+           "CLAUDE_SONNET_API_KEY": "your-anthropic-api-key",
            "LLAMA_API_URL": "https://your-llama-endpoint"
         }
     }
