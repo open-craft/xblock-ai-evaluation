@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 from xblock.exceptions import JsonHandlerError
 from xblock.field_data import DictFieldData
+from xblock.fields import Scope
 from xblock.test.toy_runtime import ToyRuntime
 
 from ai_eval import CodingAIEvalXBlock, ShortAnswerAIEvalXBlock
@@ -191,3 +192,22 @@ def test_get_model_api_url_delegates(mock_get_config, ai_eval_block):
     """Test that get_model_api_url delegates to _get_model_config_value."""
     assert ai_eval_block.get_model_api_url() == "test-url"
     mock_get_config.assert_called_once_with("api_url", None)
+
+
+@pytest.mark.parametrize(
+    "block_class, field_name",
+    [
+        (AIEvalXBlock, "model"),
+        (CodingAIEvalXBlock, "model"),
+        (ShortAnswerAIEvalXBlock, "model"),
+        (CodingAIEvalXBlock, "language"),
+    ],
+)
+def test_author_fields_use_settings_scope(block_class, field_name):
+    """Author-configured fields must use settings (usage) scope.
+
+    A capital ``Scope=`` keyword is not the field's ``scope`` argument, so it
+    was silently ignored and these fields fell back to the default
+    ``Scope.content`` (definition scope), unlike every sibling field.
+    """
+    assert block_class.fields[field_name].scope == Scope.settings

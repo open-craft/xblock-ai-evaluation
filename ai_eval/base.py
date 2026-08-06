@@ -47,7 +47,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         values=[
             {"display_name": model, "value": model} for model in SupportedModels.list()
         ],
-        Scope=Scope.settings,
+        scope=Scope.settings,
         default=SupportedModels.GPT4O.value,
     )
 
