@@ -168,6 +168,7 @@
 
 .coach-block {
   color: #1f2933;
+  position: relative;
 }
 
 .coach-question {
@@ -658,7 +659,7 @@
 }
 
 .coach-confirm-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -677,6 +678,10 @@
   max-width: 440px;
   padding: 2rem;
   width: 90%;
+}
+
+.coach-confirm-dialog:focus {
+  outline: none;
 }
 
 .coach-confirm-dialog__title {
