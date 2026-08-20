@@ -200,6 +200,27 @@ describe("CoachingStudentApp", () => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
 
+    it("scrolls the confirm dialog into view and focuses it", async () => {
+      const scrollIntoView = jest.fn();
+      const original = HTMLElement.prototype.scrollIntoView;
+      HTMLElement.prototype.scrollIntoView = scrollIntoView;
+      try {
+        const user = userEvent.setup();
+        render(<CoachingStudentApp payload={makePayload()} />);
+
+        await user.click(screen.getByRole("button", { name: /start again/i }));
+
+        const dialog = screen.getByRole("dialog");
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+        expect(dialog).toHaveFocus();
+
+        await user.keyboard("{Escape}");
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      } finally {
+        HTMLElement.prototype.scrollIntoView = original;
+      }
+    });
+
     it("cancels reset on dialog dismiss", async () => {
       const user = userEvent.setup();
       render(<CoachingStudentApp payload={makePayload()} />);

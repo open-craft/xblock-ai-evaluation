@@ -67,6 +67,22 @@ function ConfirmDialog({
   onConfirm: () => void;
   title: string;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) {
+      return;
+    }
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog.scrollIntoView?.({ block: "center" });
+    dialog.focus();
+    return () => {
+      previouslyFocused?.focus();
+    };
+  }, []);
+
   return (
     <div
       className="coach-confirm-overlay"
@@ -77,10 +93,12 @@ function ConfirmDialog({
       }}
     >
       <div
+        ref={dialogRef}
         className="coach-confirm-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="coach-confirm-title"
+        tabIndex={-1}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             onCancel();
