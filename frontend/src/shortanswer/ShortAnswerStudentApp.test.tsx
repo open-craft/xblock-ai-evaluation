@@ -158,6 +158,9 @@ describe("ShortAnswerStudentApp", () => {
       const resetButton = screen.getByRole("button", { name: /reset chat/i });
       await user.click(resetButton);
 
+      const confirmResetBtn = screen.getByRole("button", { name: /start over/i });
+      await user.click(confirmResetBtn);
+
       await waitFor(() => {
         expect(screen.queryByText("old message")).not.toBeInTheDocument();
       });
@@ -289,6 +292,9 @@ And this is paragraph two.`;
 
       const resetButton = screen.getByRole("button", { name: /reset chat/i });
       await user.click(resetButton);
+
+      const confirmResetBtn = screen.getByRole("button", { name: /start over/i });
+      await user.click(confirmResetBtn);
 
       await waitFor(() => {
         expect(screen.queryByText("old message")).not.toBeInTheDocument();

@@ -14,6 +14,7 @@ import {
 import { CodingStudentPayload } from "./types";
 import { PoweredByAI } from "../shared/PoweredByAI";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
+import { ConfirmResetModal } from "../shared/ConfirmResetModal";
 import { ErrorData, GenericErrorAlert } from "../shared/error";
 
 const HTML_CSS = "HTML/CSS";
@@ -64,12 +65,14 @@ function ActionBar({
   onRun,
   onSubmit,
   showRun,
+  setResetConfirmTarget,
 }: {
   pendingAction: "run" | "submit" | "reset" | null;
   onReset: () => void;
   onRun: () => void;
   onSubmit: () => void;
   showRun: boolean;
+  setResetConfirmTarget: (el: HTMLElement|null) => void;
 }) {
   const intl = useIntl();
   const pending = pendingAction !== null;
@@ -82,6 +85,7 @@ function ActionBar({
         className={"eval-ai-button" + (pending ? " disabled-btn" : "")}
         disabled={pending}
         onClick={onReset}
+        ref={setResetConfirmTarget}
       >
         {intl.formatMessage({
           id: "coding.student.reset",
@@ -429,6 +433,8 @@ export default function CodingStudentApp({
   const instructionsId = "coding-instructions-" + usageId;
   const resultPanelId = "coding-results-" + usageId;
   const language = payload.meta.language;
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [resetConfirmTarget, setResetConfirmTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -754,10 +760,11 @@ export default function CodingStudentApp({
           {/* HTML/CSS already updates the preview live as editor content changes, so a Run button would be redundant */}
           <ActionBar
             pendingAction={pendingAction}
-            onReset={handleReset}
+            onReset={() => setShowConfirmReset(true)}
             onRun={handleRun}
             onSubmit={handleSubmit}
             showRun={language !== HTML_CSS}
+            setResetConfirmTarget={setResetConfirmTarget}
           />
         </div>
 
@@ -781,6 +788,16 @@ export default function CodingStudentApp({
           stdout={stdout}
         />
       </div>
+
+      <ConfirmResetModal
+        positionRef={resetConfirmTarget}
+        isOpen={showConfirmReset}
+        onConfirm={() => {
+          setShowConfirmReset(false);
+          handleReset();
+        }}
+        onCancel={() => setShowConfirmReset(false)}
+      />
 
       {errorData &&
         <GenericErrorAlert
