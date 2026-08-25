@@ -297,4 +297,37 @@ And this is paragraph two.`;
       });
     });
   });
+
+  describe("error handling", () => {
+    it("shows a user friendly error alert on network error", async () => {
+      mockSendAnswer.mockImplementation(async () => {
+        throw new Error("error code 418");
+      });
+      const user = userEvent.setup();
+
+      const payload = makePayload();
+      render(<ShortAnswerStudentApp payload={payload} />);
+
+      const textarea = screen.getByRole("textbox");
+      await user.type(textarea, "my answer");
+
+      const submitButton = screen.getByRole("button", { name: /submit/i });
+      await user.click(submitButton);
+
+      // here we expect to see the error alert with friendly message and the original error message
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.getByText(/please try again/i)).toBeVisible();
+      expect(screen.getByText(/error code 418/i)).toBeVisible();
+
+      const closeButton = screen.getByRole("button", { name: /dismiss/i });
+      await user.click(closeButton);
+
+      // and the error modal should be dismissed now
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(screen.queryByText(/please try again/i)).toBeNull();
+      expect(screen.queryByText(/error code 418/i)).toBeNull();
+
+
+    });
+  });
 });
