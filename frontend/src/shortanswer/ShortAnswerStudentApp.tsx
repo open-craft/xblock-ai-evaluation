@@ -9,6 +9,7 @@ import { ArrowUpward, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/parago
 import { PoweredByAI } from "../shared/PoweredByAI";
 import { TypingIndicator } from "../shared/TypingIndicator";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
+import { ConfirmResetModal } from "../shared/ConfirmResetModal";
 import { ErrorData, GenericErrorAlert } from "../shared/error";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
@@ -139,6 +140,7 @@ function MessageComposer({
   onReset,
   onSubmit,
   textareaRef,
+  setResetConfirmTarget,
 }: {
   allowReset: boolean;
   canReset: boolean;
@@ -150,6 +152,7 @@ function MessageComposer({
   onReset: () => void;
   onSubmit: () => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
+  setResetConfirmTarget: (el: HTMLElement|null) => void;
 }) {
   const intl = useIntl();
   const sendLabel = intl.formatMessage({
@@ -168,6 +171,7 @@ function MessageComposer({
             disabled={!canReset}
             aria-disabled={!canReset}
             onClick={onReset}
+            ref={setResetConfirmTarget}
           >
             {intl.formatMessage({
               id: "shortanswer.student.reset",
@@ -248,6 +252,8 @@ export default function ShortAnswerStudentApp({
   // question panel should only default to open if user has not already send a message
   const [questionPanelIsOpen, setQuestionPanelIsOpen] = React.useState(userMessageCount == 0 ? true : false);
   const [errorData, setErrorData] = React.useState<ErrorData | null>(null);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
+  const [resetConfirmTarget, setResetConfirmTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -452,11 +458,22 @@ export default function ShortAnswerStudentApp({
             onChange={(event) => {
               setDraft(event.target.value);
             }}
-            onReset={resetConversation}
+            onReset={() => setShowConfirmReset(true)}
+            setResetConfirmTarget={setResetConfirmTarget}
             onSubmit={submitAnswer}
             textareaRef={textareaRef}
           />
         </div>
+
+        <ConfirmResetModal
+          positionRef={resetConfirmTarget}
+          isOpen={showConfirmReset}
+          onConfirm={() => {
+            setShowConfirmReset(false);
+            resetConversation();
+          }}
+          onCancel={() => setShowConfirmReset(false)}
+        />
 
         {errorData &&
           <GenericErrorAlert

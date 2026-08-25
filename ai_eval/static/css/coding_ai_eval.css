@@ -1,3 +1,7 @@
+.coding-react-app {
+    position: relative; /* so popup modal greyed background is contained */
+}
+
 .used-prog-language {
   margin: 0.5rem 1rem;
   text-align: end;
