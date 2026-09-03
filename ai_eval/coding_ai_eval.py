@@ -71,7 +71,7 @@ class CodingAIEvalXBlock(AIEvalXBlock):
             for language in SUPPORTED_LANGUAGE_MAP
         ],
         default=LanguageLabels.Python,
-        Scope=Scope.settings,
+        scope=Scope.settings,
     )
 
     evaluation_prompt = String(
