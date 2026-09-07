@@ -25,6 +25,7 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
       title: "",
       allow_reset: true,
       character_image: "",
+      character_limit: 1000,
       max_responses: 10,
       question: "What is 2+2?",
       hide_question: false,
@@ -62,6 +63,26 @@ describe("ShortAnswerStudentApp", () => {
       render(<ShortAnswerStudentApp payload={payload} />);
       expect(screen.getByText("four")).toBeInTheDocument();
       expect(screen.getByText("Correct!")).toBeInTheDocument();
+    });
+  });
+
+  describe("character limit", () => {
+    it("applies the configured limit to the textarea", () => {
+      const payload = makePayload();
+      payload.meta.character_limit = 2000;
+
+      render(<ShortAnswerStudentApp payload={payload} />);
+
+      expect(screen.getByRole("textbox")).toHaveAttribute("maxlength", "2000");
+    });
+
+    it("falls back to 1000 when the payload has no limit", () => {
+      const payload = makePayload();
+      delete (payload.meta as Partial<typeof payload.meta>).character_limit;
+
+      render(<ShortAnswerStudentApp payload={payload} />);
+
+      expect(screen.getByRole("textbox")).toHaveAttribute("maxlength", "1000");
     });
   });
 
@@ -175,6 +196,7 @@ describe("ShortAnswerStudentApp", () => {
           title: "",
           allow_reset: false,
           character_image: "",
+          character_limit: 1000,
           max_responses: 10,
           question: "test",
           hide_question: false,

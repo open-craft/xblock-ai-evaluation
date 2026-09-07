@@ -132,6 +132,7 @@ function MessageComposer({
   allowReset,
   canReset,
   canSubmit,
+  characterLimit,
   disabled,
   draft,
   onChange,
@@ -142,6 +143,7 @@ function MessageComposer({
   allowReset: boolean;
   canReset: boolean;
   canSubmit: boolean;
+  characterLimit: number;
   disabled: boolean;
   draft: string;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -184,7 +186,7 @@ function MessageComposer({
               id: "shortanswer.student.placeholder",
               defaultMessage: "Type your answer here. Ctrl+Enter to send, Shift+Enter for new line.",
             })}
-            maxLength={1000}
+            maxLength={characterLimit}
             value={draft}
             onChange={onChange}
             onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -237,6 +239,7 @@ export default function ShortAnswerStudentApp({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userMessageCount = countUserMessages(messages);
   const maxResponses = Number(payload.meta.max_responses || 0);
+  const characterLimit = Number(payload.meta.character_limit) || 1000;
   const allowReset = Boolean(payload.meta.allow_reset);
   const hideQuestion = Boolean(payload.meta.hide_question);
   const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;
@@ -443,6 +446,7 @@ export default function ShortAnswerStudentApp({
             allowReset={allowReset}
             canReset={canReset}
             canSubmit={canSubmit}
+            characterLimit={characterLimit}
             disabled={controlsDisabled}
             draft={draft}
             onChange={(event) => {

@@ -126,6 +126,23 @@ Studio behavior:
   - `USE_CUSTOM_LLM_SERVICE` is enabled.
   This lock is model-specific: changing the selected model can enable/disable the field based on that model's configured key.
 
+### Short Answer character limit
+
+The Short Answer block limits learner input to 1000 characters by default. Operators can change
+this with the `SHORTANSWER_CHARACTER_LIMIT` key in the same `ai_eval` namespace, via Site
+Configuration or Django `XBLOCK_SETTINGS` (Site Configuration takes precedence):
+
+```python
+XBLOCK_SETTINGS = {
+    "ai_eval": {
+        "SHORTANSWER_CHARACTER_LIMIT": 2000,
+    }
+}
+```
+
+Values above 3000 are clamped to 3000, and invalid or non-positive values fall back to the
+default of 1000.
+
 ### Choosing which AI models are available
 
 When authoring an AI Eval XBlock, the author selects an AI model from a dropdown of built-in models.

@@ -174,6 +174,9 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     ATTACHMENT_CACHE_TTL = 600
     ATTACHMENT_CACHE_MAX_BYTES = 900_000
 
+    DEFAULT_CHARACTER_LIMIT = 1000
+    MAX_CHARACTER_LIMIT = 3000
+
     def _replace_current_session(self, session_data):
         """
         Replace the current session entry so XBlock dirty-tracking persists it.
@@ -323,6 +326,23 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         if value := get_site_configuration_value(self.block_settings_key, key):
             return value
         return self._get_settings().get(key)
+
+    def _learner_input_character_limit(self, key: str = "SHORTANSWER_CHARACTER_LIMIT") -> int:
+        """
+        Resolve the configured learner input character limit for this block.
+
+        A missing or invalid value falls back to the default so a bad setting can
+        never break rendering; values above the ceiling are clamped because the whole
+        conversation is resent to the model on every turn.
+        """
+        raw = self._get_ai_eval_setting(key)
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return self.DEFAULT_CHARACTER_LIMIT
+        if value < 1:
+            return self.DEFAULT_CHARACTER_LIMIT
+        return min(value, self.MAX_CHARACTER_LIMIT)
 
     def _ai_eval_model_maps(self) -> dict:
         """

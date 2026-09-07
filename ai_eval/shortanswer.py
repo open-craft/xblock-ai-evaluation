@@ -254,6 +254,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 "question": self.question,
                 "hide_question": self.hide_question,
                 "max_responses": self.max_responses,
+                "character_limit": self._learner_input_character_limit(),
                 "allow_reset": self.allow_reset,
                 "character_image": self.character_image,
                 "pdf_download_allowed": self.pdf_download_allowed,
@@ -352,6 +353,12 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
+        character_limit = self._learner_input_character_limit()
+        if len(user_submission) > character_limit:
+            raise JsonHandlerError(
+                400,
+                _("Your response is too long (maximum {limit} characters).").format(limit=character_limit),
+            )
         user_submission_time = now().isoformat()
 
         # Download attachments once: the rendered XML feeds the system prompt and the

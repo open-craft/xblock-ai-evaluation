@@ -343,6 +343,7 @@ def test_coding_block_studio_view(coding_block_data):
     ]
 
 
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=None))
 def test_shortanswer_block_student_view(shortanswer_block_data):
     """Test the basic view loads for ShortAnswerAIEvalXBlock."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
@@ -363,6 +364,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "title": "",
             "question": shortanswer_block_data["question"],
             "max_responses": shortanswer_block_data["max_responses"],
+            "character_limit": 1000,
             "allow_reset": shortanswer_block_data["allow_reset"],
             "character_image": shortanswer_block_data["character_image"],
             "hide_question": shortanswer_block_data["hide_question"],
@@ -401,6 +403,7 @@ def test_shortanswer_reset_forbidden(shortanswer_block_data):
     assert block.sessions == shortanswer_block_data["sessions"]
 
 
+@patch("ai_eval.base.get_site_configuration_value", Mock(return_value=None))
 def test_character_image(shortanswer_block_data):
     """Test the character image."""
     data = {
@@ -411,6 +414,74 @@ def test_character_image(shortanswer_block_data):
     with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
         frag = block.student_view()
     assert frag.json_init_args["meta"]["character_image"] == "/static/image.jpg"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        (None, 1000),
+        (2000, 2000),
+        ("2000", 2000),
+        ("abc", 1000),
+        (0, 1000),
+        (-5, 1000),
+        (50_000, 3000),
+    ],
+)
+def test_learner_input_character_limit_resolution(shortanswer_block_data, raw, expected):
+    """The configured limit is parsed leniently, defaulted, and clamped to the ceiling."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_settings = Mock(return_value={"SHORTANSWER_CHARACTER_LIMIT": raw})
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        assert block._learner_input_character_limit() == expected
+
+
+def test_learner_input_character_limit_site_config_precedence(shortanswer_block_data):
+    """A site configuration value wins over the Django settings bucket."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_settings = Mock(return_value={"SHORTANSWER_CHARACTER_LIMIT": 2000})
+    with patch(
+        "ai_eval.base.get_site_configuration_value",
+        side_effect=_fake_site_config({"SHORTANSWER_CHARACTER_LIMIT": "1500"}),
+    ):
+        assert block._learner_input_character_limit() == 1500
+
+
+def test_shortanswer_meta_character_limit_uses_setting(shortanswer_block_data):
+    """The resolved limit is exposed to the frontend through the view meta payload."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_settings = Mock(return_value={"SHORTANSWER_CHARACTER_LIMIT": 2000})
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None), \
+         patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
+        frag = block.student_view()
+    assert frag.json_init_args["meta"]["character_limit"] == 2000
+
+
+def test_shortanswer_get_response_rejects_over_limit_input(shortanswer_block_data):
+    """Input over the limit gets a 400 without reaching the LLM."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None), \
+         patch("ai_eval.base.get_llm_response") as mocked_llm:
+        with pytest.raises(JsonHandlerError) as excinfo:
+            block.get_response.__wrapped__(block, data={"user_input": "x" * 1001})
+    assert excinfo.value.status_code == 400
+    assert "1000" in excinfo.value.message
+    mocked_llm.assert_not_called()
+
+
+def test_shortanswer_get_response_accepts_input_at_limit(shortanswer_block_data):
+    """Input exactly at the limit is processed normally."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    with patch("ai_eval.shortanswer.get_llm_service") as mock_service, \
+         patch("ai_eval.llm.get_llm_service") as mock_llm_service, \
+         patch("ai_eval.base.get_site_configuration_value", return_value=None), \
+         patch("ai_eval.base.get_llm_response") as mocked_llm:
+        mock_service.return_value = Mock()
+        mock_service.return_value.supports_threads.return_value = False
+        mock_llm_service.return_value = mock_service.return_value
+        mocked_llm.return_value = (".", None)
+        block.get_response.__wrapped__(block, data={"user_input": "x" * 1000})
+    mocked_llm.assert_called_once()
 
 
 def test_shortanswer_block_studio_view(shortanswer_block_data):
