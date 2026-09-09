@@ -129,3 +129,8 @@
         animation: none;
     }
 }
+
+/* utility classes to extend bootstrap's border utilities */
+.border-3 {
+    border: 3px solid var(--pgn-color-border) !important;
+}

@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Col, Collapsible, Form, Icon, Row } from "@openedx/paragon";
 import { useIntl } from "react-intl";
-import { v4 as uuidv4 } from 'uuid';
 
-import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
@@ -11,6 +9,7 @@ import { ArrowUpward, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/parago
 import { PoweredByAI } from "../shared/PoweredByAI";
 import { TypingIndicator } from "../shared/TypingIndicator";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
+import { ErrorData, GenericErrorAlert } from "../shared/error";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
@@ -212,7 +211,6 @@ function MessageComposer({
           </Button>
         </div>
       </div>
-      <PoweredByAI />
     </React.Fragment>
   );
 }
@@ -246,6 +244,7 @@ export default function ShortAnswerStudentApp({
   const controlsDisabled = userMessageCount >= maxResponses;
   // question panel should only default to open if user has not already send a message
   const [questionPanelIsOpen, setQuestionPanelIsOpen] = React.useState(userMessageCount == 0 ? true : false);
+  const [errorData, setErrorData] = React.useState<ErrorData | null>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
@@ -321,6 +320,7 @@ export default function ShortAnswerStudentApp({
       }
     });
 
+    setErrorData(null);  // clear the error data while we try a new action
     setPending(true);
     setStatusMessage(
       intl.formatMessage({
@@ -344,24 +344,20 @@ export default function ShortAnswerStudentApp({
           defaultMessage: "Assistant response ready.",
         }),
       );
-    } catch (error: unknown) {
-      const fallbackError = intl.formatMessage({
-        id: "shortanswer.student.requestErrorAlert",
-        defaultMessage: "An error has occurred.",
-      });
-
+    } catch (error: any) {
       setMessages(messages);
       setDraft((current) => current || userInput);
       setPending(false);
-      setStatusMessage(
-        intl.formatMessage({
-          id: "shortanswer.student.requestErrorStatus",
-          defaultMessage: "Unable to process your message. Please try again.",
-        }),
-      );
 
-      window.alert(getErrorMessage(error, fallbackError));
+      setErrorData({
+        title: intl.formatMessage({
+          id: "shortanswer.student.unableToSend",
+          defaultMessage: "Unable to send message",
+        }),
+        message: error.toString(),
+      });
     }
+
   }
 
   async function resetConversation() {
@@ -369,6 +365,7 @@ export default function ShortAnswerStudentApp({
       return;
     }
 
+    setErrorData(null);  // clear the error data while we try a new action
     setPending(true);
     setStatusMessage(
       intl.formatMessage({
@@ -394,21 +391,16 @@ export default function ShortAnswerStudentApp({
 
       // After reset, re-open the question panel for convenience.
       setQuestionPanelIsOpen(true);
-    } catch (error: unknown) {
-      const fallbackError = intl.formatMessage({
-        id: "shortanswer.student.requestErrorAlert",
-        defaultMessage: "An error has occurred.",
-      });
-
+    } catch (error: any) {
       setPending(false);
-      setStatusMessage(
-        intl.formatMessage({
-          id: "shortanswer.student.resetErrorStatus",
-          defaultMessage: "Unable to reset the chat. Please try again.",
-        }),
-      );
 
-      window.alert(getErrorMessage(error, fallbackError));
+      setErrorData({
+        title: intl.formatMessage({
+          id: "shortanswer.student.unableToReset",
+          defaultMessage: "Unable to reset the chat",
+        }),
+        message: error.toString(),
+      });
     }
   }
 
@@ -462,8 +454,18 @@ export default function ShortAnswerStudentApp({
           />
         </div>
 
+        {errorData &&
+          <GenericErrorAlert
+            error={errorData}
+            onClose={() => setErrorData(null)}
+          />
+        }
+
+        <PoweredByAI />
+
         {messages.length >= 2 && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
       </div>
+
     </section>
   );
 }

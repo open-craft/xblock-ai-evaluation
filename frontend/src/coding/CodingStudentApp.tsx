@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Spinner, useArrowKeyNavigation } from "@openedx/paragon";
 
-import { getErrorMessage } from "../shared/request";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import {
   fetchAiFeedback,
@@ -15,6 +14,7 @@ import {
 import { CodingStudentPayload } from "./types";
 import { PoweredByAI } from "../shared/PoweredByAI";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
+import { ErrorData, GenericErrorAlert } from "../shared/error";
 
 const HTML_CSS = "HTML/CSS";
 const HTML_PLACEHOLDER =
@@ -420,6 +420,7 @@ export default function CodingStudentApp({
   const [hasFeedbackNotification, setHasFeedbackNotification] = useState(Boolean(initialFeedback));
   const [hasOutputNotification, setHasOutputNotification] = useState(false);
   const [hasStaleFeedback, setHasStaleFeedback] = useState(false);
+  const [errorData, setErrorData] = React.useState<ErrorData | null>(null);
   const outputTabRef = useRef<HTMLButtonElement>(null);
   const feedbackTabRef = useRef<HTMLButtonElement>(null);
   const outputTabId = "coding-output-tab-" + usageId;
@@ -566,6 +567,7 @@ export default function CodingStudentApp({
       return;
     }
 
+    setErrorData(null);  // clear the error data while we try a new action
     setPendingAction("run");
     if (language === HTML_CSS) {
       setPreviewHtml(stripScriptTags(code));
@@ -598,16 +600,14 @@ export default function CodingStudentApp({
           defaultMessage: "Execution complete. Output tab updated.",
         }),
       );
-    } catch (error: unknown) {
-      const message = getErrorMessage(
-        error,
-        intl.formatMessage({
-          id: "coding.student.runError",
-          defaultMessage: "A problem occurred while running the code.",
+    } catch (error: any) {
+      setErrorData({
+        title: intl.formatMessage({
+          id: "coding.student.unableToRun",
+          defaultMessage: "Unable to run code",
         }),
-      );
-      setStatusMessage(message);
-      window.alert(message);
+        message: error.toString(),
+      });
     } finally {
       setPendingAction(null);
     }
@@ -623,6 +623,7 @@ export default function CodingStudentApp({
       return;
     }
 
+    setErrorData(null);  // clear the error data while we try a new action
     setHasFeedbackNotification(false);
     setStatusMessage(
       intl.formatMessage({
@@ -661,14 +662,14 @@ export default function CodingStudentApp({
         await getAiFeedback(result.stdout, result.stderr);
       }
       setHasStaleFeedback(false);
-    } catch (error: unknown) {
-      const fallbackMessage = intl.formatMessage({
-        id: "coding.student.submitError",
-        defaultMessage: "A problem occurred while submitting the code.",
+    } catch (error: any) {
+      setErrorData({
+        title: intl.formatMessage({
+          id: "coding.student.unableToSubmit",
+          defaultMessage: "Unable to submit code",
+        }),
+        message: error.toString(),
       });
-      const message = getErrorMessage(error, fallbackMessage);
-      setStatusMessage(message);
-      window.alert(message);
     } finally {
       setPendingAction(null);
     }
@@ -679,6 +680,7 @@ export default function CodingStudentApp({
       return;
     }
 
+    setErrorData(null);  // clear the error data while we try a new action
     setPendingAction("reset");
     setStatusMessage(
       intl.formatMessage({
@@ -702,16 +704,14 @@ export default function CodingStudentApp({
       } catch (error) {
         // ignore focus errors
       }
-    } catch (error: unknown) {
-      const message = getErrorMessage(
-        error,
-        intl.formatMessage({
-          id: "coding.student.resetError",
-          defaultMessage: "A problem occurred during reset.",
+    } catch (error: any) {
+      setErrorData({
+        title: intl.formatMessage({
+          id: "coding.student.unableToReset",
+          defaultMessage: "Unable to reset workspace",
         }),
-      );
-      setStatusMessage(message);
-      window.alert(message);
+        message: error.toString(),
+      });
     } finally {
       setPendingAction(null);
     }
@@ -739,7 +739,7 @@ export default function CodingStudentApp({
         </p>
       </div>
       <StatusRegion message={statusMessage} />
-      <div className="eval-ai-container">
+      <div className={`eval-ai-container ${errorData != null ? "border-3 border-danger" : ""}`}>
         <div className="eval-ai-code-editor">
           <div className="used-prog-language">
             <span>{language}</span>
@@ -781,6 +781,13 @@ export default function CodingStudentApp({
           stdout={stdout}
         />
       </div>
+
+      {errorData &&
+        <GenericErrorAlert
+          error={errorData}
+          onClose={() => setErrorData(null)}
+        />
+      }
 
       <PoweredByAI />
 

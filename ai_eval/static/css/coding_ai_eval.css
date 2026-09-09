@@ -1,5 +1,4 @@
 .used-prog-language {
-  flex: 5;
   margin: 0.5rem 1rem;
   text-align: end;
 }
@@ -20,7 +19,7 @@
 
 .eval-ai-container {
   display: flex;
-  max-height: 600px;
+  max-height: 610px;
   box-shadow: 0px 0px 10px 0px #0000001A;
   border: 1px solid #CED4DA;
   border-radius: 4px;

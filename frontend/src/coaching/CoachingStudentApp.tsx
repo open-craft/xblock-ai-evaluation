@@ -15,6 +15,7 @@ import {
 import { PoweredByAI } from "../shared/PoweredByAI";
 import { TypingIndicator } from "../shared/TypingIndicator";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
+import { ErrorData, GenericErrorAlert } from "../shared/error";
 
 type PaneKey = "workspace" | "coach";
 type CoachMode = "chat" | "report" | "review";
@@ -293,6 +294,7 @@ export default function CoachingStudentApp({
     coach: "",
     workspace: "",
   });
+  const [errorData, setErrorData] = React.useState<ErrorData | null>(null);
   const workspaceHistoryRef = useRef<HTMLDivElement>(null);
   const coachHistoryRef = useRef<HTMLDivElement>(null);
   const workspaceTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -457,16 +459,6 @@ export default function CoachingStudentApp({
     });
   }
 
-  function showGenericError(pane: PaneKey) {
-    const errorMessage = intl.formatMessage({
-      id: "coaching.student.genericError",
-      defaultMessage: "An error has occurred.",
-    });
-
-    setPaneStatus(pane, errorMessage);
-    window.alert(errorMessage);
-  }
-
   function applyResponseState(response: CharacterResponse) {
     if (response.attempts) {
       setAttempts(response.attempts);
@@ -563,6 +555,7 @@ export default function CoachingStudentApp({
       setCoachDraft("");
     }
 
+    setErrorData(null);  // clear the error data while we try a new action
     setPaneBusy(pane, true);
     setPaneStatus(
       pane,
@@ -575,7 +568,7 @@ export default function CoachingStudentApp({
     try {
       const response = await sendChatMessage(handlerUrl, paneIndex, trimmedDraft);
       handleChatResponse(pane, response, trimmedDraft);
-    } catch {
+    } catch (error: any) {
       removePendingMessage(pane, trimmedDraft);
       setPaneBusy(pane, false);
       if (pane === "workspace") {
@@ -583,7 +576,19 @@ export default function CoachingStudentApp({
       } else {
         setCoachDraft(trimmedDraft);
       }
-      showGenericError(pane);
+      const errorMessage = intl.formatMessage({
+        id: "coaching.student.genericError",
+        defaultMessage: "An error has occurred.",
+      });
+      setPaneStatus(pane, errorMessage);
+
+      setErrorData({
+        title: intl.formatMessage({
+          id: "coaching.student.unableToSend",
+          defaultMessage: "Unable to send message",
+        }),
+        message: error.toString(),
+      });
     }
   }
 
@@ -592,6 +597,7 @@ export default function CoachingStudentApp({
       return;
     }
 
+    setErrorData(null);  // clear the error data while we try a new action
     setEvaluationPending(true);
     setPaneBusy("workspace", true);
     setPaneStatus(
@@ -619,7 +625,7 @@ export default function CoachingStudentApp({
           }),
         );
       }
-    } catch {
+    } catch (error: any) {
       setEvaluationPending(false);
       setPaneBusy("workspace", false);
       setPaneStatus(
@@ -629,12 +635,13 @@ export default function CoachingStudentApp({
           defaultMessage: "Unable to submit for evaluation.",
         }),
       );
-      window.alert(
-        intl.formatMessage({
-          id: "coaching.student.genericError",
-          defaultMessage: "An error has occurred.",
+      setErrorData({
+        title: intl.formatMessage({
+          id: "coaching.student.unableToSubmit",
+          defaultMessage: "Unable to submit",
         }),
-      );
+        message: error.toString(),
+      });
     }
   }
 
@@ -643,6 +650,7 @@ export default function CoachingStudentApp({
       return;
     }
 
+    setErrorData(null);  // clear the error data while we try a new action
     setBusyByPane({
       coach: true,
       workspace: true,
@@ -676,7 +684,7 @@ export default function CoachingStudentApp({
           defaultMessage: "Conversation reset.",
         }),
       );
-    } catch {
+    } catch (error: any) {
       setBusyByPane({
         coach: false,
         workspace: false,
@@ -688,12 +696,13 @@ export default function CoachingStudentApp({
           defaultMessage: "Unable to reset conversation.",
         }),
       );
-      window.alert(
-        intl.formatMessage({
-          id: "coaching.student.genericError",
-          defaultMessage: "An error has occurred.",
+      setErrorData({
+        title: intl.formatMessage({
+          id: "coaching.student.unableToReset",
+          defaultMessage: "Unable to reset the workspace",
         }),
-      );
+        message: error.toString(),
+      });
     }
   }
 
@@ -1066,6 +1075,13 @@ export default function CoachingStudentApp({
           }}
         />
       ) : null}
+
+      {errorData &&
+        <GenericErrorAlert
+          error={errorData}
+          onClose={() => setErrorData(null)}
+        />
+      }
 
       <PoweredByAI />
     </section>
