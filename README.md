@@ -140,8 +140,9 @@ XBLOCK_SETTINGS = {
 }
 ```
 
-Values above 3000 are clamped to 3000, and invalid or non-positive values fall back to the
-default of 1000.
+Caution: the whole conversation is re-sent to the model on every exchange, so a higher limit increases
+per-request token usage (and cost) as well as the size of the stored conversation history.
+Invalid or non-positive values are ignored with a logged warning, and the default of 1000 is used.
 
 ### Choosing which AI models are available
 

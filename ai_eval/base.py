@@ -175,7 +175,6 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
     ATTACHMENT_CACHE_MAX_BYTES = 900_000
 
     DEFAULT_CHARACTER_LIMIT = 1000
-    MAX_CHARACTER_LIMIT = 3000
 
     def _replace_current_session(self, session_data):
         """
@@ -331,18 +330,32 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         Resolve the configured learner input character limit for this block.
 
-        A missing or invalid value falls back to the default so a bad setting can
-        never break rendering; values above the ceiling are clamped because the whole
-        conversation is resent to the model on every turn.
+        An absent setting falls back to the default silently. A value that is
+        present but invalid is logged and ignored, so a bad setting can never
+        break rendering for learners.
         """
         raw = self._get_ai_eval_setting(key)
+        if raw is None:
+            return self.DEFAULT_CHARACTER_LIMIT
         try:
             value = int(raw)
         except (TypeError, ValueError):
+            logger.warning(
+                "Ignoring invalid %s value %r; using the default of %d.",
+                key,
+                raw,
+                self.DEFAULT_CHARACTER_LIMIT,
+            )
             return self.DEFAULT_CHARACTER_LIMIT
         if value < 1:
+            logger.warning(
+                "Ignoring non-positive %s value %r; using the default of %d.",
+                key,
+                raw,
+                self.DEFAULT_CHARACTER_LIMIT,
+            )
             return self.DEFAULT_CHARACTER_LIMIT
-        return min(value, self.MAX_CHARACTER_LIMIT)
+        return value
 
     def _ai_eval_model_maps(self) -> dict:
         """

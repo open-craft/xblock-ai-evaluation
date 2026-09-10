@@ -239,7 +239,7 @@ export default function ShortAnswerStudentApp({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userMessageCount = countUserMessages(messages);
   const maxResponses = Number(payload.meta.max_responses || 0);
-  const characterLimit = Number(payload.meta.character_limit) || 1000;
+  const characterLimit = payload.meta.character_limit;
   const allowReset = Boolean(payload.meta.allow_reset);
   const hideQuestion = Boolean(payload.meta.hide_question);
   const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;

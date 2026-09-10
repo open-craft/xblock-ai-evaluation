@@ -5,6 +5,7 @@ Testing module.
 
 import hashlib
 import io
+import logging
 import base64
 import json
 import urllib.request
@@ -425,15 +426,36 @@ def test_character_image(shortanswer_block_data):
         ("abc", 1000),
         (0, 1000),
         (-5, 1000),
-        (50_000, 3000),
+        (50_000, 50_000),
     ],
 )
 def test_learner_input_character_limit_resolution(shortanswer_block_data, raw, expected):
-    """The configured limit is parsed leniently, defaulted, and clamped to the ceiling."""
+    """The configured limit is parsed leniently and invalid values fall back to the default."""
     block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
     block._get_settings = Mock(return_value={"SHORTANSWER_CHARACTER_LIMIT": raw})
     with patch("ai_eval.base.get_site_configuration_value", return_value=None):
         assert block._learner_input_character_limit() == expected
+
+
+@pytest.mark.parametrize("raw", ["abc", 0, -5])
+def test_learner_input_character_limit_warns_on_invalid_value(shortanswer_block_data, raw, caplog):
+    """A value that is present but invalid is ignored with a logged warning."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_settings = Mock(return_value={"SHORTANSWER_CHARACTER_LIMIT": raw})
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        with caplog.at_level(logging.WARNING, logger="ai_eval.base"):
+            assert block._learner_input_character_limit() == 1000
+    assert "SHORTANSWER_CHARACTER_LIMIT" in caplog.text
+
+
+def test_learner_input_character_limit_absent_is_silent(shortanswer_block_data, caplog):
+    """An absent setting falls back to the default without logging."""
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    block._get_settings = Mock(return_value={})
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        with caplog.at_level(logging.WARNING, logger="ai_eval.base"):
+            assert block._learner_input_character_limit() == 1000
+    assert not caplog.records
 
 
 def test_learner_input_character_limit_site_config_precedence(shortanswer_block_data):

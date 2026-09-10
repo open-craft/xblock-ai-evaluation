@@ -75,15 +75,6 @@ describe("ShortAnswerStudentApp", () => {
 
       expect(screen.getByRole("textbox")).toHaveAttribute("maxlength", "2000");
     });
-
-    it("falls back to 1000 when the payload has no limit", () => {
-      const payload = makePayload();
-      delete (payload.meta as Partial<typeof payload.meta>).character_limit;
-
-      render(<ShortAnswerStudentApp payload={payload} />);
-
-      expect(screen.getByRole("textbox")).toHaveAttribute("maxlength", "1000");
-    });
   });
 
   describe("submit answer", () => {
