@@ -8,7 +8,6 @@ import * as api from "./api";
 jest.mock("./api");
 
 const mockSendChatMessage = api.sendChatMessage as jest.MockedFunction<typeof api.sendChatMessage>;
-const mockRequestEvaluation = api.requestEvaluation as jest.MockedFunction<typeof api.requestEvaluation>;
 const mockResetAll = api.resetAll as jest.MockedFunction<typeof api.resetAll>;
 
 function makePayload(overrides?: Partial<CoachingStudentPayload>): CoachingStudentPayload {
@@ -197,28 +196,16 @@ describe("CoachingStudentApp", () => {
       const resetButton = screen.getByRole("button", { name: /start again/i });
       await user.click(resetButton);
 
+      // the confirm dialog is shown, and the reset should not have been called yet
       expect(screen.getByRole("dialog")).toBeInTheDocument();
-    });
+      expect(mockResetAll).not.toHaveBeenCalled();
 
-    it("scrolls the confirm dialog into view and focuses it", async () => {
-      const scrollIntoView = jest.fn();
-      const original = HTMLElement.prototype.scrollIntoView;
-      HTMLElement.prototype.scrollIntoView = scrollIntoView;
-      try {
-        const user = userEvent.setup();
-        render(<CoachingStudentApp payload={makePayload()} />);
+      const confirmResetBtn = screen.getByRole("button", { name: /start over/i });
+      await user.click(confirmResetBtn);
 
-        await user.click(screen.getByRole("button", { name: /start again/i }));
+      // now it should be called after clicking the confirm button
+      expect(mockResetAll).toHaveBeenCalled();
 
-        const dialog = screen.getByRole("dialog");
-        expect(scrollIntoView).toHaveBeenCalledWith({ block: "center" });
-        expect(dialog).toHaveFocus();
-
-        await user.keyboard("{Escape}");
-        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      } finally {
-        HTMLElement.prototype.scrollIntoView = original;
-      }
     });
 
     it("cancels reset on dialog dismiss", async () => {

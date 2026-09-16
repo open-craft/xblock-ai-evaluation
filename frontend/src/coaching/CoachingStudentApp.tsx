@@ -3,6 +3,7 @@ import { Icon } from "@openedx/paragon";
 import { PlayCircleFilled } from "@openedx/paragon/icons";
 import { useIntl } from "react-intl";
 
+import { ConfirmResetModal } from "../shared/ConfirmResetModal";
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { CharacterResponse, requestEvaluation, resetAll, sendChatMessage } from "./api";
 import {
@@ -290,6 +291,7 @@ export default function CoachingStudentApp({
   });
   const [evaluationPending, setEvaluationPending] = useState(false);
   const [confirmType, setConfirmType] = useState<"reset" | "submit" | null>(null);
+  const [resetConfirmTarget, setResetConfirmTarget] = useState<HTMLElement | null>(null);
   const [statusByPane, setStatusByPane] = useState({
     coach: "",
     workspace: "",
@@ -952,6 +954,7 @@ export default function CoachingStudentApp({
             className="coach-button coach-button--secondary coach-reset-all"
             disabled={busyByPane.workspace || busyByPane.coach}
             onClick={() => setConfirmType("reset")}
+            ref={setResetConfirmTarget}
           >
             {intl.formatMessage({
               id: "coaching.student.reset",
@@ -1011,32 +1014,15 @@ export default function CoachingStudentApp({
 
       {(reportMode || reviewMode) && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
 
-      {confirmType === "reset" ? (
-        <ConfirmDialog
-          title={intl.formatMessage({
-            id: "coaching.student.resetConfirm.title",
-            defaultMessage: "Start again?",
-          })}
-          body={intl.formatMessage({
-            id: "coaching.student.resetConfirm.body",
-            defaultMessage:
-              "Your work will be cleared, and the activity will start again.",
-          })}
-          cancelLabel={intl.formatMessage({
-            id: "coaching.student.resetConfirm.cancel",
-            defaultMessage: "Cancel",
-          })}
-          confirmLabel={intl.formatMessage({
-            id: "coaching.student.resetConfirm.confirm",
-            defaultMessage: "Start over",
-          })}
-          onCancel={() => setConfirmType(null)}
-          onConfirm={() => {
-            setConfirmType(null);
-            resetAllConversations();
-          }}
-        />
-      ) : null}
+      <ConfirmResetModal
+        positionRef={resetConfirmTarget}
+        isOpen={confirmType == "reset"}
+        onConfirm={() => {
+          setConfirmType(null);
+          resetAllConversations();
+        }}
+        onCancel={() => setConfirmType(null)}
+      />
 
       {confirmType === "submit" ? (
         <ConfirmDialog

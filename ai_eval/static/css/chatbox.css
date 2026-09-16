@@ -31,6 +31,10 @@
   --shortanswer-submit-button-gap: var(--pgn-spacing-spacer-1-5, 0.35rem);
 }
 
+.shortanswer-react-app {
+    position: relative; /* so popup modal greyed background is contained */
+}
+
 .shortanswer-react-app::after {
   content: "";
   display: block;
