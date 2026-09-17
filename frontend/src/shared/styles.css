@@ -134,3 +134,11 @@
 .border-3 {
     border: 3px solid var(--pgn-color-border) !important;
 }
+
+/* a full size darkened background that can't be clicked through, as a backdrop for a popup modal */
+.modal-background {
+    position: absolute; /* requires the outer container to be position: relative */
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.2);
+    z-index: 999;
+}

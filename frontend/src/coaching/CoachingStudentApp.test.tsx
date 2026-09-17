@@ -9,6 +9,7 @@ jest.mock("./api");
 
 const mockSendChatMessage = api.sendChatMessage as jest.MockedFunction<typeof api.sendChatMessage>;
 const mockResetAll = api.resetAll as jest.MockedFunction<typeof api.resetAll>;
+const mockRequestEvaluation = api.requestEvaluation as jest.MockedFunction<typeof api.requestEvaluation>;
 
 function makePayload(overrides?: Partial<CoachingStudentPayload>): CoachingStudentPayload {
   return {
@@ -220,6 +221,48 @@ describe("CoachingStudentApp", () => {
 
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(mockResetAll).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("submit", () => {
+    it("shows confirm dialog before submit", async () => {
+      mockSendChatMessage.mockResolvedValue({
+        message: {
+          character: { name: "Alex", avatar: "", pane: "workspace", role: "tutor" },
+          content: "Great response!",
+          is_user: false,
+          pane: "workspace",
+        },
+        attempts: {
+          attempts_remaining: 2,
+          attempts_used: 1,
+          can_retry: true,
+          max_attempts: 3,
+        },
+        finished: false,
+      });
+
+      const user = userEvent.setup();
+      render(<CoachingStudentApp payload={makePayload()} />);
+
+      const textareas = screen.getAllByRole("textbox");
+      const workspaceTextarea = textareas[0];
+      await user.type(workspaceTextarea, "my response");
+      await user.keyboard("{Enter}");
+
+      const submitButton = screen.getByRole("button", { name: /submit for evaluation/i });
+      await user.click(submitButton);
+
+      // the confirm dialog is shown, and the submit api method should not have been called yet
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(mockRequestEvaluation).not.toHaveBeenCalled();
+
+      const confirmSubmitButton = screen.getByRole("button", { name: /submit for evaluation/i });
+      await user.click(confirmSubmitButton);
+
+      // now it should be called after clicking the confirm button
+      expect(mockRequestEvaluation).toHaveBeenCalled();
+
     });
   });
 });
