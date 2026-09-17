@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "@openedx/paragon";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { ActionRow, Button, Icon, ModalCloseButton, ModalPopup } from "@openedx/paragon";
 import { PlayCircleFilled } from "@openedx/paragon/icons";
 import { useIntl } from "react-intl";
 
@@ -52,84 +52,6 @@ function toFinalReport(response: CharacterResponse): CoachingFinalReport | null 
     report_html: response.report_html,
     show_report_card: Boolean(response.show_report_card),
   };
-}
-
-function ConfirmDialog({
-  body,
-  cancelLabel,
-  confirmLabel,
-  onCancel,
-  onConfirm,
-  title,
-}: {
-  body: React.ReactNode;
-  cancelLabel: string;
-  confirmLabel: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-  title: string;
-}) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) {
-      return;
-    }
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialog.scrollIntoView?.({ block: "center" });
-    dialog.focus();
-    return () => {
-      previouslyFocused?.focus();
-    };
-  }, []);
-
-  return (
-    <div
-      className="coach-confirm-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onCancel();
-        }
-      }}
-    >
-      <div
-        ref={dialogRef}
-        className="coach-confirm-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="coach-confirm-title"
-        tabIndex={-1}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            onCancel();
-          }
-        }}
-      >
-        <h3 className="coach-confirm-dialog__title" id="coach-confirm-title">
-          {title}
-        </h3>
-        <p className="coach-confirm-dialog__body">{body}</p>
-        <div className="coach-confirm-dialog__actions">
-          <button
-            type="button"
-            className="coach-button coach-button--secondary"
-            onClick={onCancel}
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            className="coach-button coach-button--primary"
-            onClick={onConfirm}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function autoResizeTextarea(textarea: HTMLTextAreaElement | null) {
@@ -292,6 +214,7 @@ export default function CoachingStudentApp({
   const [evaluationPending, setEvaluationPending] = useState(false);
   const [confirmType, setConfirmType] = useState<"reset" | "submit" | null>(null);
   const [resetConfirmTarget, setResetConfirmTarget] = useState<HTMLElement | null>(null);
+  const [submitConfirmTarget, setSubmitConfirmTarget] = useState<HTMLElement | null>(null);
   const [statusByPane, setStatusByPane] = useState({
     coach: "",
     workspace: "",
@@ -1003,6 +926,7 @@ export default function CoachingStudentApp({
             className="coach-button coach-button--primary coach-submit-evaluation"
             disabled={!canSubmitForEvaluation}
             onClick={() => setConfirmType("submit")}
+            ref={setSubmitConfirmTarget}
           >
             {intl.formatMessage({
               id: "coaching.student.submitForEvaluation",
@@ -1024,43 +948,16 @@ export default function CoachingStudentApp({
         onCancel={() => setConfirmType(null)}
       />
 
-      {confirmType === "submit" ? (
-        <ConfirmDialog
-          title={intl.formatMessage({
-            id: "coaching.student.submitConfirm.title",
-            defaultMessage: "Submit your work?",
-          })}
-          body={intl.formatMessage(
-            {
-              id: "coaching.student.submitConfirm.body",
-              defaultMessage:
-                "You still have {count} responses left. If you submit now, your current response will be scored.",
-            },
-            {
-              count:
-                typeof attemptsRemaining === "number"
-                  ? attemptsRemaining
-                  : intl.formatMessage({
-                      id: "coaching.student.submitConfirm.unlimited",
-                      defaultMessage: "unlimited",
-                    }),
-            },
-          )}
-          cancelLabel={intl.formatMessage({
-            id: "coaching.student.submitConfirm.cancel",
-            defaultMessage: "Cancel",
-          })}
-          confirmLabel={intl.formatMessage({
-            id: "coaching.student.submitConfirm.confirm",
-            defaultMessage: "Submit for evaluation",
-          })}
-          onCancel={() => setConfirmType(null)}
-          onConfirm={() => {
-            setConfirmType(null);
-            submitForEvaluation();
-          }}
-        />
-      ) : null}
+      <SubmitConfirmDialog
+        positionRef={submitConfirmTarget}
+        isOpen={confirmType == "submit"}
+        remainingResponses={attemptsRemaining === null ? intl.formatMessage({ id: "coaching.student.submitConfirm.unlimited", defaultMessage: "unlimited", }) : attemptsRemaining}
+        onConfirm={() => {
+          setConfirmType(null);
+          submitForEvaluation();
+        }}
+        onCancel={() => setConfirmType(null)}
+      />
 
       {errorData &&
         <GenericErrorAlert
@@ -1073,3 +970,79 @@ export default function CoachingStudentApp({
     </section>
   );
 }
+
+interface SubmitConfirmDialogProps {
+  remainingResponses: string | number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isOpen: boolean;
+  positionRef: HTMLElement | null;
+}
+
+const SubmitConfirmDialog = ({
+  remainingResponses,
+  onConfirm,
+  onCancel,
+  isOpen,
+  positionRef,
+}: SubmitConfirmDialogProps) => {
+  if (!isOpen) {
+    return null;
+  }
+
+  const intl = useIntl();
+  const labelId = useId();
+
+  return (
+    // This wrapper div ensures that you can't accidentally interact with the rest of the block while the popup is open.
+    // Ideally this wouldn't be necessary, but the isBlocking behaviour of ModalPopup is buggy.
+    <div className="modal-background">
+      <ModalPopup
+        hasArrow
+        positionRef={positionRef}
+        isOpen={isOpen}
+        // XXX: I couldn't use the built-in onClose functionality, because it's too sensitive.
+        // The onClose was triggered even when clicking the confirm button.
+        onClose={() => {}}
+        placement="top"
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={labelId}
+          className="bg-white p-3 rounded shadow border"
+        >
+          <h3 id={labelId}>{intl.formatMessage({
+            id: "coaching.student.submitConfirm.title",
+            defaultMessage: "Submit your work?",
+          })}</h3>
+          <p>
+          { intl.formatMessage(
+            {
+              id: "coaching.student.submitConfirm.body",
+              defaultMessage:
+                "You still have {count} responses left. If you submit now, your current response will be scored.",
+            },
+            { count: remainingResponses, },
+          )}
+          </p>
+
+          <ActionRow>
+            <ModalCloseButton onClick={onCancel} variant="tertiary">
+              {intl.formatMessage({
+                id: "coaching.student.submitConfirm.cancel",
+                defaultMessage: "Cancel",
+              })}
+            </ModalCloseButton>
+            <Button onClick={onConfirm}>
+              {intl.formatMessage({
+                id: "coaching.student.submitConfirm.confirm",
+                defaultMessage: "Submit for evaluation",
+              })}
+            </Button>
+          </ActionRow>
+        </div>
+      </ModalPopup>
+    </div>
+  );
+};
