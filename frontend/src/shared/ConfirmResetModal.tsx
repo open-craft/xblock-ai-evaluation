@@ -34,14 +34,7 @@ export const ConfirmResetModal = ({
   return (
     // This wrapper div ensures that you can't accidentally interact with the rest of the block while the popup is open.
     // Ideally this wouldn't be necessary, but the isBlocking behaviour of ModalPopup is buggy.
-    <div
-      style={{
-        position: "absolute", // requires the outer container to be position: relative
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.2)",
-        zIndex: 999,
-      }}
-    >
+    <div className="modal-background">
       <ModalPopup
         hasArrow
         positionRef={positionRef}
