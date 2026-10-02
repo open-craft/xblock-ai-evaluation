@@ -154,7 +154,7 @@ def _get_messages(block, session):
     `time` is the stored ISO timestamp, or "" for older data recorded before timestamps existed.
     """
     if isinstance(block, CodingAIEvalXBlock):
-        time_str = session.get(coding_ai_eval.TIME) or ""
+        time_str = session.get(coding_ai_eval.TIME, "")
         yield ("user", session[coding_ai_eval.USER_RESPONSE], time_str)
         yield ("ai_evaluation", session[coding_ai_eval.AI_EVALUATION], time_str)
         yield ("code_exec_result", session[coding_ai_eval.CODE_EXEC_RESULT], time_str)
@@ -163,7 +163,7 @@ def _get_messages(block, session):
             if isinstance(block, ShortAnswerAIEvalXBlock):
                 source = message["source"]
                 content = message["content"]
-                time_str = message.get("time") or ""
+                time_str = message.get("time", "")
             else:
                 continue
             yield (source, content, time_str)
@@ -196,10 +196,8 @@ def _fragment_sort_key(fragment):
     Times are parsed rather than compared as strings because the stored offset follows the
     server's local timezone and can change (e.g. across DST).
     """
-    try:
-        return (1, datetime.fromisoformat(fragment.get("time") or "").timestamp())
-    except (TypeError, ValueError):
-        return (0, 0)
+    time_str = fragment.get("time")
+    return datetime.fromisoformat(time_str).timestamp() if time_str else 0
 
 
 def _iter_coach_messages(block, session):
@@ -213,29 +211,20 @@ def _iter_coach_messages(block, session):
     """
     main_role = block.character_1_role or "Main character"
     coach_role = block.character_2_role or "Coach"
-    session = session or {}
-    workspace_history = session.get("workspace_history") or []
-    coach_history = session.get("coach_history") or []
-    evaluation_fragments = session.get("evaluation_fragments") or []
-
     chat_fragments = sorted(
-        [(fragment or {}, main_role) for fragment in workspace_history]
-        + [(fragment or {}, coach_role) for fragment in coach_history],
+        [(fragment, main_role) for fragment in session["workspace_history"]]
+        + [(fragment, coach_role) for fragment in session["coach_history"]],
         key=lambda item: _fragment_sort_key(item[0]),
     )
     for fragment, assistant_role in chat_fragments:
-        time_str = fragment.get("time") or ""
-        user_message = fragment.get("user_message") or ""
-        if user_message.strip():
-            yield ("user", user_message, time_str)
-        character_message = fragment.get("character_message") or ""
-        if character_message.strip():
-            yield (f"llm ({assistant_role})", character_message, time_str)
-    for fragment in evaluation_fragments or []:
-        fragment = fragment or {}
-        character_message = fragment.get("character_message") or ""
-        if character_message.strip():
-            yield ("llm (Evaluator)", character_message, fragment.get("time") or "")
+        time_str = fragment.get("time", "")
+        if fragment["user_message"].strip():
+            yield ("user", fragment["user_message"], time_str)
+        if fragment["character_message"].strip():
+            yield (f"llm ({assistant_role})", fragment["character_message"], time_str)
+    for fragment in session["evaluation_fragments"]:
+        if fragment["character_message"].strip():
+            yield ("llm (Evaluator)", fragment["character_message"], fragment.get("time", ""))
 
 
 def _get_coach_export_sessions(field_data_cache, block, user):
