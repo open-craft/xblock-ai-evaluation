@@ -41,6 +41,7 @@ loader = ResourceLoader(__name__)
 @XBlock.wants('user')
 class DataExportXBlock(XBlock):
     icon_class = "problem"
+    public_dir = "static"
     display_name = String(
         default=_("AI XBlocks data export"),
         scope=Scope.settings

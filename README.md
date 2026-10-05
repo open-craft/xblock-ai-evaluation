@@ -40,7 +40,8 @@ The `ai_eval_export` XBlock is a preconfigured, staff-only tool for exporting le
 - Enable it by adding `ai_eval_export` to the course `Advanced Module List`, then add it to a unit via the Studio “Advanced” component picker.
 - It only works from the LMS (Studio/CMS uses different Celery queues), and it only renders for course staff.
 - Clicking “Start export” generates a CSV and provides a download link when ready.
-- The CSV includes a `Course Name` column (human-readable course title) and includes `Location` to identify the specific XBlock usage within the course.
+- The CSV includes a `Course Name` column (human-readable course title) and includes `Location` to identify the specific XBlock usage within the course. It also includes a `Timestamp` column with the stored ISO 8601 time of each message
+
 
 ### PDF transcript downloads
 

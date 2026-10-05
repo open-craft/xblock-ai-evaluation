@@ -3,6 +3,7 @@ Celery task for student messages export.
 """
 import itertools
 import time
+from datetime import datetime
 
 from celery import shared_task
 from celery.utils.log import get_task_logger
@@ -32,6 +33,7 @@ _BASE_HEADER = (
     "Conversation",
     "Source",
     "Message",
+    "Timestamp",
 )
 
 _BLOCK_CATEGORIES = [
@@ -146,19 +148,25 @@ def _extract_all_data(course_id):
 
 
 def _get_messages(block, session):
-    """Extract messages for one conversation session of a supported XBlock."""
+    """
+    Extract (source, content, time) tuples for one conversation session of a supported XBlock.
+
+    `time` is the stored ISO timestamp, or "" for older data recorded before timestamps existed.
+    """
     if isinstance(block, CodingAIEvalXBlock):
-        yield ("user", session[coding_ai_eval.USER_RESPONSE])
-        yield ("ai_evaluation", session[coding_ai_eval.AI_EVALUATION])
-        yield ("code_exec_result", session[coding_ai_eval.CODE_EXEC_RESULT])
+        time_str = session.get(coding_ai_eval.TIME, "")
+        yield ("user", session[coding_ai_eval.USER_RESPONSE], time_str)
+        yield ("ai_evaluation", session[coding_ai_eval.AI_EVALUATION], time_str)
+        yield ("code_exec_result", session[coding_ai_eval.CODE_EXEC_RESULT], time_str)
     else:
         for message in session:
             if isinstance(block, ShortAnswerAIEvalXBlock):
                 source = message["source"]
                 content = message["content"]
+                time_str = message.get("time", "")
             else:
                 continue
-            yield (source, content)
+            yield (source, content, time_str)
 
 
 def _get_user_state_value(field_data_cache, block, user, field_name, default=None):
@@ -181,36 +189,42 @@ def _get_user_state_value(field_data_cache, block, user, field_name, default=Non
         return default
 
 
+def _fragment_sort_key(fragment):
+    """
+    Sort key placing untimed Coaching fragments first, then timed ones chronologically.
+
+    Times are parsed rather than compared as strings because the stored offset follows the
+    server's local timezone and can change (e.g. across DST).
+    """
+    time_str = fragment.get("time")
+    return datetime.fromisoformat(time_str).timestamp() if time_str else 0
+
+
 def _iter_coach_messages(block, session):
     """
-    Yield (source, content) tuples for one CoachAIEvalXBlock session.
+    Yield (source, content, time) tuples for one CoachAIEvalXBlock session.
 
-    Ordering is best-effort: workspace first, then coach, then evaluation fragments.
+    Workspace and coach fragments are interleaved in timestamp order, followed by evaluation
+    fragments. Each fragment holds one learner message and its reply under a single timestamp,
+    recorded when the reply is saved; `time` is "" for fragments recorded before timestamps
+    existed. Those untimed fragments come first, keeping their original workspace-then-coach order.
     """
     main_role = block.character_1_role or "Main character"
     coach_role = block.character_2_role or "Coach"
-    session = session or {}
-    workspace_history = session.get("workspace_history") or []
-    coach_history = session.get("coach_history") or []
-    evaluation_fragments = session.get("evaluation_fragments") or []
-
-    def _iter_fragments(fragments, assistant_role):
-        for fragment in fragments or []:
-            fragment = fragment or {}
-            user_message = fragment.get("user_message") or ""
-            if user_message.strip():
-                yield ("user", user_message)
-            character_message = fragment.get("character_message") or ""
-            if character_message.strip():
-                yield (f"llm ({assistant_role})", character_message)
-
-    yield from _iter_fragments(workspace_history, main_role)
-    yield from _iter_fragments(coach_history, coach_role)
-    for fragment in evaluation_fragments or []:
-        fragment = fragment or {}
-        character_message = fragment.get("character_message") or ""
-        if character_message.strip():
-            yield ("llm (Evaluator)", character_message)
+    chat_fragments = sorted(
+        [(fragment, main_role) for fragment in session["workspace_history"]]
+        + [(fragment, coach_role) for fragment in session["coach_history"]],
+        key=lambda item: _fragment_sort_key(item[0]),
+    )
+    for fragment, assistant_role in chat_fragments:
+        time_str = fragment.get("time", "")
+        if fragment["user_message"].strip():
+            yield ("user", fragment["user_message"], time_str)
+        if fragment["character_message"].strip():
+            yield (f"llm ({assistant_role})", fragment["character_message"], time_str)
+    for fragment in session["evaluation_fragments"]:
+        if fragment["character_message"].strip():
+            yield ("llm (Evaluator)", fragment["character_message"], fragment.get("time", ""))
 
 
 def _get_coach_export_sessions(field_data_cache, block, user):
@@ -276,7 +290,7 @@ def _extract_data(block):
                 _get_coach_export_sessions(data, block, user),
                 start=1,
             ):
-                for source, content in _iter_coach_messages(block, session):
+                for source, content, time_str in _iter_coach_messages(block, session):
                     yield (
                         section_name,
                         subsection_name,
@@ -288,6 +302,7 @@ def _extract_data(block):
                         idx,
                         source,
                         content,
+                        time_str,
                     )
         else:
             try:
@@ -301,7 +316,7 @@ def _extract_data(block):
                 continue
 
             for idx, session in enumerate(sessions, start=1):
-                for source, content in _get_messages(block, session):
+                for source, content, time_str in _get_messages(block, session):
                     yield (
                         section_name,
                         subsection_name,
@@ -313,6 +328,7 @@ def _extract_data(block):
                         idx,
                         source,
                         content,
+                        time_str,
                     )
 
 
