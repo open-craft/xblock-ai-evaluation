@@ -40,6 +40,7 @@ setup(
         "mistune",
         "nh3",
         "Pygments",
+        "pypdf",
     ],
     entry_points={
         "xblock.v1": [
@@ -47,7 +48,9 @@ setup(
             "shortanswer_ai_eval = ai_eval:ShortAnswerAIEvalXBlock",
             "coding_ai_eval = ai_eval:CodingAIEvalXBlock",
             "coach_ai_eval = ai_eval:CoachAIEvalXBlock",
-        ]
+        ],
+        "lms.djangoapp": ["ai_eval = ai_eval.apps:AiEvalConfig"],
+        "cms.djangoapp": ["ai_eval = ai_eval.apps:AiEvalConfig"],
     },
     package_data=package_data("ai_eval", ["static", "public", "templates"]),
     python_requires=">=3.11",
