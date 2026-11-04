@@ -1,3 +1,4 @@
+import { MessageAttachment, PaneUploadState, UploadFileLimits, UploadHandlerUrls } from "../shared/attachments";
 import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface CoachingCharacter {
@@ -12,6 +13,8 @@ export interface CoachingMessage {
   content: string;
   is_user: boolean;
   pane: string;
+  /** The learner's files. Only on learner messages. */
+  attachments?: MessageAttachment[];
 }
 
 export interface CoachingAttemptState {
@@ -25,16 +28,22 @@ export interface CoachingFinalReport {
   attempts: CoachingAttemptState;
   evaluation_markdown: string;
   final_submission: string;
+  final_submission_attachments: MessageAttachment[];
   finished: boolean;
   report_html: string;
   show_report_card: boolean;
 }
 
-export interface CoachingStudentHandlerUrls {
+export interface CoachingStudentHandlerUrls extends UploadHandlerUrls {
   get_character_response: string;
   get_evaluator_response: string;
   reset_all: string;
   download_pdf: string;
+}
+
+export interface CoachingUploads extends UploadFileLimits {
+  workspace: PaneUploadState;
+  coach: PaneUploadState;
 }
 
 export interface CoachingStudentInitialState {
@@ -42,6 +51,7 @@ export interface CoachingStudentInitialState {
   chat_histories: CoachingMessage[][];
   final_report?: CoachingFinalReport;
   finished: boolean;
+  uploads: CoachingUploads;
 }
 
 export interface CoachingStudentMeta {
