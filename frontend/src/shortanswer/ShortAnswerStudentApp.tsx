@@ -11,6 +11,9 @@ import { TypingIndicator } from "../shared/TypingIndicator";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
 import { ConfirmResetModal } from "../shared/ConfirmResetModal";
 import { ErrorData, GenericErrorAlert } from "../shared/error";
+import { AttachmentChips } from "../shared/AttachmentChips";
+import { AttachmentUploader } from "../shared/AttachmentUploader";
+import { AttachmentUploads, useAttachmentUploads } from "../shared/useAttachmentUploads";
 
 function countUserMessages(messages: ShortAnswerMessage[]) {
   return messages.reduce((count, message) => {
@@ -106,13 +109,21 @@ function MessageList({
     >
       {messages.map((message, index) => {
         const messageClassName = message.source === "user" ? "user-answer p-3" : "ai-eval";
+        const bubble = (
+          <div
+            className={"mb-5 chat-message " + messageClassName}
+            dangerouslySetInnerHTML={{ __html: renderedMessages[index] }}
+          />
+        );
+
+        if (!message.attachments?.length) {
+          return <div className="chat-message-container" key={String(index)}>{bubble}</div>;
+        }
 
         return (
-          <div className="chat-message-container" key={String(index)}>
-            <div
-              className={"mb-5 chat-message " + messageClassName}
-              dangerouslySetInnerHTML={{ __html: renderedMessages[index] }}
-            />
+          <div className="chat-message-container chat-message-container--with-attachments" key={String(index)}>
+            <AttachmentChips attachments={message.attachments} className={message.content ? "mb-2" : "mb-5"} />
+            {message.content ? bubble : null}
           </div>
         );
       })}
@@ -139,8 +150,10 @@ function MessageComposer({
   onChange,
   onReset,
   onSubmit,
+  resetting,
   textareaRef,
   setResetConfirmTarget,
+  uploads,
 }: {
   allowReset: boolean;
   canReset: boolean;
@@ -151,8 +164,10 @@ function MessageComposer({
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onReset: () => void;
   onSubmit: () => void;
+  resetting: boolean;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   setResetConfirmTarget: (el: HTMLElement|null) => void;
+  uploads: AttachmentUploads;
 }) {
   const intl = useIntl();
   const sendLabel = intl.formatMessage({
@@ -179,27 +194,29 @@ function MessageComposer({
             })}
           </Button>
         ) : null}
-        <div className="chat-input-wrapper">
-          <Form.Control
-            ref={textareaRef}
-            rows={1}
-            disabled={disabled}
-            as="textarea"
-            autoResize
-            placeholder={intl.formatMessage({
-              id: "shortanswer.student.placeholder",
-              defaultMessage: "Type your answer here. Ctrl+Enter to send, Shift+Enter for new line.",
-            })}
-            maxLength={characterLimit}
-            value={draft}
-            onChange={onChange}
-            onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                e.preventDefault();
-                onSubmit();
-              }
-            }}
-          />
+        <div className={"chat-input-wrapper" + (uploads.enabled ? " chat-input-wrapper--with-uploads" : "")}>
+          <AttachmentUploader uploads={uploads} disabled={disabled || resetting}>
+            <Form.Control
+              ref={textareaRef}
+              rows={1}
+              disabled={disabled}
+              as="textarea"
+              autoResize
+              placeholder={intl.formatMessage({
+                id: "shortanswer.student.placeholder",
+                defaultMessage: "Type your answer here. Ctrl+Enter to send, Shift+Enter for new line.",
+              })}
+              maxLength={characterLimit}
+              value={draft}
+              onChange={onChange}
+              onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }}
+            />
+          </AttachmentUploader>
           <Button
             type="button"
             variant="secondary"
@@ -234,6 +251,8 @@ export default function ShortAnswerStudentApp({
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState(false);
+  // Uploads stay available while a message is sending, but not during a reset, which discards pending files.
+  const [resetting, setResetting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const questionHtml = useMemo(() => renderMarkdown(payload.meta.question), [payload.meta.question]);
   const [chatMinHeight, setChatMinHeight] = useState<number | null>(null);
@@ -241,13 +260,20 @@ export default function ShortAnswerStudentApp({
   const imageRef = useRef<HTMLImageElement>(null);
   const questionRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const uploads = useAttachmentUploads({
+    pane: "shortanswer",
+    paneState: payload.initial_state.uploads.shortanswer,
+    fileLimits: payload.initial_state.uploads,
+    handlerUrls: payload.handler_urls,
+  });
   const userMessageCount = countUserMessages(messages);
   const maxResponses = Number(payload.meta.max_responses || 0);
   const characterLimit = payload.meta.character_limit;
   const allowReset = Boolean(payload.meta.allow_reset);
   const hideQuestion = Boolean(payload.meta.hide_question);
-  const canSubmit = !pending && draft.length > 0 && userMessageCount < maxResponses;
-  const canReset = allowReset && !pending && userMessageCount > 0;
+  const hasMessageContent = draft.trim().length > 0 || uploads.uploadedAttachments.length > 0;
+  const canSubmit = !pending && !uploads.uploading && hasMessageContent && userMessageCount < maxResponses;
+  const canReset = allowReset && !pending && !uploads.uploading && userMessageCount > 0;
   const controlsDisabled = userMessageCount >= maxResponses;
   // question panel should only default to open if user has not already send a message
   const [questionPanelIsOpen, setQuestionPanelIsOpen] = React.useState(userMessageCount == 0 ? true : false);
@@ -306,14 +332,17 @@ export default function ShortAnswerStudentApp({
     }
 
     const userInput = draft;
+    const sentAttachments = uploads.uploadedAttachments;
     const nextMessages = messages.concat({
       source: "user",
       content: userInput,
+      attachments: sentAttachments,
     });
 
     setMessages(nextMessages);
 
     setDraft("");
+    uploads.clearAttachments();
 
     // This is a hacky workaround for the issue where the textarea doesn't auto-resize when the value is set externally.
     // https://github.com/openedx/paragon/issues/4319
@@ -339,7 +368,11 @@ export default function ShortAnswerStudentApp({
     );
 
     try {
-      const llmContent = await sendAnswer(payload.handler_urls.get_response, userInput);
+      const llmContent = await sendAnswer(
+        payload.handler_urls.get_response,
+        userInput,
+        sentAttachments.map((attachment) => attachment.upload_id),
+      );
       setMessages(
         nextMessages.concat({
           source: "llm",
@@ -356,6 +389,7 @@ export default function ShortAnswerStudentApp({
     } catch (error: any) {
       setMessages(messages);
       setDraft((current) => current || userInput);
+      uploads.handleFailedSend(sentAttachments, error);
       setPending(false);
 
       setErrorData({
@@ -376,6 +410,7 @@ export default function ShortAnswerStudentApp({
 
     setErrorData(null);  // clear the error data while we try a new action
     setPending(true);
+    setResetting(true);
     setStatusMessage(
       intl.formatMessage({
         id: "shortanswer.student.resetting",
@@ -384,9 +419,11 @@ export default function ShortAnswerStudentApp({
     );
 
     try {
-      await resetChat(payload.handler_urls.reset);
+      const response = await resetChat(payload.handler_urls.reset);
       setMessages([]);
+      uploads.resetAttachments(response.remaining);
       setPending(false);
+      setResetting(false);
       setStatusMessage(
         intl.formatMessage({
           id: "shortanswer.student.resetDone",
@@ -402,6 +439,7 @@ export default function ShortAnswerStudentApp({
       setQuestionPanelIsOpen(true);
     } catch (error: any) {
       setPending(false);
+      setResetting(false);
 
       setErrorData({
         title: intl.formatMessage({
@@ -461,7 +499,9 @@ export default function ShortAnswerStudentApp({
             onReset={() => setShowConfirmReset(true)}
             setResetConfirmTarget={setResetConfirmTarget}
             onSubmit={submitAnswer}
+            resetting={resetting}
             textareaRef={textareaRef}
+            uploads={uploads}
           />
         </div>
 
