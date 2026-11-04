@@ -1635,6 +1635,7 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
                         else None
                     ),
                     content=entry["user_message"],
+                    attachments=attachment_filenames(entry),
                 )
             )
             sections[-1].messages.append(
@@ -1657,6 +1658,10 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
 
         content = CoachedData(
             final_submission=session["final_submission"],
+            # Sessions saved before learner uploads have no final_submission_attachments.
+            final_submission_attachments=[
+                attachment["filename"] for attachment in session.get("final_submission_attachments", [])
+            ],
             final_evaluation=session["final_evaluation_markdown"],
             evaluator_name=self.character_1_name,
             sections=sections,

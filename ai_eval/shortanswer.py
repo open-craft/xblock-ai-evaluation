@@ -17,7 +17,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 from .pdf_generator import ShortAnswerData, ShortAnswerMessage
-from .upload_mixin import LEARNER_CONTENT_FRAMING, LearnerUploadMixin, PaneUploadFields
+from .upload_mixin import LEARNER_CONTENT_FRAMING, LearnerUploadMixin, PaneUploadFields, attachment_filenames
 from .utils import now, strip_html_tags
 
 
@@ -585,6 +585,7 @@ class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
                         # NOTE: time field was added in 2026-04, so some existing instances may not have this field
                         time=data.get("time"),
                         kind="student",
+                        attachments=attachment_filenames(data),
                     )
                 )
                 for data in session

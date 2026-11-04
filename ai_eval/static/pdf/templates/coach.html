@@ -17,6 +17,9 @@
                     <div class="content">
                         {{ message.content | safe }}
                     </div>
+                    {% if message.attachments %}
+                        <div class="attachments">Attached: {{ message.attachments | join(", ") }}</div>
+                    {% endif %}
                 </div>
 
             {% endfor %}
@@ -26,6 +29,9 @@
     <h2>Your Final Submission</h2>
 
     {{ data.final_submission | safe }}
+    {% if data.final_submission_attachments %}
+        <div class="attachments">Attached: {{ data.final_submission_attachments | join(", ") }}</div>
+    {% endif %}
 
     <hr>
 
