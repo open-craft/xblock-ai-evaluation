@@ -45,6 +45,19 @@ class AttachmentDownloadError(Exception):
         super().__init__(f'Error downloading "{url}": {cause}')
 
 
+def attachment_xml(filename: str, contents: str, source: str) -> str:
+    """
+    Return one ``<attachment>`` block to splice into a prompt.
+
+    ``source`` is ``"author"`` for files the author attached and ``"learner"``
+    for files a learner uploaded, so the model can tell them apart.
+    """
+    return (
+        f'<attachment source="{source}"><filename>{saxutils.escape(filename)}</filename>'
+        f"<contents>{saxutils.escape(contents)}</contents></attachment>"
+    )
+
+
 def _get_model_choices(block):
     """
     Return the dropdown entries for the `model` field.
@@ -267,10 +280,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         blocks, hash_inputs = [], []
         for filename, contents in self._get_attachments(attachment_urls):
-            blocks.append(
-                f"<attachment><filename>{saxutils.escape(filename)}</filename>"
-                f"<contents>{saxutils.escape(contents)}</contents></attachment>"
-            )
+            blocks.append(attachment_xml(filename, contents, source="author"))
             hash_inputs.append(f"{filename}|{contents}")
         return "\n".join(blocks), hash_inputs
 
