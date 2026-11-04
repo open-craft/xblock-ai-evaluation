@@ -256,6 +256,18 @@ def test_payload_uploads_disabled_while_masquerading():
 
 
 @pytest.mark.django_db
+def test_send_with_files_rejected_while_masquerading():
+    block = make_shortanswer_block()
+    upload = save_block_upload(block, "shortanswer")
+
+    with masquerading_as_learner(), pytest.raises(JsonHandlerError) as error:
+        block.get_response.__wrapped__(block, {"user_input": "", "upload_ids": [str(upload.upload_id)]})
+
+    assert error.value.get_response().json["code"] == "uploads_disabled"
+    assert pending_upload_count(block) == 1
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("block_type", ["shortanswer", "coach"])
 def test_reset_while_masquerading_keeps_learner_pending_uploads(block_type):
     if block_type == "shortanswer":
@@ -545,6 +557,7 @@ def test_old_session_without_attachments_loads():
 
     assert shortanswer_block._uploads_used("shortanswer") == 0
     assert coach_block._uploads_used("workspace") == 0
+    assert coach_block._get_active_session()["final_submission_attachments"] == []
 
 
 # Studio

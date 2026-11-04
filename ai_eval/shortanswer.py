@@ -17,7 +17,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 from .pdf_generator import ShortAnswerData, ShortAnswerMessage
-from .upload_mixin import LearnerUploadMixin, PaneUploadFields
+from .upload_mixin import LEARNER_CONTENT_FRAMING, LearnerUploadMixin, PaneUploadFields
 from .utils import now, strip_html_tags
 
 
@@ -224,6 +224,16 @@ class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         """Whether the learner has responses remaining."""
         return len(self._current_pane_messages(pane)) < self.max_responses
 
+    def _user_message_content(self, text, attachments):
+        """
+        Return the LLM content of a learner message: its text, or its text followed by its files.
+
+        Empty text becomes "." because some providers reject empty messages.
+        """
+        if not attachments:
+            return text or "."
+        return [{"type": "text", "text": text or "."}, *self._attachment_parts(attachments)]
+
     def index_dictionary(self):
         """
         Return the block content to be indexed for search.
@@ -385,17 +395,23 @@ class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
+        upload_ids = self._upload_ids_from_request(data)
         character_limit = self._learner_input_character_limit()
         if len(user_submission) > character_limit:
             raise JsonHandlerError(
                 400,
                 _("Your response is too long (maximum {limit} characters).").format(limit=character_limit),
             )
+        if not user_submission.strip() and not upload_ids:
+            raise JsonHandlerError(400, _("Your message is empty."))
+        if not self._pane_takes_messages("shortanswer"):
+            raise JsonHandlerError(403, _("No responses remaining."))
+        message_attachments = self._pending_attachments_for_message("shortanswer", upload_ids)
         user_submission_time = now().isoformat()
 
         # Download attachments once: the rendered XML feeds the system prompt and the
         # per-file hash inputs feed the reuse tag below.
-        attachments, attachment_hash_inputs = self._render_attachments_xml(self.attachment_urls)
+        author_attachments_xml, attachment_hash_inputs = self._render_attachments_xml(self.attachment_urls)
 
         # Compute a tag to identify compatible reuse across provider/model/prompt
         # Include evaluation prompt, question, and attachment content hashes
@@ -418,9 +434,11 @@ class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
             "content": f"""
                 {self.evaluation_prompt}
 
-                {attachments}
+                {author_attachments_xml}
 
                 {question_line}Evaluation must be in Markdown format.
+
+                {LEARNER_CONTENT_FRAMING}
             """,
         }
         messages = [system_msg]
@@ -429,36 +447,43 @@ class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         # subsequent roles are 'assistant' and 'user'
         for message in self.sessions[-1]:
             if message["source"] == "user":
-                role = "user"
+                messages.append({
+                    "role": "user",
+                    "content": self._user_message_content(message["content"], message.get("attachments", [])),
+                })
             else:
-                role = "assistant"
-            messages.append({
-                "role": role,
-                "content": message["content"] or ".",
-            })
-        messages.append({"role": "user", "content": user_submission})
+                messages.append({"role": "assistant", "content": message["content"] or "."})
+        messages.append({"role": "user", "content": self._user_message_content(user_submission, message_attachments)})
+        self._log_if_files_replaced(
+            sum(len(message.get("attachments", [])) for message in self.sessions[-1]) + len(message_attachments),
+        )
 
-        try:
-            response = self.get_llm_response(messages, tag=current_tag)
-        except Exception as e:
-            logger.error(
-                f"Failed while making LLM request using model {self.model}. Error: {e}",
-                exc_info=True,
-            )
-            if str(e) == TIMEOUT_ERROR_MESSAGE:
-                raise JsonHandlerError(500, str(e)) from e
-            raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
+        with self._sending_attachments(message_attachments):
+            try:
+                response = self.get_llm_response(messages, tag=current_tag)
+            except Exception as e:
+                logger.error(
+                    f"Failed while making LLM request using model {self.model}. Error: {e}",
+                    exc_info=True,
+                )
+                if str(e) == TIMEOUT_ERROR_MESSAGE:
+                    raise JsonHandlerError(500, str(e)) from e
+                raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
-        llm_response_time = now().isoformat()
+            if not response:
+                raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")
 
-        if response:
+            llm_response_time = now().isoformat()
             self._replace_current_session(self.sessions[-1] + [
-                {"source": "user", "content": user_submission, "time": user_submission_time},
+                {
+                    "source": "user",
+                    "content": user_submission,
+                    "time": user_submission_time,
+                    "attachments": message_attachments,
+                },
                 {"source": "llm", "content": response, "time": llm_response_time},
             ])
-            return {"response": response}
-
-        raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")
+        return {"response": response}
 
     @XBlock.json_handler
     def reset(self, data, suffix=""):

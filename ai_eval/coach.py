@@ -24,7 +24,7 @@ from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
-from .upload_mixin import LearnerUploadMixin, PaneUploadFields
+from .upload_mixin import LEARNER_CONTENT_FRAMING, LearnerUploadMixin, PaneUploadFields, attachment_filenames
 from .utils import now, strip_html_tags, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
 
 
@@ -115,9 +115,12 @@ class CoachingSession(pydantic.BaseModel):
     attempts_used: int = pydantic.Field(default=0, ge=0)
     finished: bool = False
     final_submission: str = ""
+    final_submission_attachments: list = pydantic.Field(default_factory=list)
     final_evaluation_markdown: str = ""
 
-    @pydantic.field_validator("workspace_history", "coach_history", "evaluation_fragments", mode="before")
+    @pydantic.field_validator(
+        "workspace_history", "coach_history", "evaluation_fragments", "final_submission_attachments", mode="before",
+    )
     @classmethod
     def ensure_list(cls, v):
         """Accept only lists; replace anything else with an empty list."""
@@ -140,6 +143,28 @@ class CoachingSession(pydantic.BaseModel):
 
 
 _EMPTY_SESSION = CoachingSession().model_dump()
+
+
+def _latest_workspace_batch(session):
+    """Return the files of the most recent workspace message that had any: the files the evaluator gets."""
+    for fragment in reversed(session["workspace_history"]):
+        if fragment.get("attachments"):
+            return fragment["attachments"]
+    return []
+
+
+def _with_attachment_marker(message):
+    """
+    Return the conversation message with ``[Attached: ...]`` after the learner's text, if they attached files.
+
+    The marker is part of the prompt only. The UI history is built without it.
+    """
+    filenames = attachment_filenames(message)
+    if not filenames:
+        return message
+    marker = f"[Attached: {', '.join(filenames)}]"
+    content = f"{message['content']}\n{marker}" if message["content"] else marker
+    return {**message, "content": content}
 
 
 class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
@@ -876,7 +901,8 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         pane = self._get_character_data(character_index)["pane"]
         messages = []
         user_content = fragment.get("user_message")
-        if user_content:
+        attachments = fragment.get("attachments", [])
+        if user_content or attachments:
             messages.append({
                 "character": {
                     "name": "",
@@ -886,6 +912,7 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
                 },
                 "is_user": True,
                 "content": user_content,
+                "attachments": attachments,
                 "pane": pane,
             })
         messages.append({
@@ -934,12 +961,14 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         if not session["finished"]:
             return None
         final_submission = session["final_submission"]
+        final_submission_attachments = session["final_submission_attachments"]
         evaluation_markdown = session["final_evaluation_markdown"]
-        if not final_submission or not evaluation_markdown:
+        if not (final_submission or final_submission_attachments) or not evaluation_markdown:
             return None
         report_html = self._render_final_report(final_submission)
         return {
             "final_submission": final_submission,
+            "final_submission_attachments": final_submission_attachments,
             "evaluation_markdown": evaluation_markdown,
             "report_html": report_html,
             "show_report_card": True,
@@ -963,9 +992,12 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
             urls += list(self.evaluator_attachment_urls)
         return urls
 
-    def _messages_for_character(self, character_index, user_input=None):
+    def _messages_for_character(self, character_index, user_input, user_attachments):
         """
         Build LLM message payload for the requested character.
+
+        Each character gets only the files attached in its own pane, including
+        ``user_attachments``, the files of the message being sent.
         """
         session = self._ensure_histories()
         history_fragments = (
@@ -975,20 +1007,24 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         if character_index == 0 and self.initial_message:
             chat_history.append({
                 "character": self._get_character_data(0),
+                "is_user": False,
                 "content": self.initial_message,
             })
         if character_index == 1 and self.coach_initial_message:
             chat_history.append({
                 "character": self._get_character_data(1),
+                "is_user": False,
                 "content": self.coach_initial_message,
             })
         for fragment in history_fragments:
             chat_history.extend(self._get_chat_fragment_messages(fragment))
-        if user_input is not None:
-            chat_history.append({
-                "character": {"name": "", "role": "user"},
-                "content": user_input,
-            })
+        chat_history.append({
+            "character": {"name": "", "role": "user"},
+            "is_user": True,
+            "content": user_input,
+            "attachments": user_attachments,
+        })
+        attachments_by_learner_message = [message["attachments"] for message in chat_history if message["is_user"]]
 
         prompt = self._render_template(
             [
@@ -1008,16 +1044,48 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
             prompt += "\n\n" + blacklist_instruction
         prompt += "\n\n" + self._render_template(
             self.conversation_format,
-            messages=chat_history,
+            messages=[_with_attachment_marker(message) for message in chat_history],
         )
+        prompt += "\n\n" + LEARNER_CONTENT_FRAMING
 
-        def _generate():
-            yield {"role": "system", "content": prompt}
-            if self._model_slot() == SupportedModels.CLAUDE_SONNET.name:
-                # Claude needs a dummy user reply before the first assistant reply.
-                yield {"role": "user", "content": "."}
+        return self._llm_messages(prompt, self._files_message_parts(attachments_by_learner_message))
 
-        return _generate()
+    def _files_message_parts(self, attachments_by_learner_message):
+        """
+        Return the content parts of the message that sends the learner's files, or none if there are no files.
+
+        ``attachments_by_learner_message`` holds the attachments of each learner
+        message in order, so each file is labelled with the message it came with.
+        """
+        numbered_attachments = [
+            (message_number, attachment)
+            for message_number, attachments in enumerate(attachments_by_learner_message, start=1)
+            for attachment in attachments
+        ]
+        if not numbered_attachments:
+            return []
+        attachments = [attachment for _message_number, attachment in numbered_attachments]
+        self._log_if_files_replaced(len(attachments))
+        file_parts = self._attachment_parts(attachments)
+        files_message_parts = [{"type": "text", "text": "Files the learner attached, in order:"}]
+        for (message_number, attachment), file_part in zip(numbered_attachments, file_parts):
+            files_message_parts.append({"type": "text", "text": f"{attachment['filename']} (message {message_number})"})
+            files_message_parts.append(file_part)
+        return files_message_parts
+
+    def _llm_messages(self, system_prompt, files_message_parts):
+        """
+        Return the LLM messages: the system prompt, then the learner's files if there are any.
+
+        Claude needs a user message before the first assistant reply. The files
+        message is one; without files, a dummy "." is sent instead.
+        """
+        messages = [{"role": "system", "content": system_prompt}]
+        if files_message_parts:
+            messages.append({"role": "user", "content": files_message_parts})
+        elif self._model_slot() == SupportedModels.CLAUDE_SONNET.name:
+            messages.append({"role": "user", "content": "."})
+        return messages
 
     def _get_attempt_state(self):
         """
@@ -1307,39 +1375,43 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         if user_input is None:
             user_input = ""
         user_input = str(user_input)
-        trimmed_input = user_input.strip()
+        upload_ids = self._upload_ids_from_request(data)
+        if not user_input.strip() and not upload_ids:
+            raise JsonHandlerError(400, _("Your message is empty."))
+        pane = self._get_character_data(character_index)["pane"]
+        attachments = self._pending_attachments_for_message(pane, upload_ids)
 
-        if character_index == 0:
-            max_attempts = self.max_attempts or 0
-            if not trimmed_input:
-                raise JsonHandlerError(400, "Input cannot be empty.")
-            if max_attempts and session["attempts_used"] >= max_attempts:
-                raise JsonHandlerError(403, "No attempts remaining.")
-            session["attempts_used"] += 1
+        with self._sending_attachments(attachments):
+            if character_index == 0:
+                max_attempts = self.max_attempts or 0
+                if max_attempts and session["attempts_used"] >= max_attempts:
+                    raise JsonHandlerError(403, "No attempts remaining.")
+                session["attempts_used"] += 1
 
-        thread_context = f"character{character_index}"
-        message = self.get_llm_response(
-            self._messages_for_character(character_index, user_input),
-            tag=self._get_thread_tag(thread_context),
-        )
-        blacklist_terms = self._get_blacklist_terms()
-        if blacklist_terms:
-            if re.search(fr"\b({'|'.join(map(re.escape, blacklist_terms))})\b",
-                         message, re.I):
-                raise JsonHandlerError(500, "Internal error.")
-        if self.message_content_tag:
-            m = re.search((fr'<{re.escape(self.message_content_tag)}>(.*)'
-                           fr'</{re.escape(self.message_content_tag)}>'),
-                          message)
-            if m:
-                message = m.group(1)
+            thread_context = f"character{character_index}"
+            message = self.get_llm_response(
+                self._messages_for_character(character_index, user_input, attachments),
+                tag=self._get_thread_tag(thread_context),
+            )
+            blacklist_terms = self._get_blacklist_terms()
+            if blacklist_terms:
+                if re.search(fr"\b({'|'.join(map(re.escape, blacklist_terms))})\b",
+                             message, re.I):
+                    raise JsonHandlerError(500, "Internal error.")
+            if self.message_content_tag:
+                m = re.search((fr'<{re.escape(self.message_content_tag)}>(.*)'
+                               fr'</{re.escape(self.message_content_tag)}>'),
+                              message)
+                if m:
+                    message = m.group(1)
 
-        session = self._record_fragment(
-            character_index,
-            user_input,
-            message,
-            session=session,
-        )
+            session = self._record_fragment(
+                character_index,
+                user_input,
+                message,
+                session=session,
+                attachments=attachments,
+            )
         character = self._get_character_data(character_index)
         return {
             "message": {
@@ -1386,13 +1458,17 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         if session["finished"]:
             raise JsonHandlerError(403, "The session has ended.")
 
+        # The evaluator gets the latest workspace text, plus the files of the most
+        # recent workspace message that had any. They may come from different messages.
         latest_fragment = None
         for fragment in reversed(session["workspace_history"]):
             if (fragment.get("user_message") or "").strip():
                 latest_fragment = fragment
                 break
-        if not latest_fragment:
+        submitted_attachments = _latest_workspace_batch(session)
+        if not latest_fragment and not submitted_attachments:
             raise JsonHandlerError(400, "No learner response available for evaluation.")
+        final_submission = latest_fragment["user_message"] if latest_fragment else ""
 
         scenario_data = dict(self.scenario_data or {})
 
@@ -1406,31 +1482,30 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         blacklist_instruction = self._build_blacklist_instruction()
         if blacklist_instruction:
             prompt += "\n\n" + blacklist_instruction
-        conversation_messages = [
-            {
-                "character": {"name": "", "role": "user"},
-                "content": latest_fragment["user_message"],
-            }
-        ]
+        submission_message = {
+            "character": {"name": "", "role": "user"},
+            "content": final_submission,
+            "attachments": submitted_attachments,
+        }
         prompt += "\n\n" + self._render_template(
             self.conversation_format,
-            messages=conversation_messages,
+            messages=[_with_attachment_marker(submission_message)],
         )
-
-        def _evaluator_messages():
-            yield {"role": "system", "content": prompt}
-            if self._model_slot() == SupportedModels.CLAUDE_SONNET.name:
-                yield {"role": "user", "content": "."}
+        prompt += "\n\n" + LEARNER_CONTENT_FRAMING
 
         message = self.get_llm_response(
-            _evaluator_messages(),
+            self._llm_messages(prompt, self._files_message_parts([submitted_attachments])),
             tag=self._get_thread_tag("evaluator"),
         )
         session = self._record_fragment(0, "", message, session=session, is_evaluation=True)
         session["finished"] = True
-        session["final_submission"] = latest_fragment["user_message"]
+        session["final_submission"] = final_submission
+        session["final_submission_attachments"] = submitted_attachments
         session["final_evaluation_markdown"] = message
         self._set_active_session(session)
+        # A finished session takes no more messages in either pane, so files still waiting in the composers could
+        # never be sent. Like unsent text, they aren't evaluated.
+        self._discard_pending_uploads()
         character = {"name": "", "role": "evaluator", "avatar": "", "pane": "workspace"}
         report_html = self._render_final_report(session["final_submission"])
         return {
@@ -1440,6 +1515,7 @@ class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
                 "pane": character["pane"],
             },
             "final_submission": session["final_submission"],
+            "final_submission_attachments": session["final_submission_attachments"],
             "report_html": report_html,
             "evaluation_markdown": message,
             "show_report_card": True,

@@ -100,6 +100,7 @@ def _empty_coach_session():
         "attempts_used": 0,
         "finished": False,
         "final_submission": "",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "",
     }
 
@@ -693,6 +694,7 @@ def test_coach_block_migrates_older_state_to_sessions(coach_block_data):
         "attempts_used": 1,
         "finished": True,
         "final_submission": "student answer",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "# Evaluation Report",
     }
 
@@ -744,6 +746,7 @@ def test_coach_get_character_response_uses_session_runtime_state(
                 "user_message": "second answer",
                 "character_message": "patient follow-up",
                 "time": DEFAULT_FROZEN_TIME,
+                "attachments": [],
             },
         ],
         "coach_history": [],
@@ -751,6 +754,7 @@ def test_coach_get_character_response_uses_session_runtime_state(
         "attempts_used": 2,
         "finished": False,
         "final_submission": "",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "",
     }]
     assert not block.workspace_history
@@ -801,6 +805,7 @@ def test_coach_get_evaluator_response_persists_active_session(
         "attempts_used": 1,
         "finished": True,
         "final_submission": "final learner answer",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "# Evaluation Report",
     }]
     mock_get_llm.assert_called_once()
@@ -821,6 +826,7 @@ def test_coach_reset_all_appends_new_empty_session_for_meaningful_state(coach_bl
         "attempts_used": 1,
         "finished": False,
         "final_submission": "",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "",
     }
     block = CoachAIEvalXBlock(
@@ -1138,7 +1144,7 @@ def test_coach_messages_for_character_include_blacklist_instruction(coach_block_
         None,
     )
 
-    messages = list(block._messages_for_character(0, "second answer"))
+    messages = list(block._messages_for_character(0, "second answer", []))
 
     assert messages[0]["role"] == "system"
     assert (
@@ -1654,12 +1660,12 @@ def test_coach_attachments_injected_per_audience(coach_block_data):
     """Each agent's prompt sees exactly the attachments its audience is allowed."""
     block = _coach_block_with_attachments(coach_block_data)
 
-    workspace_prompt = _system_prompt(block._messages_for_character(0, "hi"))
+    workspace_prompt = _system_prompt(block._messages_for_character(0, "hi", []))
     assert "<filename>workspace.txt</filename>" in workspace_prompt
     assert "coach.txt" not in workspace_prompt
     assert "eval.txt" not in workspace_prompt
 
-    coach_prompt = _system_prompt(block._messages_for_character(1, "hi"))
+    coach_prompt = _system_prompt(block._messages_for_character(1, "hi", []))
     assert "<filename>workspace.txt</filename>" in coach_prompt
     assert "<filename>coach.txt</filename>" in coach_prompt
     assert "eval.txt" not in coach_prompt
