@@ -134,7 +134,7 @@ const shortAnswerPayload: ShortAnswerStudioPayload = {
         choices: [{ value: "gpt-4o-mini", display_name: "gpt-4o-mini" }],
       },
       show_display_name: {
-        display_name: "Show Display Name",
+        display_name: "Show Component Name",
       },
     },
     learner_uploads_enabled: false,

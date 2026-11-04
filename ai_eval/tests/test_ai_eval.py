@@ -513,6 +513,8 @@ def test_shortanswer_block_studio_view(shortanswer_block_data):
 
     assert frag.js_init_fn == "ShortAnswerAIEvalXBlockStudio"
     assert '<div data-ai-eval-react-root="true"' in frag.content
+    # Studio hides its "Editing: ..." modal title for editors marked "editor-with-tabs".
+    assert "editor-with-tabs" in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",
@@ -637,6 +639,8 @@ def test_coach_block_studio_view(coach_block_data):
 
     assert frag.js_init_fn == "CoachAIEvalXBlockStudio"
     assert '<div data-ai-eval-react-root="true"' in frag.content
+    # Studio hides its "Editing: ..." modal title for editors marked "editor-with-tabs".
+    assert "editor-with-tabs" in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",

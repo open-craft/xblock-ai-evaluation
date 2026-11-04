@@ -45,6 +45,29 @@
     padding: 0;
 }
 
+.shortanswer-react-studio .ai-eval-studio-title {
+    align-items: center;
+    border-bottom: 1px solid var(--pgn-color-gray-200, #eaeaea);
+    display: flex;
+    gap: var(--shortanswer-studio-spacing-sm);
+    margin-bottom: 1rem;
+    min-height: 3.5rem;
+    padding-bottom: 1rem;
+}
+
+.shortanswer-react-studio .ai-eval-studio-title__name {
+    color: var(--pgn-color-primary-500, #0a3055);
+    font-size: var(--pgn-typography-font-size-h3, 1.5rem);
+    font-weight: var(--pgn-typography-font-weight-bold, 700);
+    line-height: 1.25;
+    margin: 0;
+}
+
+.shortanswer-react-studio .ai-eval-studio-title .pgn__form-control-decorator-group {
+    flex: 1 1 auto;
+    max-width: 600px;
+}
+
 .shortanswer-react-studio .ai-eval-studio-actions {
     position: sticky;
     bottom: 0;

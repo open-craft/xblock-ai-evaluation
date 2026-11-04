@@ -86,6 +86,49 @@ describe("ShortAnswerStudioApp", () => {
     jest.restoreAllMocks();
   });
 
+  it("shows the name as an editable heading instead of a Display Name input", () => {
+    render(<ShortAnswerStudioApp payload={makePayload()} />);
+
+    expect(screen.getByRole("heading", { name: "Short Answer with AI Evaluation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit component name" })).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Short Answer with AI Evaluation")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Show Component Name" })).toBeInTheDocument();
+  });
+
+  it("saves the name edited in the heading", async () => {
+    const fetchMock = mockSuccessfulSave();
+    const user = userEvent.setup();
+    render(<ShortAnswerStudioApp payload={makePayload()} />);
+
+    await user.click(screen.getByRole("button", { name: "Edit component name" }));
+    const nameInput = screen.getByRole("textbox", { name: "Component name" });
+    await user.clear(nameInput);
+    await user.type(nameInput, "Reflection{Enter}");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(submittedBody(fetchMock).display_name).toBe("Reflection");
+  });
+
+  it("orders the fields from Evaluation Prompt down as in the design", () => {
+    render(<ShortAnswerStudioApp payload={makePayload({ allow_learner_uploads: true })} />);
+
+    const labels = [
+      "Evaluation Prompt",
+      "Attachment URLs",
+      "Character Image URL",
+      "File Upload",
+      "Max File Uploads",
+      "Max Responses",
+      "Allow Reset",
+      "PDF Download",
+    ].map((label) => screen.getByText(label));
+
+    labels.slice(1).forEach((label, index) => {
+      expect(labels[index].compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
   it("shows Max File Uploads only while File Upload is Yes", async () => {
     const user = userEvent.setup();
     render(<ShortAnswerStudioApp payload={makePayload()} />);

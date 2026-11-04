@@ -6,6 +6,7 @@ import { Alert, Button, Form } from "@openedx/paragon";
 
 import { RequestError } from "../shared/request";
 import { StudioEditorLayout } from "../shared/StudioEditorLayout";
+import { StudioEditorTitle } from "../shared/StudioEditorTitle";
 import { LearnerUploadStudioMeta, maxFileUploadsSchema } from "../shared/learnerUploadStudioSettings";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
@@ -1665,6 +1666,12 @@ function CoachingStudioFormContent({
         onCancel={handleCancel}
         onSave={saveStudioSettings}
       >
+        <StudioEditorTitle
+          displayName={formik.values.display_name}
+          onDisplayNameChange={(nextDisplayName) => {
+            formik.setFieldValue("display_name", nextDisplayName);
+          }}
+        />
         <div className="wrapper-comp-settings is-active" id="settings-tab">
           <div className="coaching-studio-shell">
             <StudioValidationSummary
