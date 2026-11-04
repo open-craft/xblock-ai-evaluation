@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ActionRow, Button, Icon, ModalCloseButton, ModalPopup } from "@openedx/paragon";
 import { PlayCircleFilled } from "@openedx/paragon/icons";
 import { useIntl } from "react-intl";
@@ -17,6 +18,9 @@ import { PoweredByAI } from "../shared/PoweredByAI";
 import { TypingIndicator } from "../shared/TypingIndicator";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
 import { ErrorData, GenericErrorAlert } from "../shared/error";
+import { AttachmentChips } from "../shared/AttachmentChips";
+import { AttachmentUploader } from "../shared/AttachmentUploader";
+import { useAttachmentUploads } from "../shared/useAttachmentUploads";
 
 type PaneKey = "workspace" | "coach";
 type CoachMode = "chat" | "report" | "review";
@@ -48,6 +52,7 @@ function toFinalReport(response: CharacterResponse): CoachingFinalReport | null 
     attempts: response.attempts || DEFAULT_ATTEMPTS,
     evaluation_markdown: response.evaluation_markdown || "",
     final_submission: response.final_submission || "",
+    final_submission_attachments: response.final_submission_attachments || [],
     finished: Boolean(response.finished),
     report_html: response.report_html,
     show_report_card: Boolean(response.show_report_card),
@@ -118,20 +123,29 @@ const ChatMessage = React.memo(function ChatMessage({ message }: { message: Pend
   const character = message.character;
   const className = `coach-message coach-message--pane-${pane} ${isUser ? "coach-message--user" : "coach-message--ai"}${message.pending ? " coach-message--pending" : ""}`;
 
+  const bubble = (
+    <div className="coach-message__bubble">
+      {!isUser && character.name ? (
+        <div className="coach-message__meta">
+          <span className="coach-message__name">{character.name}</span>
+        </div>
+      ) : null}
+      <div
+        className="coach-message__content"
+        dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
+      />
+    </div>
+  );
+
   return (
     <div className={className}>
       {!isUser ? <MessageAvatar character={character} /> : null}
-      <div className="coach-message__bubble">
-        {!isUser && character.name ? (
-          <div className="coach-message__meta">
-            <span className="coach-message__name">{character.name}</span>
-          </div>
-        ) : null}
-        <div
-          className="coach-message__content"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(message.content) }}
-        />
-      </div>
+      {message.attachments?.length ? (
+        <div className="coach-message__attachments">
+          <AttachmentChips attachments={message.attachments} stacked={pane === "coach"} />
+          {message.content ? bubble : null}
+        </div>
+      ) : bubble}
     </div>
   );
 });
@@ -146,6 +160,8 @@ function ReportCard({
   report: CoachingFinalReport;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // The server renders the submission section; the submitted files' chips are added to it.
+  const [submissionSection, setSubmissionSection] = useState<Element | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -154,6 +170,7 @@ function ReportCard({
     }
 
     container.innerHTML = report.report_html || "";
+    setSubmissionSection(container.querySelector(".coach-report-submission"));
     const evaluationNode = container.querySelector(".coach-report-card__evaluation");
     if (evaluationNode) {
       evaluationNode.innerHTML = evaluationHtml;
@@ -176,7 +193,14 @@ function ReportCard({
     };
   }, [evaluationHtml, onReviewConversation, report.report_html]);
 
-  return <div ref={containerRef} />;
+  return (
+    <>
+      <div ref={containerRef} />
+      {submissionSection && report.final_submission_attachments.length > 0
+        ? createPortal(<AttachmentChips attachments={report.final_submission_attachments} />, submissionSection)
+        : null}
+    </>
+  );
 }
 
 function getInitialMode(finalReport: CoachingFinalReport | null) {
@@ -220,6 +244,19 @@ export default function CoachingStudentApp({
     workspace: "",
   });
   const [errorData, setErrorData] = React.useState<ErrorData | null>(null);
+  const workspaceUploads = useAttachmentUploads({
+    pane: "workspace",
+    paneState: payload.initial_state.uploads.workspace,
+    fileLimits: payload.initial_state.uploads,
+    handlerUrls: payload.handler_urls,
+  });
+  const coachUploads = useAttachmentUploads({
+    pane: "coach",
+    paneState: payload.initial_state.uploads.coach,
+    fileLimits: payload.initial_state.uploads,
+    handlerUrls: payload.handler_urls,
+  });
+  const uploadsByPane = { workspace: workspaceUploads, coach: coachUploads };
   const workspaceHistoryRef = useRef<HTMLDivElement>(null);
   const coachHistoryRef = useRef<HTMLDivElement>(null);
   const workspaceTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -255,7 +292,10 @@ export default function CoachingStudentApp({
     !finished &&
     attemptsUsed > 0 &&
     !busyByPane.workspace &&
+    !workspaceUploads.uploading &&
     !evaluationPending;
+  const resetDisabled =
+    busyByPane.workspace || busyByPane.coach || workspaceUploads.uploading || coachUploads.uploading;
   const reviewMode = mode === "review";
   const reportMode = mode === "report";
   const evaluationHtml = useMemo(
@@ -438,6 +478,8 @@ export default function CoachingStudentApp({
     const paneIndex = pane === "workspace" ? 0 : 1;
     const draft = pane === "workspace" ? workspaceDraft : coachDraft;
     const trimmedDraft = draft.trim();
+    const uploads = uploadsByPane[pane];
+    const sentAttachments = uploads.uploadedAttachments;
 
     if (
       !handlerUrl ||
@@ -445,7 +487,8 @@ export default function CoachingStudentApp({
       finished ||
       evaluationPending ||
       busyByPane[pane] ||
-      !trimmedDraft
+      uploads.uploading ||
+      (!trimmedDraft && sentAttachments.length === 0)
     ) {
       return;
     }
@@ -464,6 +507,7 @@ export default function CoachingStudentApp({
       content: trimmedDraft,
       is_user: true,
       pane,
+      attachments: sentAttachments,
       pending: true,
     };
 
@@ -479,6 +523,7 @@ export default function CoachingStudentApp({
     } else {
       setCoachDraft("");
     }
+    uploads.clearAttachments();
 
     setErrorData(null);  // clear the error data while we try a new action
     setPaneBusy(pane, true);
@@ -491,7 +536,12 @@ export default function CoachingStudentApp({
     );
 
     try {
-      const response = await sendChatMessage(handlerUrl, paneIndex, trimmedDraft);
+      const response = await sendChatMessage(
+        handlerUrl,
+        paneIndex,
+        trimmedDraft,
+        sentAttachments.map((attachment) => attachment.upload_id),
+      );
       handleChatResponse(pane, response, trimmedDraft);
     } catch (error: any) {
       removePendingMessage(pane, trimmedDraft);
@@ -501,6 +551,7 @@ export default function CoachingStudentApp({
       } else {
         setCoachDraft(trimmedDraft);
       }
+      uploads.handleFailedSend(sentAttachments, error);
       const errorMessage = intl.formatMessage({
         id: "coaching.student.genericError",
         defaultMessage: "An error has occurred.",
@@ -518,7 +569,7 @@ export default function CoachingStudentApp({
   }
 
   async function submitForEvaluation() {
-    if (mode !== "chat" || finished || evaluationPending || busyByPane.workspace) {
+    if (mode !== "chat" || finished || evaluationPending || busyByPane.workspace || workspaceUploads.uploading) {
       return;
     }
 
@@ -538,6 +589,9 @@ export default function CoachingStudentApp({
       setEvaluationPending(false);
       setPaneBusy("workspace", false);
       applyResponseState(response);
+      // The finished session deleted the files still waiting in either composer.
+      workspaceUploads.clearAttachments();
+      coachUploads.clearAttachments();
       const nextReport = toFinalReport(response);
       if (nextReport) {
         setReport(nextReport);
@@ -571,7 +625,7 @@ export default function CoachingStudentApp({
   }
 
   async function resetAllConversations() {
-    if (busyByPane.workspace || busyByPane.coach) {
+    if (resetDisabled) {
       return;
     }
 
@@ -590,14 +644,16 @@ export default function CoachingStudentApp({
 
     try {
       const response = await resetAll(payload.handler_urls.reset_all);
-      const nextHistories = splitHistories(response.chat_histories!);
+      const nextHistories = splitHistories(response.chat_histories);
       setHistories(nextHistories);
-      setAttempts(response.attempts!);
+      setAttempts(response.attempts);
       setFinished(Boolean(response.finished));
       setMode("chat");
       setReport(null);
       setWorkspaceDraft("");
       setCoachDraft("");
+      workspaceUploads.resetAttachments(response.remaining);
+      coachUploads.resetAttachments(response.remaining);
       setBusyByPane({
         coach: false,
         workspace: false,
@@ -707,35 +763,46 @@ export default function CoachingStudentApp({
             {statusByPane.workspace}
           </div>
 
-          <div className={"coach-input" + (workspaceInputVisible ? "" : " coach-input--hidden")}>
+          <div
+            className={
+              "coach-input" +
+              (workspaceInputVisible ? "" : " coach-input--hidden") +
+              (workspaceUploads.enabled ? " coach-input--with-uploads" : "")
+            }
+          >
             <label htmlFor="coach-workspace-input" className="sr-only">
               {intl.formatMessage({
                 id: "coaching.student.workspacePlaceholder",
                 defaultMessage: "Start typing your answer",
               })}
             </label>
-            <textarea
-              id="coach-workspace-input"
-              ref={workspaceTextareaRef}
-              className="coach-input__textarea"
+            <AttachmentUploader
+              uploads={workspaceUploads}
               disabled={!workspaceInputVisible || busyByPane.workspace || evaluationPending}
-              maxLength={1000}
-              placeholder={intl.formatMessage({
-                id: "coaching.student.workspacePlaceholder",
-                defaultMessage: "Start typing your answer",
-              })}
-              rows={1}
-              value={workspaceDraft}
-              onChange={(event) => {
-                setWorkspaceDraft(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage("workspace");
-                }
-              }}
-            />
+            >
+              <textarea
+                id="coach-workspace-input"
+                ref={workspaceTextareaRef}
+                className="coach-input__textarea"
+                disabled={!workspaceInputVisible || busyByPane.workspace || evaluationPending}
+                maxLength={1000}
+                placeholder={intl.formatMessage({
+                  id: "coaching.student.workspacePlaceholder",
+                  defaultMessage: "Start typing your answer",
+                })}
+                rows={1}
+                value={workspaceDraft}
+                onChange={(event) => {
+                  setWorkspaceDraft(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage("workspace");
+                  }
+                }}
+              />
+            </AttachmentUploader>
             <button
               type="button"
               className="coach-button coach-button--icon coach-send-button"
@@ -748,7 +815,8 @@ export default function CoachingStudentApp({
                 !workspaceInputVisible ||
                 busyByPane.workspace ||
                 evaluationPending ||
-                !workspaceDraft.trim()
+                workspaceUploads.uploading ||
+                (!workspaceDraft.trim() && workspaceUploads.uploadedAttachments.length === 0)
               }
               onClick={() => {
                 sendMessage("workspace");
@@ -820,35 +888,47 @@ export default function CoachingStudentApp({
             {statusByPane.coach}
           </div>
 
-          <div className={"coach-input" + (coachInputVisible ? "" : " coach-input--hidden")}>
+          <div
+            className={
+              "coach-input" +
+              (coachInputVisible ? "" : " coach-input--hidden") +
+              (coachUploads.enabled ? " coach-input--with-uploads" : "")
+            }
+          >
             <label htmlFor="coach-side-input" className="sr-only">
               {intl.formatMessage({
                 id: "coaching.student.coachPlaceholder",
                 defaultMessage: "Start typing...",
               })}
             </label>
-            <textarea
-              id="coach-side-input"
-              ref={coachTextareaRef}
-              className="coach-input__textarea"
+            <AttachmentUploader
+              uploads={coachUploads}
               disabled={!coachInputVisible || busyByPane.coach || evaluationPending}
-              maxLength={1000}
-              placeholder={intl.formatMessage({
-                id: "coaching.student.coachPlaceholder",
-                defaultMessage: "Start typing...",
-              })}
-              rows={1}
-              value={coachDraft}
-              onChange={(event) => {
-                setCoachDraft(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  sendMessage("coach");
-                }
-              }}
-            />
+              stacked
+            >
+              <textarea
+                id="coach-side-input"
+                ref={coachTextareaRef}
+                className="coach-input__textarea"
+                disabled={!coachInputVisible || busyByPane.coach || evaluationPending}
+                maxLength={1000}
+                placeholder={intl.formatMessage({
+                  id: "coaching.student.coachPlaceholder",
+                  defaultMessage: "Start typing...",
+                })}
+                rows={1}
+                value={coachDraft}
+                onChange={(event) => {
+                  setCoachDraft(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    sendMessage("coach");
+                  }
+                }}
+              />
+            </AttachmentUploader>
             <button
               type="button"
               className="coach-button coach-button--icon coach-send-button"
@@ -858,7 +938,11 @@ export default function CoachingStudentApp({
               })}
               data-character-index="1"
               disabled={
-                !coachInputVisible || busyByPane.coach || evaluationPending || !coachDraft.trim()
+                !coachInputVisible ||
+                busyByPane.coach ||
+                evaluationPending ||
+                coachUploads.uploading ||
+                (!coachDraft.trim() && coachUploads.uploadedAttachments.length === 0)
               }
               onClick={() => {
                 sendMessage("coach");
@@ -875,7 +959,7 @@ export default function CoachingStudentApp({
           <button
             type="button"
             className="coach-button coach-button--secondary coach-reset-all"
-            disabled={busyByPane.workspace || busyByPane.coach}
+            disabled={resetDisabled}
             onClick={() => setConfirmType("reset")}
             ref={setResetConfirmTarget}
           >
@@ -951,6 +1035,7 @@ export default function CoachingStudentApp({
       <SubmitConfirmDialog
         positionRef={submitConfirmTarget}
         isOpen={confirmType == "submit"}
+        uploadsEnabled={workspaceUploads.enabled}
         remainingResponses={attemptsRemaining === null ? intl.formatMessage({ id: "coaching.student.submitConfirm.unlimited", defaultMessage: "unlimited", }) : attemptsRemaining}
         onConfirm={() => {
           setConfirmType(null);
@@ -973,6 +1058,8 @@ export default function CoachingStudentApp({
 
 interface SubmitConfirmDialogProps {
   remainingResponses: string | number;
+  /** Whether the learner can attach files in the workspace; the evaluator then also gets their latest files. */
+  uploadsEnabled: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   isOpen: boolean;
@@ -981,6 +1068,7 @@ interface SubmitConfirmDialogProps {
 
 const SubmitConfirmDialog = ({
   remainingResponses,
+  uploadsEnabled,
   onConfirm,
   onCancel,
   isOpen,
@@ -1018,11 +1106,17 @@ const SubmitConfirmDialog = ({
           })}</h3>
           <p>
           { intl.formatMessage(
-            {
-              id: "coaching.student.submitConfirm.body",
-              defaultMessage:
-                "You still have {count} responses left. If you submit now, your current response will be scored.",
-            },
+            uploadsEnabled
+              ? {
+                id: "coaching.student.submitConfirm.bodyWithUploads",
+                defaultMessage:
+                  "You still have {count} responses left. If you submit now, your latest answer and your most recently sent file(s) will be evaluated.",
+              }
+              : {
+                id: "coaching.student.submitConfirm.body",
+                defaultMessage:
+                  "You still have {count} responses left. If you submit now, your current response will be scored.",
+              },
             { count: remainingResponses, },
           )}
           </p>
