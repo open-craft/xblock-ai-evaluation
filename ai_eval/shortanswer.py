@@ -51,8 +51,8 @@ class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
     )
 
     show_display_name = Boolean(
-        display_name=_("Show Display Name"),
-        help=_("Show the title in the block header. When off, the header shows AI Discussion."),
+        display_name=_("Show Component Name"),
+        help=_("Show the component name in the block header. When off, the header shows AI Discussion."),
         default=False,
         scope=Scope.settings,
     )
@@ -338,8 +338,11 @@ class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
         # Ideally we shouldn't need to define any HTML as the React App StudioUI should take care of everything.
         # However, the Studio Runtime for the XBlock looks for certain elements in the DOM to render it's wrapper.
         #
-        # So, "editor-with-buttons" is defined to prevent the footer nativations from showing up.
-        fragment = Fragment('<div data-ai-eval-react-root="true" class="editor-with-buttons is-active"></div>')
+        # So, "editor-with-buttons" is defined to prevent the footer nativations from showing up, and
+        # "editor-with-tabs" to hide the modal's "Editing: ..." title, since the editor shows the name itself.
+        fragment = Fragment(
+            '<div data-ai-eval-react-root="true" class="editor-with-buttons editor-with-tabs is-active"></div>'
+        )
         fragment.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
 
         fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.studio.js"))

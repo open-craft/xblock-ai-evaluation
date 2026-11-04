@@ -220,4 +220,20 @@ describe("CoachingStudioApp learner upload fields", () => {
     expect(screen.getByRole("heading", { name: "Coach Chat" })).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("shows the component name as an editable heading and saves the new name", async () => {
+    const fetchMock = mockSuccessfulSave();
+    const user = userEvent.setup();
+    render(<CoachingStudioApp payload={makeUploadPayload()} />);
+
+    expect(screen.getByRole("heading", { name: "Coaching" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit component name" }));
+    await user.type(screen.getByRole("textbox", { name: "Component name" }), " activity{Enter}");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).display_name)
+      .toBe("Coaching activity");
+  });
 });

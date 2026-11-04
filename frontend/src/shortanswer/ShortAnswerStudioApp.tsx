@@ -6,6 +6,7 @@ import { Button, Form } from "@openedx/paragon";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioEditorLayout } from "../shared/StudioEditorLayout";
+import { StudioEditorTitle } from "../shared/StudioEditorTitle";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -216,19 +217,6 @@ function ShortAnswerSettingsForm({
         <FieldHelp metadata={fieldMetadata.background_theme} />
       </fieldset>
 
-      <Form.Group controlId="xb-field-edit-display_name" isInvalid={Boolean(validationErrors.display_name)}>
-        <Form.Label>{fieldMetadata.display_name?.display_name || "display_name"}</Form.Label>
-        <Form.Control
-          type="text"
-          value={values.display_name || ""}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-            onChange("display_name", event.target.value);
-          }}
-        />
-        <FieldErrors errors={validationErrors.display_name} />
-        <FieldHelp metadata={fieldMetadata.display_name} />
-      </Form.Group>
-
       <Form.Group controlId="xb-field-edit-show_display_name" isInvalid={Boolean(validationErrors.show_display_name)}>
         <Form.Checkbox
           checked={Boolean(values.show_display_name)}
@@ -336,6 +324,28 @@ function ShortAnswerSettingsForm({
         <FieldHelp metadata={fieldMetadata.evaluation_prompt} />
       </Form.Group>
 
+      <AttachmentUrlsEditor
+        metadata={fieldMetadata.attachment_urls}
+        value={values.attachment_urls || []}
+        errors={validationErrors.attachment_urls}
+        onChange={(nextValue) => {
+          onChange("attachment_urls", nextValue);
+        }}
+      />
+
+      <Form.Group controlId="xb-field-edit-character_image" isInvalid={Boolean(validationErrors.character_image)}>
+        <Form.Label>{fieldMetadata.character_image?.display_name || "character_image"}</Form.Label>
+        <Form.Control
+          type="text"
+          value={values.character_image || ""}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            onChange("character_image", event.target.value);
+          }}
+        />
+        <FieldErrors errors={validationErrors.character_image} />
+        <FieldHelp metadata={fieldMetadata.character_image} />
+      </Form.Group>
+
       {meta.learner_uploads_enabled ? (
         <ShortAnswerUploadFields
           fieldMetadata={fieldMetadata}
@@ -374,28 +384,6 @@ function ShortAnswerSettingsForm({
         <FieldErrors errors={validationErrors.allow_reset} />
         <FieldHelp metadata={fieldMetadata.allow_reset} />
       </Form.Group>
-
-      <Form.Group controlId="xb-field-edit-character_image" isInvalid={Boolean(validationErrors.character_image)}>
-        <Form.Label>{fieldMetadata.character_image?.display_name || "character_image"}</Form.Label>
-        <Form.Control
-          type="text"
-          value={values.character_image || ""}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-            onChange("character_image", event.target.value);
-          }}
-        />
-        <FieldErrors errors={validationErrors.character_image} />
-        <FieldHelp metadata={fieldMetadata.character_image} />
-      </Form.Group>
-
-      <AttachmentUrlsEditor
-        metadata={fieldMetadata.attachment_urls}
-        value={values.attachment_urls || []}
-        errors={validationErrors.attachment_urls}
-        onChange={(nextValue) => {
-          onChange("attachment_urls", nextValue);
-        }}
-      />
 
       <StudioDownloadPDFField
         onChange={onChange}
@@ -551,6 +539,12 @@ function ShortAnswerStudioFormContent({
         onCancel={handleCancel}
         onSave={handleSave}
       >
+        <StudioEditorTitle
+          displayName={formik.values.display_name}
+          onDisplayNameChange={(nextDisplayName) => {
+            formik.setFieldValue("display_name", nextDisplayName);
+          }}
+        />
         <div className="wrapper-comp-settings is-active" id="settings-tab">
           <StudioValidationSummary
             hasFieldErrors={hasFieldErrors}
