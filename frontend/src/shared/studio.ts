@@ -90,6 +90,15 @@ export function collectYupErrors(
   return errors;
 }
 
+/** Whether a Studio number field's value (a number, or the input's text) is a whole number from min to max. */
+export function isIntegerBetween(value: unknown, min: number, max: number) {
+  if (value === "" || value === null || value === undefined) {
+    return false;
+  }
+  const number = Number(value);
+  return Number.isInteger(number) && number >= min && number <= max;
+}
+
 export function getSaveErrorMessage(error: unknown, fallbackMessage: string) {
   if (error instanceof RequestError && error.payload) {
     if (hasStudioValidationIssues(error.payload)) {

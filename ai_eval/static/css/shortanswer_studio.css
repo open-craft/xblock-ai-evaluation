@@ -81,6 +81,16 @@
     grid-column: 2;
 }
 
+.shortanswer-react-studio .pgn__form-group > p.pgn__form-label {
+    grid-row: span 2;
+    margin-bottom: 0;
+    padding-top: 0;
+}
+
+.shortanswer-react-studio .pgn__form-group .pgn__form-control-set-inline > * + * {
+    margin-left: 1.5rem;
+}
+
 .shortanswer-react-studio .pgn__form-group input.form-control,
 .shortanswer-react-studio .pgn__form-group select.form-control {
     font-size: var(--shortanswer-studio-control-font-size);

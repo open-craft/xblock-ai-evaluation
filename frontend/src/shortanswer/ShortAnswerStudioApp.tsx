@@ -10,6 +10,7 @@ import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
   getSaveErrorMessage,
+  isIntegerBetween,
   isModelApiKeyLocked,
   normalizeStudioSaveResponse,
   normalizeValidationErrors,
@@ -20,12 +21,15 @@ import {
 } from "../shared/studio";
 import { StudioFieldMetadata, XBlockRuntime } from "../shared/types";
 import {
+  ShortAnswerStudioMeta,
   ShortAnswerStudioPayload,
   ShortAnswerStudioState,
   StudioLockMetadata,
 } from "./types";
 import { StudioDownloadPDFField } from "../shared/StudioDownloadPDF";
 import { BACKGROUND_OPTIONS } from "./appearance";
+import { maxFileUploadsSchema } from "../shared/learnerUploadStudioSettings";
+import { ShortAnswerUploadFields } from "./ShortAnswerUploadFields";
 
 const shortAnswerSchema = Yup.object({
   allow_reset: Yup.boolean()
@@ -44,11 +48,7 @@ const shortAnswerSchema = Yup.object({
     .test(
       "valid-max-responses",
       "max responses must be an integer between 1 and 30",
-      (value) => {
-        if (value === "" || value === null || value === undefined) return false;
-        const num = Number(value);
-        return Number.isInteger(num) && num >= 1 && num <= 30;
-      },
+      (value) => isIntegerBetween(value, 1, 30),
     ),
   model: Yup.string().ensure()
     .required("Model field is mandatory - please select one from the dropdown."),
@@ -66,6 +66,8 @@ const shortAnswerSchema = Yup.object({
   pdf_download_allowed: Yup.boolean(),
   pdf_download_title: Yup.string().ensure(),
   pdf_download_description: Yup.string().ensure(),
+  allow_learner_uploads: Yup.boolean(),
+  max_file_uploads: maxFileUploadsSchema("allow_learner_uploads"),
 });
 
 function normalizeAttachmentUrls(value: unknown) {
@@ -96,6 +98,8 @@ function buildSubmitPayload(values: ShortAnswerStudioState) {
     pdf_download_allowed: values.pdf_download_allowed,
     pdf_download_title: values.pdf_download_title,
     pdf_download_description: values.pdf_download_description,
+    allow_learner_uploads: values.allow_learner_uploads,
+    max_file_uploads: values.max_file_uploads,
   };
 }
 
@@ -168,12 +172,14 @@ function AttachmentUrlsEditor({
 
 function ShortAnswerSettingsForm({
   lockMetadata,
+  meta,
   validationErrors,
   values,
   fieldMetadata,
   onChange,
 }: {
   lockMetadata?: StudioLockMetadata;
+  meta: ShortAnswerStudioMeta;
   validationErrors: ValidationErrors;
   values: ShortAnswerStudioState;
   fieldMetadata: Record<string, StudioFieldMetadata>;
@@ -330,6 +336,16 @@ function ShortAnswerSettingsForm({
         <FieldHelp metadata={fieldMetadata.evaluation_prompt} />
       </Form.Group>
 
+      {meta.learner_uploads_enabled ? (
+        <ShortAnswerUploadFields
+          fieldMetadata={fieldMetadata}
+          maxFileUploadsCeiling={meta.max_file_uploads_ceiling}
+          validationErrors={validationErrors}
+          values={values}
+          onChange={onChange}
+        />
+      ) : null}
+
       <Form.Group controlId="xb-field-edit-max_responses" isInvalid={Boolean(validationErrors.max_responses)}>
         <Form.Label>{fieldMetadata.max_responses?.display_name || "max_responses"}</Form.Label>
         <Form.Control
@@ -406,8 +422,9 @@ function ShortAnswerStudioFormContent({
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
-  const fieldMetadata = payload.meta.field_metadata || {};
-  const lockMetadata = payload.meta.lock_metadata;
+  const meta = payload.meta;
+  const fieldMetadata = meta.field_metadata || {};
+  const lockMetadata = meta.lock_metadata;
 
   const handleSave = useCallback(async function handleSave() {
     if (!payload.handler_urls.studio_submit || isSavingRef.current) {
@@ -421,7 +438,7 @@ function ShortAnswerStudioFormContent({
     });
 
     try {
-      await shortAnswerSchema.validate(valuesRef.current, { abortEarly: false });
+      await shortAnswerSchema.validate(valuesRef.current, { abortEarly: false, context: meta });
     } catch (error: unknown) {
       if (error instanceof Yup.ValidationError) {
         setValidationErrors(collectYupErrors(error));
@@ -515,7 +532,7 @@ function ShortAnswerStudioFormContent({
         message: inlineRequestError,
       });
     }
-  }, [intl, payload.handler_urls.studio_submit, runtime]);
+  }, [intl, meta, payload.handler_urls.studio_submit, runtime]);
 
   const hasFieldErrors = Object.keys(validationErrors).length > 0;
 
@@ -544,6 +561,7 @@ function ShortAnswerStudioFormContent({
             values={formik.values}
             validationErrors={validationErrors}
             lockMetadata={lockMetadata}
+            meta={meta}
             fieldMetadata={fieldMetadata}
             onChange={(fieldName, nextValue) => {
               formik.setFieldValue(fieldName, nextValue);

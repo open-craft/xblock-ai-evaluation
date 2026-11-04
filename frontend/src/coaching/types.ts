@@ -1,4 +1,5 @@
 import { MessageAttachment, PaneUploadState, UploadFileLimits, UploadHandlerUrls } from "../shared/attachments";
+import { LearnerUploadStudioMeta } from "../shared/learnerUploadStudioSettings";
 import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface CoachingCharacter {
@@ -121,13 +122,17 @@ export interface CoachingStudioState {
   pdf_download_allowed: boolean;
   pdf_download_title: string;
   pdf_download_description: string;
+  workspace_allow_learner_uploads: boolean;
+  workspace_max_file_uploads: number | string | null;
+  coach_allow_learner_uploads: boolean;
+  coach_max_file_uploads: number | string | null;
 }
 
 export interface CoachingStudioHandlerUrls {
   studio_submit: string;
 }
 
-export interface CoachingStudioMeta {
+export interface CoachingStudioMeta extends LearnerUploadStudioMeta {
   field_metadata?: Record<string, StudioFieldMetadata>;
   lock_metadata?: CoachingStudioLockMetadata;
 }
