@@ -17,6 +17,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 from .pdf_generator import ShortAnswerData, ShortAnswerMessage
+from .upload_mixin import LearnerUploadMixin, PaneUploadFields
 from .utils import now, strip_html_tags
 
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 resource_loader = ResourceLoader(__name__)
 
 
-class ShortAnswerAIEvalXBlock(AIEvalXBlock):
+class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
     """
     Short Answer Xblock.
     """
@@ -108,6 +109,20 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         resettable_editor=False,
     )
 
+    allow_learner_uploads = Boolean(
+        display_name=_("File Upload"),
+        help=_("Allow learners to upload a file as part of their response"),
+        scope=Scope.settings,
+        default=False,
+    )
+
+    max_file_uploads = Integer(
+        display_name=_("Max File Uploads"),
+        help=_("Maximum number of files a learner can upload during the conversation"),
+        scope=Scope.settings,
+        default=3,
+    )
+
     # XXX: Deprecated.
     messages = Dict(
         scope=Scope.user_state,
@@ -127,7 +142,13 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         "allow_reset",
         "character_image",
         "attachment_urls",
+        "allow_learner_uploads",
+        "max_file_uploads",
     )
+
+    _pane_fields = {
+        "shortanswer": PaneUploadFields("allow_learner_uploads", "max_file_uploads"),
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -195,6 +216,14 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         return validation_errors, validation_warnings
 
+    def _current_pane_messages(self, pane):
+        """Return the learner's messages in the current session (Short Answer has a single pane)."""
+        return [message for message in self.sessions[-1] if message["source"] == "user"]
+
+    def _pane_takes_messages(self, pane):
+        """Whether the learner has responses remaining."""
+        return len(self._current_pane_messages(pane)) < self.max_responses
+
     def index_dictionary(self):
         """
         Return the block content to be indexed for search.
@@ -245,9 +274,12 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 "get_response": self.runtime.handler_url(self, "get_response"),
                 "reset": self.runtime.handler_url(self, "reset"),
                 "download_pdf": self.runtime.handler_url(self, "download_pdf"),
+                "upload_file": self.runtime.handler_url(self, "upload_file"),
+                "delete_upload": self.runtime.handler_url(self, "delete_upload"),
             },
             initial_state={
                 "messages": list(self.sessions[-1]),
+                "uploads": self._learner_uploads_payload(),
             },
             meta={
                 "title": self.display_name if self.show_display_name else "",
@@ -437,7 +469,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             raise JsonHandlerError(403, "Reset is disabled.")
         self.thread_map = {}
         self.sessions.append([])
-        return {}
+        self._discard_pending_uploads()
+        return {"remaining": self._remaining_uploads_by_pane()}
 
     @staticmethod
     def workbench_scenarios():

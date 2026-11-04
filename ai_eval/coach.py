@@ -24,6 +24,7 @@ from .llm import get_llm_service
 from .llm_services import CustomLLMService
 from .supported_models import SupportedModels
 from .pdf_generator import CoachedData, CoachedSection, CoachedMessage
+from .upload_mixin import LearnerUploadMixin, PaneUploadFields
 from .utils import now, strip_html_tags, FALLBACK_COACH_MESSAGE_TIME, FALLBACK_WORKSPACE_MESSAGE_TIME
 
 
@@ -141,7 +142,7 @@ class CoachingSession(pydantic.BaseModel):
 _EMPTY_SESSION = CoachingSession().model_dump()
 
 
-class CoachAIEvalXBlock(AIEvalXBlock):
+class CoachAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
     """
 
     AI-powered XBlock for simulated conversations with
@@ -355,6 +356,34 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         resettable_editor=False,
     )
 
+    workspace_allow_learner_uploads = Boolean(
+        display_name=_("File Upload"),
+        help=_("Allow learners to upload a file as part of their response"),
+        default=False,
+        scope=Scope.settings,
+    )
+
+    workspace_max_file_uploads = Integer(
+        display_name=_("Max File Uploads"),
+        help=_("Maximum number of files a learner can upload during the workspace conversation"),
+        default=3,
+        scope=Scope.settings,
+    )
+
+    coach_allow_learner_uploads = Boolean(
+        display_name=_("File Upload"),
+        help=_("Allow learners to upload a file as part of their response"),
+        default=False,
+        scope=Scope.settings,
+    )
+
+    coach_max_file_uploads = Integer(
+        display_name=_("Max File Uploads"),
+        help=_("Maximum number of files a learner can upload during the coach chat conversation"),
+        default=3,
+        scope=Scope.settings,
+    )
+
     finished = Boolean(
         scope=Scope.user_state,
         default=False,
@@ -433,7 +462,16 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         "workspace_attachment_urls",
         "coach_attachment_urls",
         "evaluator_attachment_urls",
+        "workspace_allow_learner_uploads",
+        "workspace_max_file_uploads",
+        "coach_allow_learner_uploads",
+        "coach_max_file_uploads",
     )
+
+    _pane_fields = {
+        "workspace": PaneUploadFields("workspace_allow_learner_uploads", "workspace_max_file_uploads"),
+        "coach": PaneUploadFields("coach_allow_learner_uploads", "coach_max_file_uploads"),
+    }
 
     def studio_view(self, context=None):
         """Render the React Studio editor for Coaching."""
@@ -858,6 +896,17 @@ class CoachAIEvalXBlock(AIEvalXBlock):
         })
         return messages
 
+    def _current_pane_messages(self, pane):
+        """Return the fragments of the active session's workspace or coach history."""
+        session = self._get_active_session()
+        return session["workspace_history"] if pane == "workspace" else session["coach_history"]
+
+    def _pane_takes_messages(self, pane):
+        """Whether the active session isn't finished and, for the workspace, has attempts remaining."""
+        if self._get_active_session()["finished"]:
+            return False
+        return pane != "workspace" or self._get_attempt_state()["can_retry"]
+
     def _get_chat_histories(self):
         """
         Get chat histories separated by character.
@@ -1098,11 +1147,14 @@ class CoachAIEvalXBlock(AIEvalXBlock):
                 "get_evaluator_response": self.runtime.handler_url(self, "get_evaluator_response"),
                 "reset_all": self.runtime.handler_url(self, "reset_all"),
                 "download_pdf": self.runtime.handler_url(self, "download_pdf"),
+                "upload_file": self.runtime.handler_url(self, "upload_file"),
+                "delete_upload": self.runtime.handler_url(self, "delete_upload"),
             },
             initial_state={
                 "chat_histories": self._get_chat_histories(),
                 "finished": active_session["finished"],
                 "attempts": self._get_attempt_state(),
+                "uploads": self._learner_uploads_payload(),
             },
             meta={
                 "characters": characters,
@@ -1306,16 +1358,20 @@ class CoachAIEvalXBlock(AIEvalXBlock):
 
         Preserve prior meaningful sessions and start a fresh active session.
         """
+        if not self.allow_reset:
+            raise JsonHandlerError(403, "Reset is disabled.")
         session = self._get_active_session()
         if self._session_has_meaningful_data(session):
             self._start_new_session()
         else:
             self._set_active_session(_EMPTY_SESSION.copy())
         self._clear_thread_contexts(["character0", "character1", "evaluator"])
+        self._discard_pending_uploads()
         return {
             "chat_histories": self._get_chat_histories(),
             "attempts": self._get_attempt_state(),
             "finished": self._get_active_session()["finished"],
+            "remaining": self._remaining_uploads_by_pane(),
         }
 
     @XBlock.json_handler
