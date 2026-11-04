@@ -4,6 +4,8 @@ import uuid
 
 from django.db import models
 
+from .upload_storage import FILENAME_MAX_LENGTH
+
 
 class LearnerUpload(models.Model):
     """
@@ -32,7 +34,7 @@ class LearnerUpload(models.Model):
     pane = models.CharField(max_length=16, choices=Pane.choices)
     # Where the bytes live in storage. Never leaves the server.
     storage_path = models.CharField(max_length=1024)
-    filename = models.CharField(max_length=255)
+    filename = models.CharField(max_length=FILENAME_MAX_LENGTH)
     content_type = models.CharField(max_length=64)
     size = models.PositiveIntegerField()
     # No reader yet: recorded so duplicates can be removed later without a data migration.
