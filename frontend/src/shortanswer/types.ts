@@ -1,18 +1,26 @@
+import { MessageAttachment, PaneUploadState, UploadFileLimits, UploadHandlerUrls } from "../shared/attachments";
 import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface ShortAnswerMessage {
   source: string;
   content: string;
+  /** The learner's files. Missing on LLM messages and on messages saved before learner uploads. */
+  attachments?: MessageAttachment[];
 }
 
-export interface ShortAnswerStudentHandlerUrls {
+export interface ShortAnswerStudentHandlerUrls extends UploadHandlerUrls {
   get_response: string;
   reset: string;
   download_pdf: string;
 }
 
+export interface ShortAnswerUploads extends UploadFileLimits {
+  shortanswer: PaneUploadState;
+}
+
 export interface ShortAnswerStudentInitialState {
   messages: ShortAnswerMessage[] | null;
+  uploads: ShortAnswerUploads;
 }
 
 export interface ShortAnswerStudentMeta {
