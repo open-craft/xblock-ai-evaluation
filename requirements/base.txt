@@ -191,6 +191,8 @@ pygments==2.20.0
     # via
     #   -r requirements/base.in
     #   rich
+pypdf==6.21.2
+    # via -r requirements/base.in
 pyphen==0.17.2
     # via weasyprint
 python-dateutil==2.9.0.post0
