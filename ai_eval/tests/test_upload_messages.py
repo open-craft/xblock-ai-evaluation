@@ -657,3 +657,28 @@ def rendered_transcript_html(block):
         html_to_pdf.return_value.write_pdf.return_value = b"%PDF-"
         block.download_pdf(None)
     return html_to_pdf.call_args.kwargs["string"]
+
+
+def test_pdf_transcript_lists_attachment_filenames():
+    attachments = [
+        {"upload_id": "1b9e", "filename": "notes.txt", "content_type": "text/plain"},
+        {"upload_id": "2c0f", "filename": "report.pdf", "content_type": "application/pdf"},
+    ]
+    shortanswer_block = make_shortanswer_block(pdf_download_allowed=True, character_image="", sessions=[[
+        {"source": "user", "content": "", "attachments": attachments},
+        {"source": "llm", "content": "feedback"},
+    ]])
+    coach_block = make_coach_block(pdf_download_allowed=True, sessions=[{
+        "workspace_history": [{**coach_fragment_with_attachments(0, attachments), "user_message": ""}],
+        "coach_history": [],
+        "finished": True,
+        "final_submission": "",
+        "final_submission_attachments": attachments,
+        "final_evaluation_markdown": "# Evaluation Report",
+    }])
+
+    shortanswer_html = rendered_transcript_html(shortanswer_block)
+    coach_html = rendered_transcript_html(coach_block)
+
+    assert "Attached: notes.txt, report.pdf" in shortanswer_html
+    assert coach_html.count("Attached: notes.txt, report.pdf") == 2
