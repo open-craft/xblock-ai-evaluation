@@ -327,8 +327,12 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         return self._get_settings().get(key)
 
     def _learner_input_character_limit(self, key: str = "SHORTANSWER_CHARACTER_LIMIT") -> int:
+        """Resolve the configured learner input character limit for this block."""
+        return self._positive_int_setting(key, self.DEFAULT_CHARACTER_LIMIT)
+
+    def _positive_int_setting(self, key: str, default: int) -> int:
         """
-        Resolve the configured learner input character limit for this block.
+        Read a positive integer `ai_eval` setting.
 
         An absent setting falls back to the default silently. A value that is
         present but invalid is logged and ignored, so a bad setting can never
@@ -336,25 +340,15 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         """
         raw = self._get_ai_eval_setting(key)
         if raw is None:
-            return self.DEFAULT_CHARACTER_LIMIT
+            return default
         try:
             value = int(raw)
         except (TypeError, ValueError):
-            logger.warning(
-                "Ignoring invalid %s value %r; using the default of %d.",
-                key,
-                raw,
-                self.DEFAULT_CHARACTER_LIMIT,
-            )
-            return self.DEFAULT_CHARACTER_LIMIT
+            logger.warning("Ignoring invalid %s value %r; using the default of %d.", key, raw, default)
+            return default
         if value < 1:
-            logger.warning(
-                "Ignoring non-positive %s value %r; using the default of %d.",
-                key,
-                raw,
-                self.DEFAULT_CHARACTER_LIMIT,
-            )
-            return self.DEFAULT_CHARACTER_LIMIT
+            logger.warning("Ignoring non-positive %s value %r; using the default of %d.", key, raw, default)
+            return default
         return value
 
     def _ai_eval_model_maps(self) -> dict:
