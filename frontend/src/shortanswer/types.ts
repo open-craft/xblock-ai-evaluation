@@ -1,4 +1,5 @@
 import { MessageAttachment, PaneUploadState, UploadFileLimits, UploadHandlerUrls } from "../shared/attachments";
+import { LearnerUploadStudioMeta } from "../shared/learnerUploadStudioSettings";
 import { SharedPayload, StudioFieldMetadata } from "../shared/types";
 
 export interface ShortAnswerMessage {
@@ -65,13 +66,15 @@ export interface ShortAnswerStudioState {
   pdf_download_allowed: boolean;
   pdf_download_title: string;
   pdf_download_description: string;
+  allow_learner_uploads: boolean;
+  max_file_uploads: number | string | null;
 }
 
 export interface ShortAnswerStudioHandlerUrls {
   studio_submit: string;
 }
 
-export interface ShortAnswerStudioMeta {
+export interface ShortAnswerStudioMeta extends LearnerUploadStudioMeta {
   field_metadata?: Record<string, StudioFieldMetadata>;
   lock_metadata?: StudioLockMetadata;
 }

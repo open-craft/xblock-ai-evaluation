@@ -51,6 +51,8 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
       "character_1_prompt",
       "character_1_avatar",
       "workspace_attachment_urls",
+      "workspace_allow_learner_uploads",
+      "workspace_max_file_uploads",
     ],
   },
   {
@@ -65,6 +67,8 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
       "character_2_prompt",
       "character_2_avatar",
       "coach_attachment_urls",
+      "coach_allow_learner_uploads",
+      "coach_max_file_uploads",
     ],
   },
   {
