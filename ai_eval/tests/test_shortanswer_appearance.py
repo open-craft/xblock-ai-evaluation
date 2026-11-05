@@ -90,13 +90,14 @@ def test_rejects_unknown_background_without_partial_save(block, value):
     assert block.background_theme == "default"
 
 
-def test_older_studio_clients_preserve_background(block):
-    """A cached older editor must not clear the newer background setting."""
+def test_omitting_background_rejects_and_preserves_stored_value(block):
+    """A payload without background_theme is rejected; the stored value is unchanged."""
     block.background_theme = "navy"
     values = block._studio_initial_state()
     del values["background_theme"]
     response = block.studio_submit.__wrapped__(block, values)
-    assert response["success"] is True
+    assert response["success"] is False
+    assert response["validation_errors"] == {"background_theme": ["Missing field in Studio payload."]}
     assert block.background_theme == "navy"
 
 

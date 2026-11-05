@@ -1219,6 +1219,7 @@ def test_shortanswer_studio_submit_success(shortanswer_block_data):
                 {
                     "display_name": "Updated title",
                     "show_display_name": False,
+                    "background_theme": "default",
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
@@ -1260,6 +1261,7 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
                 {
                     "display_name": "Updated title",
                     "show_display_name": False,
+                    "background_theme": "default",
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
@@ -1315,6 +1317,7 @@ def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_
         "character_image": ["Missing field in Studio payload."],
         "attachment_urls": ["Missing field in Studio payload."],
         "hide_question": ["Missing field in Studio payload."],
+        "background_theme": ["Missing field in Studio payload."],
         "pdf_download_allowed": ["Missing field in Studio payload."],
         "pdf_download_description": ["Missing field in Studio payload."],
         "pdf_download_title": ["Missing field in Studio payload."],
@@ -1337,6 +1340,7 @@ def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
                 {
                     "display_name": "Updated title",
                     "show_display_name": False,
+                    "background_theme": "default",
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",

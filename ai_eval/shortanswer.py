@@ -328,12 +328,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         missing_fields = []
         for field_name in self.editable_fields:
             if field_name not in data:
-                # Older cached Studio clients do not send appearance settings.
-                # Preserve authored values rather than rejecting or resetting them.
-                if field_name == "background_theme":
-                    values[field_name] = getattr(self, field_name)
-                else:
-                    missing_fields.append(field_name)
+                missing_fields.append(field_name)
                 continue
             field = self.fields[field_name]
             values[field_name] = field.from_json(data[field_name])
