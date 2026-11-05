@@ -12,6 +12,15 @@ interface ConfirmResetModalProps {
   onCancel: () => void;
   isOpen: boolean;
   positionRef: HTMLElement | null;
+  placement?: "right" | "bottom-end";
+  // Optional copy/variant overrides so individual blocks can match their design
+  // without changing the shared defaults used by the other blocks.
+  title?: string;
+  body?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  confirmVariant?: React.ComponentProps<typeof Button>["variant"];
+  dialogClassName?: string;
 }
 
 export const ConfirmResetModal = ({
@@ -19,11 +28,30 @@ export const ConfirmResetModal = ({
   onCancel,
   isOpen,
   positionRef,
+  placement = "right",
+  title = "Start again?",
+  body = "Your work will be cleared, and the activity will start again.",
+  confirmLabel = "Start over",
+  cancelLabel = "Cancel",
+  confirmVariant = "danger",
+  dialogClassName = "bg-white p-3 rounded shadow border",
 }: ConfirmResetModalProps) => {
   const intl = useIntl();
-  const title = intl.formatMessage({
+  const titleText = intl.formatMessage({
     id: "resetConfirm.title",
-    defaultMessage: "Start again?",
+    defaultMessage: title,
+  });
+  const bodyText = intl.formatMessage({
+    id: "resetConfirm.body",
+    defaultMessage: body,
+  });
+  const confirmText = intl.formatMessage({
+    id: "resetConfirm.confirm",
+    defaultMessage: confirmLabel,
+  });
+  const cancelText = intl.formatMessage({
+    id: "resetConfirm.cancel",
+    defaultMessage: cancelLabel,
   });
 
   const labelId = useId();
@@ -42,35 +70,23 @@ export const ConfirmResetModal = ({
         // XXX: I couldn't use the built-in onClose functionality, because it's too sensitive.
         // The onClose was triggered even when clicking the confirm button.
         onClose={() => {}}
-        placement="right"
+        placement={placement}
       >
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby={labelId}
-          className="bg-white p-3 rounded shadow border"
+          className={dialogClassName}
         >
-          <h3 id={labelId}>{title}</h3>
-          <p>
-            {intl.formatMessage({
-              id: "resetConfirm.body",
-              defaultMessage:
-                "Your work will be cleared, and the activity will start again.",
-            })}
-          </p>
+          <h3 id={labelId}>{titleText}</h3>
+          <p>{bodyText}</p>
 
           <ActionRow>
             <ModalCloseButton onClick={onCancel} variant="tertiary">
-              {intl.formatMessage({
-                id: "resetConfirm.cancel",
-                defaultMessage: "Cancel",
-              })}
+              {cancelText}
             </ModalCloseButton>
-            <Button onClick={onConfirm} variant="danger">
-              {intl.formatMessage({
-                id: "resetConfirm.confirm",
-                defaultMessage: "Start over",
-              })}
+            <Button onClick={onConfirm} variant={confirmVariant}>
+              {confirmText}
             </Button>
           </ActionRow>
         </div>

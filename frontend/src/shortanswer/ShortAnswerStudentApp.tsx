@@ -1,11 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Col, Collapsible, Form, Icon, Row } from "@openedx/paragon";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Button, Collapsible, Form, Icon } from "@openedx/paragon";
 import { useIntl } from "react-intl";
 
 import { renderMarkdown } from "../shared/renderMarkdown";
 import { sendAnswer, resetChat } from "./api";
 import { ShortAnswerMessage, ShortAnswerStudentPayload } from "./types";
-import { ArrowUpward, KeyboardArrowDown, KeyboardArrowUp } from "@openedx/paragon/icons";
+import { ArrowUpward, AutoAwesome, KeyboardArrowDown, KeyboardArrowUp, RestartAlt } from "@openedx/paragon/icons";
+import { getBackgroundOption } from "./appearance";
 import { PoweredByAI } from "../shared/PoweredByAI";
 import { TypingIndicator } from "../shared/TypingIndicator";
 import { DownloadPDFSection } from "../shared/DownloadPDFSection";
@@ -19,7 +20,6 @@ function countUserMessages(messages: ShortAnswerMessage[]) {
 }
 
 interface QuestionPanelProps {
-  title: string;
   questionHtml: string;
   questionRef: React.RefObject<HTMLDivElement>;
   isOpen: boolean;
@@ -27,66 +27,43 @@ interface QuestionPanelProps {
 }
 
 function QuestionPanel(
-  { title, questionHtml, questionRef, isOpen, setIsOpen }: QuestionPanelProps
+  { questionHtml, questionRef, isOpen, setIsOpen }: QuestionPanelProps
 ) {
 
   // Extract the first element out of the question html
   // to display it as the preview on the Collapsible.
   const tmpWrapper = document.createElement('div');
   tmpWrapper.innerHTML = questionHtml;
-  const truncatedQuestionHtml = tmpWrapper.firstElementChild?.outerHTML;
+  const truncatedQuestionHtml = tmpWrapper.firstElementChild?.outerHTML || "";
   tmpWrapper.firstElementChild?.remove();
   const remainingQuestionHtml = tmpWrapper.innerHTML;
 
   return (
-    <>
-      {title && <h4 className="text-secondary-500">{title}</h4>}
-      <Collapsible.Advanced
+    <Collapsible.Advanced
         open={isOpen}
         onToggle={(isOpen: boolean) => setIsOpen(isOpen)}
         ref={questionRef} className="shortanswer-question"
       >
-        <Collapsible.Trigger>
-          <Row>
-            <Col xs={1} className="pr-2 ml-n5">
-                <Collapsible.Visible whenClosed>
-                  <Icon className="ml-auto" src={KeyboardArrowDown} />
-                </Collapsible.Visible>
-                <Collapsible.Visible whenOpen>
-                  <Icon className="ml-auto" src={KeyboardArrowUp} />
-                </Collapsible.Visible>
-            </Col>
-            <Col
-              xs={11} className="pl-0 font-weight-bold"
-              dangerouslySetInnerHTML={{ __html: truncatedQuestionHtml }}
-            />
-          </Row>
+        <Collapsible.Trigger className="shortanswer-question-trigger">
+          <span className="shortanswer-question-toggle" aria-hidden="true">
+            <Collapsible.Visible whenClosed><Icon src={KeyboardArrowDown} /></Collapsible.Visible>
+            <Collapsible.Visible whenOpen><Icon src={KeyboardArrowUp} /></Collapsible.Visible>
+          </span>
+          <div dangerouslySetInnerHTML={{ __html: truncatedQuestionHtml }} />
         </Collapsible.Trigger>
-
-        <Collapsible.Body>
-          <Row>
-            <Col xs={1} className="pr-2 ml-n5"></Col>
-            <Col
-              xs={11} className="pl-0"
-              dangerouslySetInnerHTML={{ __html: remainingQuestionHtml }}
-            />
-          </Row>
-          </Collapsible.Body>
+        <Collapsible.Body className="shortanswer-question-body">
+          <div dangerouslySetInnerHTML={{ __html: remainingQuestionHtml }} />
+        </Collapsible.Body>
       </Collapsible.Advanced>
-    </>
   );
 }
 
 function MessageList({
   messages,
-  minHeight,
   pending,
-  historyRef,
 }: {
   messages: ShortAnswerMessage[];
-  minHeight: number | null;
   pending: boolean;
-  historyRef: React.RefObject<HTMLDivElement>;
 }) {
   const renderedMessages = useMemo(
     () => messages.map((msg) => renderMarkdown(msg.content)),
@@ -96,8 +73,6 @@ function MessageList({
   return (
     <div
       className="chat-history"
-      ref={historyRef}
-      style={{ minHeight: minHeight === null ? undefined : minHeight }}
       role="log"
       aria-live="polite"
       aria-relevant="additions text"
@@ -105,12 +80,12 @@ function MessageList({
       aria-busy={pending ? "true" : undefined}
     >
       {messages.map((message, index) => {
-        const messageClassName = message.source === "user" ? "user-answer p-3" : "ai-eval";
+        const messageClassName = message.source === "user" ? "user-answer" : "ai-eval";
 
         return (
           <div className="chat-message-container" key={String(index)}>
             <div
-              className={"mb-5 chat-message " + messageClassName}
+              className={"chat-message " + messageClassName}
               dangerouslySetInnerHTML={{ __html: renderedMessages[index] }}
             />
           </div>
@@ -130,29 +105,21 @@ function StatusRegion({ message }: { message: string }) {
 }
 
 function MessageComposer({
-  allowReset,
-  canReset,
   canSubmit,
   characterLimit,
   disabled,
   draft,
   onChange,
-  onReset,
   onSubmit,
   textareaRef,
-  setResetConfirmTarget,
 }: {
-  allowReset: boolean;
-  canReset: boolean;
   canSubmit: boolean;
   characterLimit: number;
   disabled: boolean;
   draft: string;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onReset: () => void;
   onSubmit: () => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
-  setResetConfirmTarget: (el: HTMLElement|null) => void;
 }) {
   const intl = useIntl();
   const sendLabel = intl.formatMessage({
@@ -163,22 +130,6 @@ function MessageComposer({
   return (
     <React.Fragment>
       <div className="chat-submit-row">
-        {allowReset ? (
-          <Button
-            type="button"
-            variant="outline-secondary"
-            className="reset-btn rounded-pill"
-            disabled={!canReset}
-            aria-disabled={!canReset}
-            onClick={onReset}
-            ref={setResetConfirmTarget}
-          >
-            {intl.formatMessage({
-              id: "shortanswer.student.reset",
-              defaultMessage: "Reset chat",
-            })}
-          </Button>
-        ) : null}
         <div className="chat-input-wrapper">
           <Form.Control
             ref={textareaRef}
@@ -186,6 +137,7 @@ function MessageComposer({
             disabled={disabled}
             as="textarea"
             autoResize
+            aria-label={intl.formatMessage({ id: "shortanswer.student.answer", defaultMessage: "Your answer" })}
             placeholder={intl.formatMessage({
               id: "shortanswer.student.placeholder",
               defaultMessage: "Type your answer here. Ctrl+Enter to send, Shift+Enter for new line.",
@@ -236,9 +188,13 @@ export default function ShortAnswerStudentApp({
   const [pending, setPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const questionHtml = useMemo(() => renderMarkdown(payload.meta.question), [payload.meta.question]);
-  const [chatMinHeight, setChatMinHeight] = useState<number | null>(null);
+  const headerId = useId();
+  const headerTitle = payload.meta.title?.trim() || intl.formatMessage({
+    id: "shortanswer.student.title", defaultMessage: "AI Discussion",
+  });
+  const background = getBackgroundOption(payload.meta.background_theme);
+  const resetLabel = intl.formatMessage({ id: "shortanswer.student.reset", defaultMessage: "Reset chat" });
   const historyRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
   const questionRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const userMessageCount = countUserMessages(messages);
@@ -264,35 +220,6 @@ export default function ShortAnswerStudentApp({
       historyRef.current.scrollTop = historyRef.current.scrollHeight;
     }
   }, [messages, pending]);
-
-  useEffect(() => {
-    function updateChatMinHeight() {
-      const imageElement = imageRef.current;
-      const questionElement = questionRef.current;
-
-      if (!imageElement || !questionElement) {
-        setChatMinHeight(null);
-        return;
-      }
-
-      const imageHeight = imageElement.height;
-      if (!imageHeight) {
-        setChatMinHeight(null);
-        return;
-      }
-
-      const questionHeight = questionElement.offsetHeight;
-      const nextMinHeight = imageHeight - questionHeight;
-      setChatMinHeight(nextMinHeight > 0 ? nextMinHeight : null);
-    }
-
-    updateChatMinHeight();
-    window.addEventListener("resize", updateChatMinHeight);
-
-    return () => {
-      window.removeEventListener("resize", updateChatMinHeight);
-    };
-  }, [payload.meta.character_image, questionHtml]);
 
   async function submitAnswer() {
     if (!canSubmit) {
@@ -414,60 +341,78 @@ export default function ShortAnswerStudentApp({
   }
 
   return (
-    <section className="shortanswer-react-app" data-block-kind="shortanswer" data-view={payload.view}>
+    <section
+      className="shortanswer-react-app"
+      data-block-kind="shortanswer"
+      data-view={payload.view}
+      data-background-theme={background.value}
+      style={{ backgroundColor: background.color }}
+      aria-labelledby={headerId}
+    >
       <div className="shortanswer_block">
-        {!hideQuestion && (
-          <QuestionPanel isOpen={questionPanelIsOpen} setIsOpen={setQuestionPanelIsOpen} title={payload.meta.title} questionHtml={questionHtml} questionRef={questionRef} />
-        )}
+        <header className="shortanswer-header">
+          <span className="shortanswer-header-icon" aria-hidden="true"><Icon src={AutoAwesome} /></span>
+          <h2 id={headerId} className="shortanswer-header-title">{headerTitle}</h2>
+          {allowReset && (
+            <Button
+              type="button"
+              variant="tertiary"
+              className="shortanswer-reset"
+              disabled={!canReset}
+              aria-disabled={!canReset}
+              aria-label={resetLabel}
+              title={resetLabel}
+              onClick={() => setShowConfirmReset(true)}
+              ref={setResetConfirmTarget}
+            >
+              <Icon src={RestartAlt} />
+            </Button>
+          )}
+        </header>
 
-        {payload.meta.character_image ? (
-          <div className="shortanswer_image">
-            <img
-              ref={imageRef}
-              src={payload.meta.character_image}
-              alt=""
-              onLoad={() => {
-                const imageElement = imageRef.current;
-                const questionElement = questionRef.current;
-                if (!imageElement || !questionElement) {
-                  setChatMinHeight(null);
-                  return;
-                }
-                const nextMinHeight = imageElement.height - questionElement.offsetHeight;
-                setChatMinHeight(nextMinHeight > 0 ? nextMinHeight : null);
-              }}
+        <div className={"shortanswer-layout" + (payload.meta.character_image ? " shortanswer-layout--with-image" : "")}>
+          {payload.meta.character_image && (
+            <div className="shortanswer-character"><img src={payload.meta.character_image} alt="" /></div>
+          )}
+          <div className="shortanswer-panel">
+            <div className="shortanswer-conversation" ref={historyRef}>
+              {!hideQuestion && (
+                <QuestionPanel
+                  isOpen={questionPanelIsOpen}
+                  setIsOpen={setQuestionPanelIsOpen}
+                  questionHtml={questionHtml}
+                  questionRef={questionRef}
+                />
+              )}
+              <MessageList messages={messages} pending={pending} />
+            </div>
+            <StatusRegion message={statusMessage} />
+            <MessageComposer
+              canSubmit={canSubmit}
+              characterLimit={characterLimit}
+              disabled={controlsDisabled}
+              draft={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onSubmit={submitAnswer}
+              textareaRef={textareaRef}
             />
+            <PoweredByAI className="shortanswer-attribution" />
           </div>
-        ) : null}
-
-        <div id="chatbox">
-          <MessageList
-            messages={messages}
-            minHeight={chatMinHeight}
-            pending={pending}
-            historyRef={historyRef}
-          />
-          <StatusRegion message={statusMessage} />
-          <MessageComposer
-            allowReset={allowReset}
-            canReset={canReset}
-            canSubmit={canSubmit}
-            characterLimit={characterLimit}
-            disabled={controlsDisabled}
-            draft={draft}
-            onChange={(event) => {
-              setDraft(event.target.value);
-            }}
-            onReset={() => setShowConfirmReset(true)}
-            setResetConfirmTarget={setResetConfirmTarget}
-            onSubmit={submitAnswer}
-            textareaRef={textareaRef}
-          />
         </div>
 
         <ConfirmResetModal
           positionRef={resetConfirmTarget}
+          placement="bottom-end"
           isOpen={showConfirmReset}
+          title={intl.formatMessage({ id: "shortanswer.reset.title", defaultMessage: "Restart interactive?" })}
+          body={intl.formatMessage({
+            id: "shortanswer.reset.body",
+            defaultMessage: "If you restart, your progress in this interactive will be lost.",
+          })}
+          confirmLabel={intl.formatMessage({ id: "shortanswer.reset.confirm", defaultMessage: "Restart" })}
+          cancelLabel={intl.formatMessage({ id: "shortanswer.reset.cancel", defaultMessage: "Stay" })}
+          confirmVariant="brand"
+          dialogClassName="shortanswer-reset-dialog"
           onConfirm={() => {
             setShowConfirmReset(false);
             resetConversation();
@@ -481,8 +426,6 @@ export default function ShortAnswerStudentApp({
             onClose={() => setErrorData(null)}
           />
         }
-
-        <PoweredByAI />
 
         {messages.length >= 2 && payload.meta.pdf_download_allowed && <DownloadPDFSection pdfUrl={payload.handler_urls.download_pdf} title={payload.meta.pdf_download_title} description={payload.meta.pdf_download_description} />}
       </div>

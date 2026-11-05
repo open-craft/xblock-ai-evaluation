@@ -183,7 +183,67 @@
     margin-top: var(--shortanswer-studio-spacing-xs);
 }
 
+/* Native radios keep thumbnail selection keyboard-accessible without a custom widget. */
+.shortanswer-react-studio .shortanswer-background-picker {
+    border: 0;
+    margin: 3rem 0;
+    padding: 0 0 0 5rem;
+    min-width: 0;
+}
+
+.shortanswer-react-studio .shortanswer-background-picker legend {
+    font-size: var(--shortanswer-studio-label-font-size);
+    font-weight: var(--shortanswer-studio-label-font-weight);
+    margin-bottom: 16px;
+}
+
+.shortanswer-react-studio .shortanswer-background-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.shortanswer-react-studio .shortanswer-background-option {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    width: 144px;
+    cursor: pointer;
+    position: relative;
+}
+
+.shortanswer-react-studio .shortanswer-background-option input {
+    grid-row: 2;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
+.shortanswer-react-studio .shortanswer-background-swatch {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: block;
+    height: 64px;
+    border: 1px solid var(--pgn-color-gray-300, #c5d0db);
+    border-radius: 8px;
+}
+
+.shortanswer-react-studio .shortanswer-background-option input:checked + .shortanswer-background-swatch {
+    outline: 3px solid var(--pgn-color-primary-500, #002855);
+    outline-offset: 2px;
+}
+
+.shortanswer-react-studio .shortanswer-background-option input:focus-visible + .shortanswer-background-swatch {
+    outline: 3px dashed var(--pgn-color-primary-500, #002855);
+    outline-offset: 3px;
+}
+
 @media (max-width: 1180px) {
+    .shortanswer-react-studio .shortanswer-background-picker {
+        padding-left: 1rem;
+    }
+
     .shortanswer-react-studio .pgn__form-group {
         grid-template-columns: 1fr;
         padding-left: 1rem;

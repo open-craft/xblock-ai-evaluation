@@ -363,6 +363,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
         },
         "meta": {
             "title": "",
+            "background_theme": "default",
             "question": shortanswer_block_data["question"],
             "max_responses": shortanswer_block_data["max_responses"],
             "character_limit": 1000,
@@ -375,6 +376,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
         },
         "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
         "style_urls": [
+            "http://local.openedx.io:8000",
             "http://local.openedx.io:8000",
             "http://local.openedx.io:8000",
         ],
