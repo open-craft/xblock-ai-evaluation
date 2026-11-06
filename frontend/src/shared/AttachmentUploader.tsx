@@ -34,6 +34,7 @@ interface AttachmentUploaderProps {
 export function AttachmentUploader({ uploads, disabled, stacked = false, children }: AttachmentUploaderProps) {
   const intl = useIntl();
   const tooltipId = useId();
+  const uploaderRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -47,7 +48,7 @@ export function AttachmentUploader({ uploads, disabled, stacked = false, childre
     : "";
 
   return (
-    <div className="attachment-uploader">
+    <div className="attachment-uploader" ref={uploaderRef}>
       {uploads.alertCode ? (
         <UploadAlert
           key={uploads.alertKey}
@@ -83,6 +84,9 @@ export function AttachmentUploader({ uploads, disabled, stacked = false, childre
         <OverlayTrigger
           placement="top"
           overlay={<Tooltip id={tooltipId}>{uploadButtonLabel}</Tooltip>}
+          // Render the tooltip inside the block's Shadow DOM, not at the end of the page's <body>, where the host
+          // page's own .tooltip styles (the LMS adds a border and an extra arrow) would apply to it.
+          container={() => uploaderRef.current}
         >
           <IconButton
             ref={uploadButtonRef}
