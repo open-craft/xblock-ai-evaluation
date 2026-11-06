@@ -17,6 +17,7 @@ from .base import AIEvalXBlock
 from .llm import get_llm_service
 from .llm_services import CustomLLMService, TIMEOUT_ERROR_MESSAGE
 from .pdf_generator import ShortAnswerData, ShortAnswerMessage
+from .upload_mixin import LEARNER_CONTENT_FRAMING, LearnerUploadMixin, PaneUploadFields, attachment_filenames
 from .utils import now, strip_html_tags
 
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 resource_loader = ResourceLoader(__name__)
 
 
-class ShortAnswerAIEvalXBlock(AIEvalXBlock):
+class ShortAnswerAIEvalXBlock(LearnerUploadMixin, AIEvalXBlock):
     """
     Short Answer Xblock.
     """
@@ -40,8 +41,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     )
 
     show_display_name = Boolean(
-        display_name=_("Show Display Name"),
-        help=_("Show the display name as a heading on the component to students."),
+        display_name=_("Show Component Name"),
+        help=_("Display the component name as a heading."),
         default=False,
         scope=Scope.settings,
     )
@@ -108,6 +109,20 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         resettable_editor=False,
     )
 
+    allow_learner_uploads = Boolean(
+        display_name=_("File Upload"),
+        help=_("Allow learners to upload a file as part of their response"),
+        scope=Scope.settings,
+        default=False,
+    )
+
+    max_file_uploads = Integer(
+        display_name=_("Max File Uploads"),
+        help=_("Maximum number of files a learner can upload during the conversation"),
+        scope=Scope.settings,
+        default=3,
+    )
+
     # XXX: Deprecated.
     messages = Dict(
         scope=Scope.user_state,
@@ -127,7 +142,13 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         "allow_reset",
         "character_image",
         "attachment_urls",
+        "allow_learner_uploads",
+        "max_file_uploads",
     )
+
+    _pane_fields = {
+        "shortanswer": PaneUploadFields("allow_learner_uploads", "max_file_uploads"),
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -195,6 +216,24 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
         return validation_errors, validation_warnings
 
+    def _current_pane_messages(self, pane):
+        """Return the learner's messages in the current session (Short Answer has a single pane)."""
+        return [message for message in self.sessions[-1] if message["source"] == "user"]
+
+    def _pane_takes_messages(self, pane):
+        """Whether the learner has responses remaining."""
+        return len(self._current_pane_messages(pane)) < self.max_responses
+
+    def _user_message_content(self, text, attachments):
+        """
+        Return the LLM content of a learner message: its text, or its text followed by its files.
+
+        Empty text becomes "." because some providers reject empty messages.
+        """
+        if not attachments:
+            return text or "."
+        return [{"type": "text", "text": text or "."}, *self._attachment_parts(attachments)]
+
     def index_dictionary(self):
         """
         Return the block content to be indexed for search.
@@ -245,9 +284,12 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                 "get_response": self.runtime.handler_url(self, "get_response"),
                 "reset": self.runtime.handler_url(self, "reset"),
                 "download_pdf": self.runtime.handler_url(self, "download_pdf"),
+                "upload_file": self.runtime.handler_url(self, "upload_file"),
+                "delete_upload": self.runtime.handler_url(self, "delete_upload"),
             },
             initial_state={
                 "messages": list(self.sessions[-1]),
+                "uploads": self._learner_uploads_payload(),
             },
             meta={
                 "title": self.display_name if self.show_display_name else "",
@@ -276,8 +318,11 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         # Ideally we shouldn't need to define any HTML as the React App StudioUI should take care of everything.
         # However, the Studio Runtime for the XBlock looks for certain elements in the DOM to render it's wrapper.
         #
-        # So, "editor-with-buttons" is defined to prevent the footer nativations from showing up.
-        fragment = Fragment('<div data-ai-eval-react-root="true" class="editor-with-buttons is-active"></div>')
+        # So, "editor-with-buttons" is defined to prevent the footer nativations from showing up, and
+        # "editor-with-tabs" to hide the modal's "Editing: ..." title, since the editor shows the name itself.
+        fragment = Fragment(
+            '<div data-ai-eval-react-root="true" class="editor-with-buttons editor-with-tabs is-active"></div>'
+        )
         fragment.add_css(resource_loader.load_unicode("static/css/studio_fixes.css"))
 
         fragment.add_javascript_url(self.runtime.local_resource_url(self, "static/bundles/shortanswer.studio.js"))
@@ -353,17 +398,23 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     def get_response(self, data, suffix=""):  # pylint: disable=unused-argument
         """Get LLM feedback"""
         user_submission = str(data["user_input"])
+        upload_ids = self._upload_ids_from_request(data)
         character_limit = self._learner_input_character_limit()
         if len(user_submission) > character_limit:
             raise JsonHandlerError(
                 400,
                 _("Your response is too long (maximum {limit} characters).").format(limit=character_limit),
             )
+        if not user_submission.strip() and not upload_ids:
+            raise JsonHandlerError(400, _("Your message is empty."))
+        if not self._pane_takes_messages("shortanswer"):
+            raise JsonHandlerError(403, _("No responses remaining."))
+        message_attachments = self._pending_attachments_for_message("shortanswer", upload_ids)
         user_submission_time = now().isoformat()
 
         # Download attachments once: the rendered XML feeds the system prompt and the
         # per-file hash inputs feed the reuse tag below.
-        attachments, attachment_hash_inputs = self._render_attachments_xml(self.attachment_urls)
+        author_attachments_xml, attachment_hash_inputs = self._render_attachments_xml(self.attachment_urls)
 
         # Compute a tag to identify compatible reuse across provider/model/prompt
         # Include evaluation prompt, question, and attachment content hashes
@@ -386,9 +437,11 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             "content": f"""
                 {self.evaluation_prompt}
 
-                {attachments}
+                {author_attachments_xml}
 
                 {question_line}Evaluation must be in Markdown format.
+
+                {LEARNER_CONTENT_FRAMING}
             """,
         }
         messages = [system_msg]
@@ -397,36 +450,43 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         # subsequent roles are 'assistant' and 'user'
         for message in self.sessions[-1]:
             if message["source"] == "user":
-                role = "user"
+                messages.append({
+                    "role": "user",
+                    "content": self._user_message_content(message["content"], message.get("attachments", [])),
+                })
             else:
-                role = "assistant"
-            messages.append({
-                "role": role,
-                "content": message["content"] or ".",
-            })
-        messages.append({"role": "user", "content": user_submission})
+                messages.append({"role": "assistant", "content": message["content"] or "."})
+        messages.append({"role": "user", "content": self._user_message_content(user_submission, message_attachments)})
+        self._log_if_files_replaced(
+            sum(len(message.get("attachments", [])) for message in self.sessions[-1]) + len(message_attachments),
+        )
 
-        try:
-            response = self.get_llm_response(messages, tag=current_tag)
-        except Exception as e:
-            logger.error(
-                f"Failed while making LLM request using model {self.model}. Error: {e}",
-                exc_info=True,
-            )
-            if str(e) == TIMEOUT_ERROR_MESSAGE:
-                raise JsonHandlerError(500, str(e)) from e
-            raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
+        with self._sending_attachments(message_attachments):
+            try:
+                response = self.get_llm_response(messages, tag=current_tag)
+            except Exception as e:
+                logger.error(
+                    f"Failed while making LLM request using model {self.model}. Error: {e}",
+                    exc_info=True,
+                )
+                if str(e) == TIMEOUT_ERROR_MESSAGE:
+                    raise JsonHandlerError(500, str(e)) from e
+                raise JsonHandlerError(500, "A probem occurred. Please retry.") from e
 
-        llm_response_time = now().isoformat()
+            if not response:
+                raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")
 
-        if response:
+            llm_response_time = now().isoformat()
             self._replace_current_session(self.sessions[-1] + [
-                {"source": "user", "content": user_submission, "time": user_submission_time},
+                {
+                    "source": "user",
+                    "content": user_submission,
+                    "time": user_submission_time,
+                    "attachments": message_attachments,
+                },
                 {"source": "llm", "content": response, "time": llm_response_time},
             ])
-            return {"response": response}
-
-        raise JsonHandlerError(500, "A probem occurred. The LLM sent an empty response.")
+        return {"response": response}
 
     @XBlock.json_handler
     def reset(self, data, suffix=""):
@@ -437,7 +497,8 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             raise JsonHandlerError(403, "Reset is disabled.")
         self.thread_map = {}
         self.sessions.append([])
-        return {}
+        self._discard_pending_uploads()
+        return {"remaining": self._remaining_uploads_by_pane()}
 
     @staticmethod
     def workbench_scenarios():
@@ -507,6 +568,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
                         # NOTE: time field was added in 2026-04, so some existing instances may not have this field
                         time=data.get("time"),
                         kind="student",
+                        attachments=attachment_filenames(data),
                     )
                 )
                 for data in session
