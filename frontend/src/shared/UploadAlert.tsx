@@ -1,6 +1,6 @@
 import React from "react";
 import { Alert } from "@openedx/paragon";
-import { Error as ErrorIcon, Info } from "@openedx/paragon/icons";
+import { Error as ErrorIcon } from "@openedx/paragon/icons";
 import { useIntl } from "react-intl";
 
 import { supportedFileTypes, UPLOAD_ALERT_MESSAGES, UploadAlertCode, UploadFileLimits } from "./attachments";
@@ -30,9 +30,9 @@ export function UploadAlert({ code, limit, remaining, fileLimits, onDismiss }: U
 
   return (
     <Alert
-      className="upload-alert mb-0"
+      className={isLimitReached ? "upload-alert upload-alert--limit-reached mb-0" : "upload-alert mb-0"}
       variant={isLimitReached ? "info" : "danger"}
-      icon={isLimitReached ? Info : ErrorIcon}
+      icon={isLimitReached ? undefined : ErrorIcon}
       dismissible
       onClose={onDismiss}
     >

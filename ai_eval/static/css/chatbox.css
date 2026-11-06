@@ -154,6 +154,7 @@
 }
 
 .chat-input-wrapper--with-uploads textarea,
+.chat-input-wrapper--with-uploads textarea:hover,
 .chat-input-wrapper--with-uploads textarea:focus {
   background: transparent;
   border: none;
