@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import ShortAnswerStudentApp from "./ShortAnswerStudentApp";
 import { ShortAnswerStudentPayload } from "./types";
 import * as api from "./api";
+import { BACKGROUND_OPTIONS, getBackgroundOption } from "./appearance";
 
 jest.mock("./api");
 
@@ -63,6 +64,73 @@ describe("ShortAnswerStudentApp", () => {
       render(<ShortAnswerStudentApp payload={payload} />);
       expect(screen.getByText("four")).toBeInTheDocument();
       expect(screen.getByText("Correct!")).toBeInTheDocument();
+    });
+  });
+
+  describe("appearance", () => {
+    it.each([undefined, "", "   "])("uses the default header for title %p", (title) => {
+      const payload = makePayload();
+      payload.meta.title = title as unknown as string;
+      render(<ShortAnswerStudentApp payload={payload} />);
+      expect(screen.getByRole("heading", { name: "AI Discussion" })).toBeVisible();
+    });
+
+    it("keeps the header title when the question is hidden", () => {
+      const payload = makePayload();
+      payload.meta.title = "Reflect on your learning";
+      const { rerender } = render(<ShortAnswerStudentApp payload={payload} />);
+      expect(screen.getByRole("heading", { name: "Reflect on your learning" })).toBeVisible();
+      rerender(<ShortAnswerStudentApp payload={{ ...payload, meta: { ...payload.meta, hide_question: true } }} />);
+      expect(screen.getByRole("heading", { name: "Reflect on your learning" })).toBeVisible();
+      expect(screen.queryByText("What is 2+2?")).not.toBeInTheDocument();
+    });
+
+    it("renders the title as text and keeps a constant decorative icon", () => {
+      const payload = makePayload();
+      const { container, rerender } = render(<ShortAnswerStudentApp payload={payload} />);
+      const icon = container.querySelector(".shortanswer-header-icon")!;
+      const initialIcon = icon.innerHTML;
+      expect(icon).toHaveAttribute("aria-hidden", "true");
+      payload.meta.title = "<img src=x onerror=alert(1)>";
+      payload.meta.character_image = "/avatar.png";
+      rerender(<ShortAnswerStudentApp payload={{ ...payload }} />);
+      expect(screen.getByRole("heading", { name: payload.meta.title })).toBeVisible();
+      expect(container.querySelector(".shortanswer-header-title img")).toBeNull();
+      expect(icon.innerHTML).toBe(initialIcon);
+      expect(container.querySelector(".shortanswer-character img")).toHaveAttribute("src", "/avatar.png");
+    });
+
+    it.each(BACKGROUND_OPTIONS)("selects the $value theme without persisting a color", (option) => {
+      const payload = makePayload();
+      payload.meta.background_theme = option.value;
+      render(<ShortAnswerStudentApp payload={payload} />);
+      expect(screen.getByRole("region", { name: "AI Discussion" }))
+        .toHaveAttribute("data-background-theme", option.value);
+      expect(getBackgroundOption(option.value).color).toBe(option.color);
+      expect(option.color).toMatch(/^var\(/);
+    });
+
+    it.each([undefined, "", "removed-theme", "url(https://example.com)"])("falls back safely for %p", (value) => {
+      const payload = makePayload();
+      payload.meta.background_theme = value;
+      render(<ShortAnswerStudentApp payload={payload} />);
+      expect(screen.getByRole("region", { name: "AI Discussion" }))
+        .toHaveAttribute("data-background-theme", "default");
+      expect(getBackgroundOption(value)).toBe(BACKGROUND_OPTIONS[0]);
+    });
+
+    it("resets only the selected block when multiple blocks share a page", async () => {
+      mockResetChat.mockResolvedValue({});
+      const user = userEvent.setup();
+      const first = makePayload({ initial_state: { messages: [{ source: "user", content: "First answer" }] } });
+      const second = makePayload({ initial_state: { messages: [{ source: "user", content: "Second answer" }] } });
+      render(<><ShortAnswerStudentApp payload={first} /><ShortAnswerStudentApp payload={second} /></>);
+      const headings = screen.getAllByRole("heading", { name: "AI Discussion" });
+      expect(headings[0].id).not.toBe(headings[1].id);
+      await user.click(screen.getAllByRole("button", { name: "Reset chat" })[0]);
+      await user.click(screen.getByRole("button", { name: "Restart" }));
+      await waitFor(() => expect(screen.queryByText("First answer")).not.toBeInTheDocument());
+      expect(screen.getByText("Second answer")).toBeVisible();
     });
   });
 
@@ -144,6 +212,45 @@ describe("ShortAnswerStudentApp", () => {
   });
 
   describe("reset", () => {
+    it("shows the Figma restart confirmation copy", async () => {
+      const user = userEvent.setup();
+      const payload = makePayload({ initial_state: { messages: [{ source: "user", content: "Keep this" }] } });
+      render(<ShortAnswerStudentApp payload={payload} />);
+      await user.click(screen.getByRole("button", { name: "Reset chat" }));
+      expect(screen.getByRole("dialog")).toBeVisible();
+      expect(screen.getByRole("heading", { name: "Restart interactive?" })).toBeVisible();
+      expect(screen.getByText("If you restart, your progress in this interactive will be lost.")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Restart" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Stay" })).toBeVisible();
+    });
+
+    it("places reset in the header and cancellation keeps the conversation", async () => {
+      const user = userEvent.setup();
+      const payload = makePayload({ initial_state: { messages: [{ source: "user", content: "Keep this" }] } });
+      render(<ShortAnswerStudentApp payload={payload} />);
+      const button = screen.getByRole("button", { name: "Reset chat" });
+      expect(button.closest("header")).not.toBeNull();
+      await user.click(button);
+      expect(mockResetChat).not.toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Stay" }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByText("Keep this")).toBeVisible();
+      expect(mockResetChat).not.toHaveBeenCalled();
+    });
+
+    it("preserves messages when reset fails", async () => {
+      mockResetChat.mockRejectedValue(new Error("Reset failed"));
+      const user = userEvent.setup();
+      render(<ShortAnswerStudentApp payload={makePayload({
+        initial_state: { messages: [{ source: "user", content: "Keep this" }] },
+      })} />);
+      await user.click(screen.getByRole("button", { name: "Reset chat" }));
+      await user.click(screen.getByRole("button", { name: "Restart" }));
+      await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
+      expect(screen.getByText("Keep this")).toBeVisible();
+      expect(screen.getByRole("button", { name: "Reset chat" })).toBeEnabled();
+    });
+
     it("keeps reset disabled until the conversation has a user message", () => {
       render(<ShortAnswerStudentApp payload={makePayload()} />);
 
@@ -170,7 +277,7 @@ describe("ShortAnswerStudentApp", () => {
       const resetButton = screen.getByRole("button", { name: /reset chat/i });
       await user.click(resetButton);
 
-      const confirmResetBtn = screen.getByRole("button", { name: /start over/i });
+      const confirmResetBtn = screen.getByRole("button", { name: /restart/i });
       await user.click(confirmResetBtn);
 
       await waitFor(() => {
@@ -202,9 +309,7 @@ describe("ShortAnswerStudentApp", () => {
 
       render(<ShortAnswerStudentApp payload={payload} />);
 
-      const buttons = screen.getAllByRole("button");
-      const resetButton = buttons.find((b) => /reset/i.test(b.textContent || ""));
-      expect(resetButton).toBeUndefined();
+      expect(screen.queryByRole("button", { name: /reset chat/i })).not.toBeInTheDocument();
     });
   });
 
@@ -306,7 +411,7 @@ And this is paragraph two.`;
       const resetButton = screen.getByRole("button", { name: /reset chat/i });
       await user.click(resetButton);
 
-      const confirmResetBtn = screen.getByRole("button", { name: /start over/i });
+      const confirmResetBtn = screen.getByRole("button", { name: /restart/i });
       await user.click(confirmResetBtn);
 
       await waitFor(() => {

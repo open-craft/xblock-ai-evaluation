@@ -21,6 +21,8 @@ export interface ShortAnswerStudentMeta {
   character_limit: number;
   max_responses: number;
   title: string;
+  // Optional to support previews cached before the background setting was introduced.
+  background_theme?: string;
   question: string;
   hide_question: boolean;
   pdf_download_allowed: boolean;
@@ -47,6 +49,7 @@ export interface ShortAnswerStudioState {
   character_image: string;
   display_name: string;
   show_display_name: boolean;
+  background_theme: string;
   evaluation_prompt: string;
   max_responses: number | string | null;
   model: string;

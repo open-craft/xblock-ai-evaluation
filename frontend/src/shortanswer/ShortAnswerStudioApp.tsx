@@ -25,6 +25,7 @@ import {
   StudioLockMetadata,
 } from "./types";
 import { StudioDownloadPDFField } from "../shared/StudioDownloadPDF";
+import { BACKGROUND_OPTIONS } from "./appearance";
 
 const shortAnswerSchema = Yup.object({
   allow_reset: Yup.boolean()
@@ -33,6 +34,9 @@ const shortAnswerSchema = Yup.object({
   attachment_urls: Yup.array(Yup.string().ensure()).ensure(),
   character_image: Yup.string().ensure(),
   display_name: Yup.string().ensure(),
+  background_theme: Yup.string()
+    .oneOf(BACKGROUND_OPTIONS.map((option) => option.value))
+    .default("default"),
   evaluation_prompt: Yup.string().ensure(),
   max_responses: Yup.mixed()
     .transform((value: unknown) => (value === null || value === undefined ? "" : value))
@@ -77,6 +81,7 @@ function normalizeAttachmentUrls(value: unknown) {
 function buildSubmitPayload(values: ShortAnswerStudioState) {
   return {
     display_name: values.display_name || "",
+    background_theme: values.background_theme || "default",
     model: values.model || "",
     model_api_key: values.model_api_key || "",
     model_api_url: values.model_api_url || "",
@@ -174,6 +179,7 @@ function ShortAnswerSettingsForm({
   fieldMetadata: Record<string, StudioFieldMetadata>;
   onChange: (fieldName: string, nextValue: unknown) => void;
 }) {
+  const intl = useIntl();
   const modelApiKeyLocked = isModelApiKeyLocked(values, lockMetadata);
   const modelChoices = Array.isArray(fieldMetadata.model?.choices)
     ? fieldMetadata.model.choices
@@ -181,6 +187,29 @@ function ShortAnswerSettingsForm({
 
   return (
     <Form>
+      <fieldset className="shortanswer-background-picker">
+        <legend>{fieldMetadata.background_theme?.display_name || intl.formatMessage({
+          id: "shortanswer.studio.background", defaultMessage: "Container background",
+        })}</legend>
+        <div className="shortanswer-background-options">
+          {BACKGROUND_OPTIONS.map((option) => (
+            <label className="shortanswer-background-option" key={option.value}>
+              <input
+                type="radio"
+                name="background_theme"
+                value={option.value}
+                checked={values.background_theme === option.value}
+                onChange={() => onChange("background_theme", option.value)}
+              />
+              <span className="shortanswer-background-swatch" style={{ backgroundColor: option.color }} aria-hidden="true" />
+              <span>{intl.formatMessage(option.label)}</span>
+            </label>
+          ))}
+        </div>
+        <FieldErrors errors={validationErrors.background_theme} />
+        <FieldHelp metadata={fieldMetadata.background_theme} />
+      </fieldset>
+
       <Form.Group controlId="xb-field-edit-display_name" isInvalid={Boolean(validationErrors.display_name)}>
         <Form.Label>{fieldMetadata.display_name?.display_name || "display_name"}</Form.Label>
         <Form.Control

@@ -1,0 +1,311 @@
+/* Short-answer-only layout. The shared chatbox.css also serves coaching.
+ * Colors stay as CSS variables so brand overrides apply inside the Shadow DOM.
+ * The PDF's desktop panel is 1008 x 600 within a 1280px, 136px-inset container.
+ */
+.shortanswer-react-app {
+  --shortanswer-text: var(--pgn-wgu-color-text-main-navy, #002855);
+  --shortanswer-heading: var(--pgn-shortanswer-header-color, var(--pgn-wgu-color-lake-700, #2e8090));
+  --shortanswer-panel-bg: var(--pgn-color-white, #ffffff);
+  --shortanswer-message-bg: var(--pgn-shortanswer-message-ai-bg-color, #f4f5f7);
+  --shortanswer-panel-radius: 16px;
+  container: shortanswer / inline-size;
+  color: var(--shortanswer-text);
+  font-family: var(--pgn-typography-font-family-base, Lato, sans-serif);
+  padding: 0;
+  position: relative;
+}
+
+.shortanswer-react-app .shortanswer_block {
+  box-sizing: border-box;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding: var(--pgn-shortanswer-container-padding-y, 80px) 136px;
+}
+
+.shortanswer-react-app .shortanswer-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 48px;
+  margin-bottom: 32px;
+  color: var(--shortanswer-heading);
+}
+
+.shortanswer-react-app .shortanswer-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  flex: 0 0 64px;
+  border-inline-end: 1px solid var(--pgn-wgu-color-lake-muted, #8cc4ce);
+  padding-inline-end: 16px;
+}
+
+.shortanswer-react-app .shortanswer-header-icon .pgn__icon {
+  width: 40px;
+  height: 40px;
+}
+
+.shortanswer-react-app .shortanswer-header-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
+  font-family: var(--pgn-typography-headings-font-family, Sora, sans-serif);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+.shortanswer-react-app .shortanswer-reset {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  padding: 8px;
+  color: var(--shortanswer-text);
+  border-radius: 9999px;
+}
+
+.shortanswer-react-app .shortanswer-reset .pgn__icon {
+  width: 32px;
+  height: 32px;
+}
+
+.shortanswer-react-app .shortanswer-reset:disabled {
+  opacity: 0.4;
+}
+
+.shortanswer-react-app .shortanswer-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 32px;
+}
+
+.shortanswer-react-app .shortanswer-layout--with-image {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+
+.shortanswer-react-app .shortanswer-character img {
+  width: 100%;
+  height: auto;
+}
+
+.shortanswer-react-app .shortanswer-panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: var(--pgn-shortanswer-panel-height, 600px);
+  padding: 32px 64px;
+  border-radius: var(--shortanswer-panel-radius);
+  background: var(--shortanswer-panel-bg);
+  box-shadow: 0 16px 32px rgba(34, 62, 93, 0.08);
+}
+
+.shortanswer-react-app .shortanswer-conversation {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  margin-bottom: 24px;
+}
+
+.shortanswer-react-app .chat-history {
+  max-height: none;
+  overflow: visible;
+  margin: 0;
+}
+
+.shortanswer-react-app .shortanswer-question {
+  margin: 0 0 24px;
+  padding: 24px;
+  border: 0;
+  border-radius: var(--shortanswer-panel-radius);
+  background: var(--shortanswer-message-bg);
+}
+
+.shortanswer-react-app .shortanswer-question-trigger {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 400;
+  color: inherit;
+}
+
+.shortanswer-react-app .shortanswer-question-toggle {
+  flex: 0 0 24px;
+}
+
+.shortanswer-react-app .shortanswer-question-body {
+  padding: 0 0 0 32px;
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.shortanswer-react-app .shortanswer-question p:last-child {
+  margin-bottom: 0;
+}
+
+.shortanswer-react-app .chat-message {
+  max-width: 90%;
+  padding: 24px;
+  margin-bottom: 24px;
+  border-radius: var(--shortanswer-panel-radius);
+  font-size: 18px;
+  line-height: 28px;
+}
+
+.shortanswer-react-app .ai-eval {
+  color: var(--shortanswer-text);
+  background: var(--shortanswer-message-bg);
+}
+
+.shortanswer-react-app .user-answer {
+  background: var(--pgn-shortanswer-message-user-bg-color, #e9f6f5);
+  border-end-end-radius: 4px;
+}
+
+.shortanswer-react-app .chat-message > :last-child {
+  margin-bottom: 0;
+}
+
+.shortanswer-react-app .shortanswer-conversation img {
+  max-width: 100%;
+}
+
+.shortanswer-react-app .shortanswer-conversation pre {
+  white-space: pre-wrap;
+}
+
+.shortanswer-react-app .chat-submit-row {
+  flex: 0 0 auto;
+  padding: 0;
+  margin: 0;
+}
+
+.shortanswer-react-app .chat-input-wrapper {
+  min-width: 0;
+}
+
+.shortanswer-react-app .chat-input-wrapper textarea {
+  box-sizing: border-box;
+  min-height: 56px;
+  max-height: 160px;
+  padding: 16px 56px 16px 24px;
+  line-height: 24px;
+  border-radius: 28px;
+}
+
+.shortanswer-react-app .chat-send-button {
+  width: 40px;
+  height: 40px;
+  right: 11px;
+  bottom: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortanswer-react-app .shortanswer-attribution {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-top: 16px;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--pgn-wgu-color-navy-muted, #223e5d);
+}
+
+.shortanswer-react-app .shortanswer-reset-dialog {
+  box-sizing: border-box;
+  max-width: min(570px, calc(100vw - 48px));
+  padding: 24px;
+  background: var(--pgn-color-white, #ffffff);
+  border: 1px solid var(--pgn-color-gray-200, #eaeaea);
+  border-radius: 16px;
+  box-shadow: 0 16px 32px rgba(34, 62, 93, 0.12);
+}
+
+.shortanswer-react-app .modal-background [role="dialog"] h3 {
+  margin: 0 0 8px;
+  color: var(--shortanswer-text);
+  font-family: var(--pgn-typography-headings-font-family, Sora, sans-serif);
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+}
+
+.shortanswer-react-app .modal-background [role="dialog"] p {
+  margin: 0 0 24px;
+  color: var(--pgn-wgu-color-navy-muted, #223e5d);
+  font-size: 16px;
+  line-height: 24px;
+}
+
+@container shortanswer (max-width: 1023px) {
+  .shortanswer-react-app .shortanswer_block {
+    padding: 48px 24px;
+  }
+
+  .shortanswer-react-app .shortanswer-panel {
+    height: var(--pgn-shortanswer-panel-height, 796px);
+    padding: 32px;
+  }
+}
+
+@container shortanswer (max-width: 575px) {
+  .shortanswer-react-app .shortanswer-header {
+    gap: 16px;
+  }
+
+  .shortanswer-react-app .shortanswer-header-icon {
+    flex-basis: 40px;
+  }
+
+  .shortanswer-react-app .shortanswer-header-icon .pgn__icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .shortanswer-react-app .shortanswer-reset {
+    flex-basis: 40px;
+    width: 40px;
+    padding: 4px;
+  }
+
+  .shortanswer-react-app .shortanswer-layout--with-image {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shortanswer-react-app .shortanswer-character {
+    max-width: 160px;
+    justify-self: center;
+  }
+
+  .shortanswer-react-app .shortanswer-panel {
+    height: var(--pgn-shortanswer-panel-height, 608px);
+    padding: 16px;
+  }
+
+  .shortanswer-react-app .shortanswer-question-trigger,
+  .shortanswer-react-app .shortanswer-question-body {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .shortanswer-react-app .chat-message,
+  .shortanswer-react-app .shortanswer-question {
+    max-width: 100%;
+    padding: 16px;
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .shortanswer-react-app .chat-input-wrapper textarea {
+    padding-inline-start: 16px;
+  }
+}

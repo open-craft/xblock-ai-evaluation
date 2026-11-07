@@ -32,16 +32,26 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
 
     has_author_view = True
 
+    BACKGROUND_THEMES = ("default", "lake", "blue", "navy", "white")
+
     display_name = String(
         display_name=_("Display Name"),
-        help=_("Name of the component in the studio"),
-        default="Short answer with AI Evaluation",
+        help=_("Title at the top of the discussion and the name shown in Studio."),
+        default="AI Discussion",
+        scope=Scope.settings,
+    )
+
+    background_theme = String(
+        display_name=_("Container background"),
+        help=_("Choose a course theme color, or use the course default."),
+        default="default",
+        values=list(BACKGROUND_THEMES),
         scope=Scope.settings,
     )
 
     show_display_name = Boolean(
         display_name=_("Show Display Name"),
-        help=_("Show the display name as a heading on the component to students."),
+        help=_("Show the title in the block header. When off, the header shows AI Discussion."),
         default=False,
         scope=Scope.settings,
     )
@@ -119,6 +129,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
     )
 
     editable_fields = AIEvalXBlock.editable_fields + (
+        "background_theme",
         "show_display_name",
         "question",
         "hide_question",
@@ -167,6 +178,13 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         Extend base Studio validation issues with Short Answer field rules.
         """
         validation_errors, validation_warnings = super()._collect_studio_validation_issues(data)
+
+        if data.background_theme not in self.BACKGROUND_THEMES:
+            self._add_studio_validation_error(
+                validation_errors,
+                "background_theme",
+                _("Select a valid course theme background."),
+            )
 
         if not data.hide_question and not data.question:
             self._add_studio_validation_error(
@@ -251,6 +269,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             },
             meta={
                 "title": self.display_name if self.show_display_name else "",
+                "background_theme": self.background_theme,
                 "question": self.question,
                 "hide_question": self.hide_question,
                 "max_responses": self.max_responses,
@@ -264,6 +283,7 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
             style_urls=[
                 "static/bundles/shared.css",
                 "static/css/chatbox.css",
+                "static/css/shortanswer.css",
             ]
         )
         frag.initialize_js("ShortAnswerAIEvalXBlock", js_data)
