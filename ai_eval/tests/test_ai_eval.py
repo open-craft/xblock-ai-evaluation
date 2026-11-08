@@ -363,6 +363,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
         },
         "meta": {
             "title": "",
+            "background_theme": "default",
             "question": shortanswer_block_data["question"],
             "max_responses": shortanswer_block_data["max_responses"],
             "character_limit": 1000,
@@ -375,6 +376,7 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
         },
         "mfe_config_api": "http://local.openedx.io:8000/api/mfe_config/v1?mfe=learning",
         "style_urls": [
+            "http://local.openedx.io:8000",
             "http://local.openedx.io:8000",
             "http://local.openedx.io:8000",
         ],
@@ -1217,6 +1219,7 @@ def test_shortanswer_studio_submit_success(shortanswer_block_data):
                 {
                     "display_name": "Updated title",
                     "show_display_name": False,
+                    "background_theme": "default",
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
@@ -1258,6 +1261,7 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
                 {
                     "display_name": "Updated title",
                     "show_display_name": False,
+                    "background_theme": "default",
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
@@ -1313,6 +1317,7 @@ def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_
         "character_image": ["Missing field in Studio payload."],
         "attachment_urls": ["Missing field in Studio payload."],
         "hide_question": ["Missing field in Studio payload."],
+        "background_theme": ["Missing field in Studio payload."],
         "pdf_download_allowed": ["Missing field in Studio payload."],
         "pdf_download_description": ["Missing field in Studio payload."],
         "pdf_download_title": ["Missing field in Studio payload."],
@@ -1335,6 +1340,7 @@ def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
                 {
                     "display_name": "Updated title",
                     "show_display_name": False,
+                    "background_theme": "default",
                     "model": SupportedModels.GPT4O.value,
                     "model_api_key": "updated-key",
                     "model_api_url": "",
