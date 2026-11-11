@@ -16,6 +16,20 @@ DEFAULT_TOKEN_EXPIRES_IN = 3300
 TIMEOUT_ERROR_MESSAGE = "We're sorry, but the connection timed out. Please try that request again."
 
 
+def _message_text(message):
+    """
+    Return a chat message's content as plain text.
+
+    The content is a string, or a list of content parts when the learner attached
+    files. The custom service never receives file parts (uploads are gated off for
+    it), but a conversation's earlier files still arrive as text notes in parts.
+    """
+    content = message.get('content', '')
+    if isinstance(content, str):
+        return content.strip()
+    return " ".join(part["text"] for part in content if part["type"] == "text").strip()
+
+
 class LLMServiceBase:
     """
     Base class for llm service.
@@ -197,17 +211,17 @@ class CustomLLMService(LLMServiceBase):
             latest_user = None
             for msg in reversed(messages):
                 if (msg.get('role') or '').lower() == 'user':
-                    latest_user = msg.get('content', '').strip()
+                    latest_user = _message_text(msg)
                     break
             prompt = f"User: {latest_user}" if latest_user is not None else ""
         else:
             prompt = " ".join(
-                f"{msg.get('role', '').capitalize()}: {msg.get('content', '').strip()}"
+                f"{msg.get('role', '').capitalize()}: {_message_text(msg)}"
                 for msg in messages
             )
         # Adjust the payload structure based on custom API requirements
         prompt = " ".join(
-            f"{msg.get('role', '').capitalize()}: {msg.get('content', '').strip()}"
+            f"{msg.get('role', '').capitalize()}: {_message_text(msg)}"
             for msg in messages
         )
         payload = {

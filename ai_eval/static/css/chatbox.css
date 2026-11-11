@@ -84,6 +84,16 @@
   max-width: 80%;
 }
 
+.chat-message-container--with-attachments {
+  align-items: flex-end;
+  flex-direction: column;
+}
+
+.chat-message-container--with-attachments .attachment-chips {
+  justify-content: flex-end;
+  max-width: 80%;
+}
+
 .user-answer {
   margin-left: auto;
   background-color: var(--pgn-shortanswer-message-user-bg-color, #E9F6F5);
@@ -128,6 +138,28 @@
   border-color: var(--shortanswer-focus);
   box-shadow: var(--shortanswer-focus-shadow);
   outline: none;
+}
+
+.chat-input-wrapper--with-uploads {
+  background: var(--shortanswer-input-bg);
+  border: 1px solid var(--shortanswer-input-border);
+  border-radius: var(--pgn-size-border-radius-lg);
+  box-shadow: var(--shortanswer-input-shadow);
+  padding: var(--shortanswer-spacing-sm) 52px var(--shortanswer-spacing-sm) var(--shortanswer-spacing-sm);
+}
+
+.chat-input-wrapper--with-uploads:focus-within {
+  border-color: var(--shortanswer-focus);
+  box-shadow: var(--shortanswer-focus-shadow);
+}
+
+.chat-input-wrapper--with-uploads textarea,
+.chat-input-wrapper--with-uploads textarea:hover,
+.chat-input-wrapper--with-uploads textarea:focus {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0 var(--shortanswer-spacing-sm);
 }
 
 .chat-send-button {
@@ -354,6 +386,22 @@
   opacity: 0.6;
 }
 
+.coach-message__attachments {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 75%;
+}
+
+.coach-message__attachments .coach-message__bubble {
+  max-width: 100%;
+}
+
+.coach-message--pending .attachment-chips {
+  opacity: 0.6;
+}
+
 .coach-input {
   display: flex;
   align-items: center;
@@ -401,6 +449,15 @@
 
 .coach-pane--coach .coach-input__textarea {
   color: #1f2933;
+}
+
+.coach-input--with-uploads {
+  align-items: flex-end;
+  padding: 0.5rem;
+}
+
+.coach-input--with-uploads .coach-input__textarea {
+  width: 100%;
 }
 
 .coach-button {
@@ -539,6 +596,10 @@
 .coach-report-submission__text {
   line-height: 1.7;
   margin: 0;
+}
+
+.coach-report-submission .attachment-chips {
+  margin-top: 1rem;
 }
 
 .coach-report-card {

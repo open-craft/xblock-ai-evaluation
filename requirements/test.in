@@ -6,6 +6,7 @@
 pytest-cov                # pytest extension for code coverage statistics
 pytest-django             # pytest extension for better Django support
 ddt                       # data-driven tests
+edx-django-utils          # provided by edx-platform; plugin signal constants (ai_eval/apps.py), monitoring and django-crum (ai_eval/compat.py)
 time-machine[dateutil]    # Freeze time for consistent timestamps for testing
 
 mock                      # required by the workbench

@@ -6,6 +6,8 @@ import { Alert, Button, Form } from "@openedx/paragon";
 
 import { RequestError } from "../shared/request";
 import { StudioEditorLayout } from "../shared/StudioEditorLayout";
+import { StudioEditorTitle } from "../shared/StudioEditorTitle";
+import { LearnerUploadStudioMeta, maxFileUploadsSchema } from "../shared/learnerUploadStudioSettings";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -42,7 +44,6 @@ import {
 import { StudioFieldMetadata } from "../shared/types";
 import {
   CoachingStudioLockMetadata,
-  CoachingStudioMeta,
   CoachingStudioPayload,
   CoachingStudioState,
 } from "./types";
@@ -106,6 +107,10 @@ const coachingSchema = Yup.object({
   pdf_download_allowed: Yup.boolean(),
   pdf_download_title: Yup.string().ensure(),
   pdf_download_description: Yup.string().ensure(),
+  workspace_allow_learner_uploads: Yup.boolean(),
+  workspace_max_file_uploads: maxFileUploadsSchema("workspace_allow_learner_uploads"),
+  coach_allow_learner_uploads: Yup.boolean(),
+  coach_max_file_uploads: maxFileUploadsSchema("coach_allow_learner_uploads"),
 });
 
 function updateListItemAtIndex(items: CoachingListItem[], index: number, nextValue: string) {
@@ -208,6 +213,10 @@ function buildSubmitPayload(values: CoachingStudioState) {
     pdf_download_allowed: values.pdf_download_allowed,
     pdf_download_title: values.pdf_download_title,
     pdf_download_description: values.pdf_download_description,
+    workspace_allow_learner_uploads: values.workspace_allow_learner_uploads,
+    workspace_max_file_uploads: values.workspace_max_file_uploads,
+    coach_allow_learner_uploads: values.coach_allow_learner_uploads,
+    coach_max_file_uploads: values.coach_max_file_uploads,
   };
 }
 
@@ -299,14 +308,18 @@ function NumberField({
   description,
   errors,
   fieldName,
+  max,
   metadata,
+  min = 0,
   onChange,
   value,
 }: {
   description?: string;
   errors?: string[];
   fieldName: string;
+  max?: number;
   metadata?: StudioFieldMetadata;
+  min?: number;
   onChange: (nextValue: string) => void;
   value: number | string | null | undefined;
 }) {
@@ -324,7 +337,8 @@ function NumberField({
         <Form.Control
           className="coaching-studio-input coaching-studio-input--compact"
           type="number"
-          min={0}
+          min={min}
+          max={max}
           step={1}
           value={value === null || typeof value === "undefined" ? "" : value}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
@@ -631,6 +645,55 @@ function AttachmentUrlListField({
           );
         }}
       />
+    </SectionCard>
+  );
+}
+
+// The File Upload toggle and, while it's on, the Max File Uploads field of one
+// pane. The Workspace and Coach Chat tabs differ only in the field names.
+function LearnerUploadSettingsCard({
+  allowUploadsFieldName,
+  maxUploadsFieldName,
+  fieldMetadata,
+  maxFileUploadsCeiling,
+  onChange,
+  validationErrors,
+  values,
+}: {
+  allowUploadsFieldName: "workspace_allow_learner_uploads" | "coach_allow_learner_uploads";
+  maxUploadsFieldName: "workspace_max_file_uploads" | "coach_max_file_uploads";
+  fieldMetadata: Record<string, StudioFieldMetadata>;
+  maxFileUploadsCeiling: number;
+  onChange: (fieldName: string, nextValue: unknown) => void;
+  validationErrors: CoachingStudioValidationErrors;
+  values: CoachingStudioState;
+}) {
+  return (
+    <SectionCard>
+      <BooleanChoiceField
+        fieldName={allowUploadsFieldName}
+        trueLabel="Yes"
+        falseLabel="No"
+        metadata={fieldMetadata[allowUploadsFieldName]}
+        value={values[allowUploadsFieldName]}
+        errors={validationErrors[allowUploadsFieldName]}
+        onChange={(nextValue) => {
+          onChange(allowUploadsFieldName, nextValue);
+        }}
+      />
+      {values[allowUploadsFieldName] ? (
+        <NumberField
+          fieldName={maxUploadsFieldName}
+          min={1}
+          max={maxFileUploadsCeiling}
+          metadata={fieldMetadata[maxUploadsFieldName]}
+          value={values[maxUploadsFieldName]}
+          errors={validationErrors[maxUploadsFieldName]}
+          onChange={(nextValue) => {
+            onChange(maxUploadsFieldName, nextValue);
+          }}
+        />
+      ) : null}
     </SectionCard>
   );
 }
@@ -1040,11 +1103,13 @@ function EvaluationSection({
 
 function WorkspaceSection({
   fieldMetadata,
+  learnerUploadMeta,
   onChange,
   validationErrors,
   values,
 }: {
   fieldMetadata: Record<string, StudioFieldMetadata>;
+  learnerUploadMeta: LearnerUploadStudioMeta;
   onChange: (fieldName: string, nextValue: unknown) => void;
   validationErrors: CoachingStudioValidationErrors;
   values: CoachingStudioState;
@@ -1147,17 +1212,30 @@ function WorkspaceSection({
         errors={validationErrors.workspace_attachment_urls}
         onChange={onChange}
       />
+      {learnerUploadMeta.learner_uploads_enabled ? (
+        <LearnerUploadSettingsCard
+          allowUploadsFieldName="workspace_allow_learner_uploads"
+          maxUploadsFieldName="workspace_max_file_uploads"
+          fieldMetadata={fieldMetadata}
+          maxFileUploadsCeiling={learnerUploadMeta.max_file_uploads_ceiling}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
     </div>
   );
 }
 
 function CoachChatSection({
   fieldMetadata,
+  learnerUploadMeta,
   onChange,
   validationErrors,
   values,
 }: {
   fieldMetadata: Record<string, StudioFieldMetadata>;
+  learnerUploadMeta: LearnerUploadStudioMeta;
   onChange: (fieldName: string, nextValue: unknown) => void;
   validationErrors: CoachingStudioValidationErrors;
   values: CoachingStudioState;
@@ -1260,6 +1338,17 @@ function CoachChatSection({
         errors={validationErrors.coach_attachment_urls}
         onChange={onChange}
       />
+      {learnerUploadMeta.learner_uploads_enabled ? (
+        <LearnerUploadSettingsCard
+          allowUploadsFieldName="coach_allow_learner_uploads"
+          maxUploadsFieldName="coach_max_file_uploads"
+          fieldMetadata={fieldMetadata}
+          maxFileUploadsCeiling={learnerUploadMeta.max_file_uploads_ceiling}
+          onChange={onChange}
+          validationErrors={validationErrors}
+          values={values}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1313,6 +1402,7 @@ function AdvancedSection({
 function SectionPanel({
   activeSection,
   fieldMetadata,
+  learnerUploadMeta,
   lockMetadata,
   onChange,
   validationErrors,
@@ -1320,6 +1410,7 @@ function SectionPanel({
 }: {
   activeSection: CoachingStudioSectionId;
   fieldMetadata: Record<string, StudioFieldMetadata>;
+  learnerUploadMeta: LearnerUploadStudioMeta;
   lockMetadata?: CoachingStudioLockMetadata;
   onChange: (fieldName: string, nextValue: unknown) => void;
   validationErrors: CoachingStudioValidationErrors;
@@ -1369,6 +1460,7 @@ function SectionPanel({
       {activeSection === "workspace" ? (
         <WorkspaceSection
           fieldMetadata={fieldMetadata}
+          learnerUploadMeta={learnerUploadMeta}
           onChange={onChange}
           validationErrors={validationErrors}
           values={values}
@@ -1377,6 +1469,7 @@ function SectionPanel({
       {activeSection === "coachChat" ? (
         <CoachChatSection
           fieldMetadata={fieldMetadata}
+          learnerUploadMeta={learnerUploadMeta}
           onChange={onChange}
           validationErrors={validationErrors}
           values={values}
@@ -1409,7 +1502,7 @@ function CoachingStudioFormContent({
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
-  const meta: CoachingStudioMeta = payload.meta || {};
+  const meta = payload.meta;
   const fieldMetadata = meta.field_metadata || {};
   const lockMetadata = meta.lock_metadata;
 
@@ -1457,7 +1550,7 @@ function CoachingStudioFormContent({
 
     let yupErrors: CoachingStudioValidationErrors = {};
     try {
-      await coachingSchema.validate(sanitizedValues, { abortEarly: false });
+      await coachingSchema.validate(sanitizedValues, { abortEarly: false, context: meta });
     } catch (error: unknown) {
       if (error instanceof Yup.ValidationError) {
         yupErrors = collectYupErrors(error);
@@ -1573,6 +1666,12 @@ function CoachingStudioFormContent({
         onCancel={handleCancel}
         onSave={saveStudioSettings}
       >
+        <StudioEditorTitle
+          displayName={formik.values.display_name}
+          onDisplayNameChange={(nextDisplayName) => {
+            formik.setFieldValue("display_name", nextDisplayName);
+          }}
+        />
         <div className="wrapper-comp-settings is-active" id="settings-tab">
           <div className="coaching-studio-shell">
             <StudioValidationSummary
@@ -1589,6 +1688,7 @@ function CoachingStudioFormContent({
               <SectionPanel
                 activeSection={activeSection}
                 fieldMetadata={fieldMetadata}
+                learnerUploadMeta={meta}
                 lockMetadata={lockMetadata}
                 onChange={(fieldName, nextValue) => {
                   formik.setFieldValue(fieldName, nextValue);

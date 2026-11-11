@@ -13,27 +13,28 @@ describe("sendAnswer", () => {
     mockPostJson.mockReset();
   });
 
-  it("posts user_input to the given URL", async () => {
+  it("posts user_input and upload_ids to the given URL", async () => {
     mockPostJson.mockResolvedValue({ response: "reply" });
 
-    await sendAnswer("/handler/get_response", "my answer");
+    await sendAnswer("/handler/get_response", "my answer", ["upload-1"]);
 
     expect(mockPostJson).toHaveBeenCalledWith("/handler/get_response", {
       user_input: "my answer",
+      upload_ids: ["upload-1"],
     });
   });
 
   it("returns response content string", async () => {
     mockPostJson.mockResolvedValue({ response: "Great answer!" });
 
-    const result = await sendAnswer("/handler/get_response", "input");
+    const result = await sendAnswer("/handler/get_response", "input", []);
     expect(result).toBe("Great answer!");
   });
 
   it("returns empty string when response is empty", async () => {
     mockPostJson.mockResolvedValue({});
 
-    const result = await sendAnswer("/handler/get_response", "input");
+    const result = await sendAnswer("/handler/get_response", "input", []);
     expect(result).toBe("");
   });
 });

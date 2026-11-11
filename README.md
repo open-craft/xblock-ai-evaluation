@@ -145,6 +145,120 @@ Caution: the whole conversation is re-sent to the model on every exchange, so a 
 per-request token usage (and cost) as well as the size of the stored conversation history.
 Invalid or non-positive values are ignored with a logged warning, and the default of 1000 is used.
 
+### Learner file uploads
+
+Learners can attach documents to their messages in the Short Answer block and in both Coaching panes
+(the workspace and the coach chat). Supported files are PDF (up to 4 MB and 10 pages) and TXT, MD
+and CSV (up to 50 KB). PDFs are sent to the model as documents; text files are inlined in the prompt.
+Uploads are off by default.
+
+#### Turning uploads on
+
+Uploads need all three of:
+
+- the site switch `LEARNER_UPLOADS_ENABLED`, set by the operator;
+- the author's **File Upload** setting on the component (in Coaching, separately for the Workspace and
+  Coach Chat tabs). The **Max File Uploads** field next to it sets how many files a learner can upload
+  per conversation (default 3);
+- a model that can read PDFs. Uploads are never offered with the Custom LLM Service.
+
+The operator can cap every **Max File Uploads** field with `MAX_FILE_UPLOADS_LIMIT` (default 5).
+Both keys go in the `ai_eval` namespace, via Site Configuration or Django `XBLOCK_SETTINGS`
+(Site Configuration takes precedence):
+
+```python
+XBLOCK_SETTINGS = {
+    "ai_eval": {
+        "LEARNER_UPLOADS_ENABLED": True,
+        "MAX_FILE_UPLOADS_LIMIT": 4,
+    }
+}
+```
+
+While the site switch is off, Studio hides the upload fields. Invalid or non-positive
+`MAX_FILE_UPLOADS_LIMIT` values are ignored with a logged warning.
+
+#### Migrations
+
+This package includes a Django app (`ai_eval`) with a database table for uploads, registered in both
+the LMS and Studio. Run migrations whenever you install or upgrade it. Tutor does this on
+`tutor local launch` and `tutor local do init`; otherwise run:
+
+```bash
+./manage.py lms migrate ai_eval
+```
+
+#### Storage
+
+Uploaded files are stored with Django's storage API. They go to the named storage `ai_eval_uploads` if
+you define it in `STORAGES`, and to the default storage otherwise. For example, to keep uploads in a
+separate S3 bucket:
+
+```python
+STORAGES["ai_eval_uploads"] = {
+    "BACKEND": "storages.backends.s3boto3.S3Storage",
+    "OPTIONS": {"bucket_name": "my-ai-eval-uploads"},
+}
+```
+
+Files are stored under the learner's course-specific anonymous ID, never their username. Files that
+were never sent are deleted when the learner removes them or resets the activity; files left unsent
+for more than 24 hours are deleted the next time the learner uploads to that component. Sent files are
+kept.
+When a learner's account is retired, all of their files are deleted. The blocks don't offer any way to
+download uploaded files: the CSV export and the PDF transcript only list filenames.
+
+Each file's storage path includes a random ID that only the learner who uploaded it can see, so
+learners can't reach each other's files. The files are otherwise as private as the storage they're in.
+In many deployments the default storage is publicly readable (for example, Tutor's MinIO bucket, which
+is public for forum uploads), so anyone who has a file's full path can open it. If uploads must not be
+reachable that way, point `ai_eval_uploads` at a private storage.
+
+#### Proxy body limits
+
+Each file is uploaded to the LMS in a single request, so every proxy in front of the LMS must accept
+request bodies of at least 5 MB on the upload handler.
+
+Tutor's Caddy limits LMS request bodies to 4,000,000 bytes, which is just under the 4 MB (4 x 1024 x 1024
+bytes) PDF limit, so the largest PDFs fail until you raise it. To raise it for the upload handler only, add this patch in a Tutor plugin, for example
+`$(tutor plugins printroot)/ai-eval-upload-size.yml`:
+
+```yaml
+name: ai-eval-upload-size
+version: 0.1.0
+patches:
+  caddyfile-lms: |
+    handle_path /courses/*/xblock/*/handler/upload_file {
+        request_body {
+            max_size 5MB
+        }
+    }
+```
+
+Then enable it and apply it:
+
+```bash
+tutor plugins enable ai-eval-upload-size
+tutor config save
+tutor local restart caddy
+```
+
+On Kubernetes, restart the Caddy deployment instead. Every other LMS path keeps the 4 MB limit. Caddy
+counts a megabyte as 1,000,000 bytes, so `5MB` covers the 4 MB PDF limit.
+
+If you use a different proxy, or another proxy sits in front of Caddy, raise its limit for the same
+path, for example nginx's `client_max_body_size` or an ingress's
+`nginx.ingress.kubernetes.io/proxy-body-size` annotation.
+
+#### Things to know
+
+- The contents of uploaded files are sent to the configured LLM provider.
+- Uploaded files are not scanned for viruses. If you need scanning, it is up to the operator to add it
+  (for example, at the storage level).
+- Cost: every attached file is re-sent to the model with each later message in its pane. The coach
+  chat has no turn limit, so its files can be re-sent many times. `MAX_FILE_UPLOADS_LIMIT` caps how many
+  files each pane can hold.
+
 ### Choosing which AI models are available
 
 When authoring an AI Eval XBlock, the author selects an AI model from a dropdown of built-in models.
