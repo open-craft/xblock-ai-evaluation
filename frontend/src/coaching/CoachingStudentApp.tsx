@@ -21,6 +21,7 @@ import { ErrorData, GenericErrorAlert } from "../shared/error";
 import { AttachmentChips } from "../shared/AttachmentChips";
 import { AttachmentUploader } from "../shared/AttachmentUploader";
 import { useAttachmentUploads } from "../shared/useAttachmentUploads";
+import { useFocusWithoutScroll } from "../shared/useFocusWithoutScroll";
 
 type PaneKey = "workspace" | "coach";
 type CoachMode = "chat" | "report" | "review";
@@ -1076,6 +1077,7 @@ const SubmitConfirmDialog = ({
 }: SubmitConfirmDialogProps) => {
   const intl = useIntl();
   const labelId = useId();
+  const cancelButtonRef = useFocusWithoutScroll<HTMLButtonElement>(isOpen);
 
   if (!isOpen) {
     return null;
@@ -1122,7 +1124,7 @@ const SubmitConfirmDialog = ({
           </p>
 
           <ActionRow>
-            <ModalCloseButton onClick={onCancel} variant="tertiary">
+            <ModalCloseButton ref={cancelButtonRef} onClick={onCancel} variant="tertiary">
               {intl.formatMessage({
                 id: "coaching.student.submitConfirm.cancel",
                 defaultMessage: "Cancel",
