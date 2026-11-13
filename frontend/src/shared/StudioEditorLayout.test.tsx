@@ -7,7 +7,7 @@ import CodingStudioApp from "../coding/CodingStudioApp";
 import { CodingStudioPayload } from "../coding/types";
 import ShortAnswerStudioApp from "../shortanswer/ShortAnswerStudioApp";
 import { ShortAnswerStudioPayload } from "../shortanswer/types";
-import { render, screen, waitFor } from "../test/helpers";
+import { render, screen, waitFor, within } from "../test/helpers";
 import { XBlockRuntime } from "./types";
 import { StudioEditorLayout } from "./StudioEditorLayout";
 
@@ -248,6 +248,127 @@ describe("StudioEditorLayout — editor integration", () => {
       "/shortanswer/studio_submit",
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("shows the JSON tab when JSON editing is enabled", () => {
+    const runtime = makeRuntime();
+    runtime.handlerUrl = jest.fn(
+      (_element, handler) => `/handler/${handler}`,
+    ) as unknown as XBlockRuntime["handlerUrl"];
+
+    renderEditor(
+      <ShortAnswerStudioApp
+        payload={{
+          ...shortAnswerPayload,
+          meta: {
+            ...shortAnswerPayload.meta,
+            json_editing_enabled: true,
+          },
+        }}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    expect(screen.getByText("JSON")).toBeInTheDocument();
+  });
+
+  it("hides the JSON tab when JSON editing is disabled", () => {
+    const runtime = makeRuntime();
+
+    renderEditor(
+      <ShortAnswerStudioApp
+        payload={shortAnswerPayload}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    expect(screen.queryByText("JSON")).not.toBeInTheDocument();
+  });
+
+  it("validates uploaded JSON in ShortAnswerStudioApp using shortAnswerSchema", async () => {
+    const user = userEvent.setup();
+    const runtime = makeRuntime();
+    runtime.handlerUrl = jest.fn(
+      (_element, handler) => `/handler/${handler}`,
+    ) as unknown as XBlockRuntime["handlerUrl"];
+
+    const { container } = renderEditor(
+      <ShortAnswerStudioApp
+        payload={{
+          ...shortAnswerPayload,
+          meta: {
+            ...shortAnswerPayload.meta,
+            json_editing_enabled: true,
+          },
+        }}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    await user.click(screen.getByText("JSON"));
+
+    expect(screen.getByText("Import")).toBeInTheDocument();
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    expect(input).not.toBeNull();
+
+    const file = new File([JSON.stringify({ max_responses: 50, model: "" })], "test.json", {
+      type: "application/json",
+    });
+    Object.defineProperty(file, "text", {
+      value: () => Promise.resolve(JSON.stringify({ max_responses: 50, model: "" })),
+    });
+
+    await userEvent.upload(input, file);
+
+    const heading = await screen.findByText("JSON validation failed!");
+    expect(heading).toBeInTheDocument();
+    const alertBox = heading.closest(".alert") || heading.parentElement!;
+    expect(within(alertBox as HTMLElement).getByText("max_responses")).toBeInTheDocument();
+    expect(
+      within(alertBox as HTMLElement).getByText("max responses must be an integer between 1 and 30"),
+    ).toBeInTheDocument();
+  });
+
+  it("wires the tablist to the tab panes with ARIA attributes", async () => {
+    const user = userEvent.setup();
+    const runtime = makeRuntime();
+    runtime.handlerUrl = jest.fn(
+      (_element, handler) => `/handler/${handler}`,
+    ) as unknown as XBlockRuntime["handlerUrl"];
+
+    renderEditor(
+      <ShortAnswerStudioApp
+        payload={{
+          ...shortAnswerPayload,
+          meta: { ...shortAnswerPayload.meta, json_editing_enabled: true },
+        }}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    const settingsTab = screen.getByRole("tab", { name: "Settings" });
+    const jsonTab = screen.getByRole("tab", { name: "JSON" });
+    const settingsPanel = document.getElementById(
+      settingsTab.getAttribute("aria-controls")!,
+    )!;
+    const jsonPanel = document.getElementById(jsonTab.getAttribute("aria-controls")!)!;
+
+    expect(settingsPanel).toHaveAttribute("role", "tabpanel");
+    expect(settingsPanel).toHaveAttribute("aria-labelledby", settingsTab.id);
+    expect(settingsPanel).toHaveAttribute("aria-hidden", "false");
+    expect(jsonPanel).toHaveAttribute("aria-labelledby", jsonTab.id);
+    expect(jsonPanel).toHaveAttribute("aria-hidden", "true");
+
+    await user.click(jsonTab);
+
+    expect(jsonTab).toHaveAttribute("aria-selected", "true");
+    expect(jsonPanel).toHaveAttribute("aria-hidden", "false");
+    expect(settingsPanel).toHaveAttribute("aria-hidden", "true");
   });
 
   it("cancels Coding through the React layout", async () => {

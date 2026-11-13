@@ -50,7 +50,7 @@ afterEach(() => {
 it("initializes a default background without changing the display-name controls", () => {
   render(<ShortAnswerStudioApp payload={makePayload()} />);
   expect(screen.getByRole("radio", { name: "Use course default" })).toBeChecked();
-  expect(screen.getByLabelText("Display Name")).toHaveValue("Existing display name");
+  expect(screen.getByText("Editing: Existing display name")).toBeInTheDocument();
   expect(screen.getByRole("checkbox", { name: "Show Display Name" })).toBeChecked();
   expect(screen.getByRole("group", { name: "Container background" })).toBeInTheDocument();
   expect(within(screen.getByRole("group", { name: "Container background" })).getAllByRole("radio")).toHaveLength(5);
@@ -60,8 +60,9 @@ it.each(BACKGROUND_OPTIONS)("saves the $value thumbnail key and the display name
   const user = userEvent.setup();
   const notify = jest.fn();
   render(<ShortAnswerStudioApp payload={makePayload()} runtime={{ notify, handlerUrl: jest.fn() }} />);
-  await user.clear(screen.getByLabelText("Display Name"));
-  await user.type(screen.getByLabelText("Display Name"), "My reflection");
+  await user.click(screen.getByRole("button", { name: "Edit display name" }));
+  await user.clear(screen.getByLabelText("Display name"));
+  await user.type(screen.getByLabelText("Display name"), "My reflection{enter}");
   await user.click(screen.getByRole("radio", { name: option.label.defaultMessage }));
   expect(screen.getByRole("radio", { name: option.label.defaultMessage })).toBeChecked();
   await user.click(screen.getByRole("button", { name: /^save$/i }));

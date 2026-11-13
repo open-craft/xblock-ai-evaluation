@@ -11,3 +11,12 @@ html {
 .modal-window .editor-with-buttons {
     margin-bottom: 0 !important;
 }
+
+[class*="view-"] .modal-window.modal-editor {
+    padding: 1px;
+}
+
+[class*="view-"] .modal-window.modal-editor .fullscreen-button {
+    right: 8px;
+    top: 8px;
+}
