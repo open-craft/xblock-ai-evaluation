@@ -80,6 +80,7 @@ export interface ShortAnswerStudioHandlerUrls {
 export interface ShortAnswerStudioMeta extends LearnerUploadStudioMeta {
   field_metadata?: Record<string, StudioFieldMetadata>;
   lock_metadata?: StudioLockMetadata;
+  json_editing_enabled?: boolean;
 }
 
 export type ShortAnswerStudioPayload = SharedPayload<

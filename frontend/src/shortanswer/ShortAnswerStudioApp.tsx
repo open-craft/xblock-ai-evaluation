@@ -2,7 +2,10 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Formik, useFormikContext } from "formik";
 import * as Yup from "yup";
-import { Button, Form } from "@openedx/paragon";
+import {
+  Button, Form, Nav, TabContainer, TabContent, TabPane, ModalDialog,
+} from "@openedx/paragon";
+import { JSONImporter } from "../shared/JSONImporter";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioEditorLayout } from "../shared/StudioEditorLayout";
@@ -20,7 +23,9 @@ import {
   submitStudioPayload,
   ValidationErrors,
 } from "../shared/studio";
-import { StudioFieldMetadata, XBlockRuntime } from "../shared/types";
+import {
+  StudioFieldMetadata, XBlockElementLike, XBlockRuntime,
+} from "../shared/types";
 import {
   ShortAnswerStudioMeta,
   ShortAnswerStudioPayload,
@@ -32,7 +37,7 @@ import { BACKGROUND_OPTIONS } from "./appearance";
 import { maxFileUploadsSchema } from "../shared/learnerUploadStudioSettings";
 import { ShortAnswerUploadFields } from "./ShortAnswerUploadFields";
 
-const shortAnswerSchema = Yup.object({
+export const shortAnswerSchema = Yup.object({
   allow_reset: Yup.boolean()
     .transform((_value: unknown, original: unknown) => Boolean(original))
     .default(false),
@@ -394,12 +399,63 @@ function ShortAnswerSettingsForm({
   );
 }
 
+
+interface HeaderProps {
+  title: string;
+  onTitleChange: (title: string) => void;
+  activeTab: string;
+  showJsonTab: boolean;
+  validationErrors: ValidationErrors;
+}
+
+function Header({ title, onTitleChange, activeTab, showJsonTab, validationErrors }: HeaderProps) {
+  return (
+    <ModalDialog.Header className="shadow-sm studio-header">
+      <div className="d-flex flex-row justify-content-between align-items-center w-100">
+        <StudioEditorTitle
+          displayName={title}
+          onDisplayNameChange={onTitleChange}
+          isInvalid={Boolean(validationErrors.display_name)}
+        />
+        {showJsonTab && (
+          <Nav
+            role="tablist"
+            variant="button-group"
+            activeKey={activeTab}
+            className="studio-header-tabs-nav pgn__tabs"
+            aria-label="Editor Sections"
+          >
+            <Nav.Link
+              as="button"
+              type="button"
+              eventKey="settings"
+              tabIndex={activeTab === "settings" ? 0 : -1}
+            >
+              Settings
+            </Nav.Link>
+            <Nav.Link
+              as="button"
+              type="button"
+              eventKey="json"
+              tabIndex={activeTab === "json" ? 0 : -1}
+            >
+              JSON
+            </Nav.Link>
+          </Nav>
+        )}
+      </div>
+    </ModalDialog.Header>
+  );
+}
+
 function ShortAnswerStudioFormContent({
   payload,
   runtime,
+  element,
 }: {
   payload: ShortAnswerStudioPayload;
   runtime?: XBlockRuntime;
+  element?: XBlockElementLike;
 }) {
   const formik = useFormikContext<ShortAnswerStudioState>();
   const valuesRef = useRef(formik.values);
@@ -409,10 +465,12 @@ function ShortAnswerStudioFormContent({
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("settings");
   const isSavingRef = useRef(false);
   const meta = payload.meta;
   const fieldMetadata = meta.field_metadata || {};
   const lockMetadata = meta.lock_metadata;
+  const jsonEditingEnabled = meta.json_editing_enabled || false;
 
   const handleSave = useCallback(async function handleSave() {
     if (!payload.handler_urls.studio_submit || isSavingRef.current) {
@@ -539,29 +597,54 @@ function ShortAnswerStudioFormContent({
         onCancel={handleCancel}
         onSave={handleSave}
       >
-        <StudioEditorTitle
-          displayName={formik.values.display_name}
-          onDisplayNameChange={(nextDisplayName) => {
-            formik.setFieldValue("display_name", nextDisplayName);
-          }}
-        />
-        <div className="wrapper-comp-settings is-active" id="settings-tab">
-          <StudioValidationSummary
-            hasFieldErrors={hasFieldErrors}
-            requestError={requestError}
-            validationWarnings={validationWarnings}
-          />
-          <ShortAnswerSettingsForm
-            values={formik.values}
+        <TabContainer
+          id="shortanswer-studio-tabs"
+          activeKey={activeTab}
+          onSelect={(eventKey: string | null) => setActiveTab(eventKey || "settings")}
+          transition={false}
+        >
+          <Header
+            title={formik.values.display_name}
+            onTitleChange={(value: string) => formik.setFieldValue("display_name", value)}
+            activeTab={activeTab}
+            showJsonTab={jsonEditingEnabled}
             validationErrors={validationErrors}
-            lockMetadata={lockMetadata}
-            meta={meta}
-            fieldMetadata={fieldMetadata}
-            onChange={(fieldName, nextValue) => {
-              formik.setFieldValue(fieldName, nextValue);
-            }}
           />
-        </div>
+          <ModalDialog.Body>
+            <TabContent>
+              <TabPane eventKey="settings">
+                <div className="wrapper-comp-settings is-active" id="settings-tab">
+                  <StudioValidationSummary
+                    hasFieldErrors={hasFieldErrors}
+                    requestError={requestError}
+                    validationWarnings={validationWarnings}
+                  />
+                  <ShortAnswerSettingsForm
+                    values={formik.values}
+                    validationErrors={validationErrors}
+                    lockMetadata={lockMetadata}
+                    meta={meta}
+                    fieldMetadata={fieldMetadata}
+                    onChange={(fieldName, nextValue) => {
+                      formik.setFieldValue(fieldName, nextValue);
+                    }}
+                  />
+                </div>
+              </TabPane>
+              {jsonEditingEnabled && (
+                <TabPane eventKey="json">
+                  <JSONImporter
+                    liveData={buildSubmitPayload(formik.values)}
+                    runtime={runtime as XBlockRuntime}
+                    element={element as XBlockElementLike}
+                    schema={shortAnswerSchema}
+                    schemaContext={meta}
+                  />
+                </TabPane>
+              )}
+            </TabContent>
+          </ModalDialog.Body>
+        </TabContainer>
       </StudioEditorLayout>
     </div>
   );
@@ -570,9 +653,11 @@ function ShortAnswerStudioFormContent({
 export default function ShortAnswerStudioApp({
   payload,
   runtime,
+  element,
 }: {
   payload: ShortAnswerStudioPayload;
   runtime?: XBlockRuntime;
+  element?: XBlockElementLike;
 }) {
   const initialValues = useMemo(
     () =>
@@ -588,7 +673,7 @@ export default function ShortAnswerStudioApp({
       enableReinitialize
       onSubmit={() => {}}
     >
-      <ShortAnswerStudioFormContent payload={payload} runtime={runtime} />
+      <ShortAnswerStudioFormContent payload={payload} runtime={runtime} element={element} />
     </Formik>
   );
 }
