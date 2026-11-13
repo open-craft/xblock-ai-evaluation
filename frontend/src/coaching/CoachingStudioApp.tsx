@@ -2,10 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useIntl } from "react-intl";
 import { Formik, useFormikContext } from "formik";
 import * as Yup from "yup";
-import { Alert, Button, Form } from "@openedx/paragon";
+import {
+  Alert, Button, Form, ModalDialog, TabContainer, TabContent, TabPane,
+} from "@openedx/paragon";
 
+import { JSONImporter } from "../shared/JSONImporter";
 import { RequestError } from "../shared/request";
 import { StudioEditorLayout } from "../shared/StudioEditorLayout";
+import { StudioHeader } from "../shared/StudioHeader";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -17,7 +21,7 @@ import {
   notifyRuntime,
   submitStudioPayload,
 } from "../shared/studio";
-import { XBlockRuntime } from "../shared/types";
+import { XBlockElementLike, XBlockRuntime } from "../shared/types";
 import {
   CoachingListItem,
   getBlacklistItems,
@@ -51,7 +55,8 @@ const coachingSchema = Yup.object({
   allow_reset: Yup.boolean()
     .transform((_value: unknown, original: unknown) => Boolean(original))
     .default(false),
-  blacklist: Yup.mixed()
+  blacklist: Yup.array()
+    .of(Yup.string().strict())
     .transform((value: unknown) => (Array.isArray(value) ? value : []))
     .default(() => []),
   character_1_avatar: Yup.string().ensure(),
@@ -62,13 +67,15 @@ const coachingSchema = Yup.object({
   character_2_name: Yup.string().ensure(),
   character_2_prompt: Yup.string().ensure(),
   character_2_role: Yup.string().ensure(),
-  coach_attachment_urls: Yup.mixed()
+  coach_attachment_urls: Yup.array()
+    .of(Yup.string().strict())
     .transform((value: unknown) => (Array.isArray(value) ? value : []))
     .default(() => []),
   coach_initial_message: Yup.string().ensure(),
   coach_title: Yup.string().ensure(),
   display_name: Yup.string().ensure(),
-  evaluator_attachment_urls: Yup.mixed()
+  evaluator_attachment_urls: Yup.array()
+    .of(Yup.string().strict())
     .transform((value: unknown) => (Array.isArray(value) ? value : []))
     .default(() => []),
   evaluator_prompt: Yup.string().ensure(),
@@ -81,7 +88,13 @@ const coachingSchema = Yup.object({
     .required("Model field is mandatory - please select one from the dropdown."),
   model_api_key: Yup.string().ensure(),
   model_api_url: Yup.string().ensure(),
-  scenario_data: Yup.mixed()
+  scenario_data: Yup.object({
+    case_details: Yup.string().ensure(),
+    evaluation_criteria: Yup.array()
+      .of(Yup.object({ name: Yup.string().strict().required() }).strict())
+      .ensure(),
+    learning_objectives: Yup.array().of(Yup.string().strict()).ensure(),
+  })
     .transform((value: unknown) => {
       if (value && typeof value === "object" && !Array.isArray(value)) {
         return value;
@@ -99,7 +112,8 @@ const coachingSchema = Yup.object({
       }
       return true;
     }),
-  workspace_attachment_urls: Yup.mixed()
+  workspace_attachment_urls: Yup.array()
+    .of(Yup.string().strict())
     .transform((value: unknown) => (Array.isArray(value) ? value : []))
     .default(() => []),
   workspace_title: Yup.string().ensure(),
@@ -713,16 +727,6 @@ function GeneralSection({
   return (
     <div className="coaching-studio-section-stack">
       <SectionCard>
-        <TextInputField
-          fieldName="display_name"
-          metadata={fieldMetadata.display_name}
-          description="Name of the XBlock component in Studio."
-          value={values.display_name || ""}
-          errors={validationErrors.display_name}
-          onChange={(nextValue) => {
-            onChange("display_name", nextValue);
-          }}
-        />
         <SelectField
           fieldName="model"
           metadata={{
@@ -1397,9 +1401,11 @@ function SectionPanel({
 function CoachingStudioFormContent({
   payload,
   runtime,
+  element,
 }: {
   payload: CoachingStudioPayload;
   runtime?: XBlockRuntime;
+  element?: XBlockElementLike;
 }) {
   const formik = useFormikContext<CoachingStudioState>();
   const intl = useIntl();
@@ -1408,13 +1414,16 @@ function CoachingStudioFormContent({
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [requestError, setRequestError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("settings");
   const isSavingRef = useRef(false);
   const meta: CoachingStudioMeta = payload.meta || {};
   const fieldMetadata = meta.field_metadata || {};
   const lockMetadata = meta.lock_metadata;
+  const jsonEditingEnabled = meta.json_editing_enabled || false;
 
   useEffect(() => {
     setActiveSection("general");
+    setActiveTab("settings");
     setValidationErrors({});
     setValidationWarnings([]);
     setRequestError("");
@@ -1573,32 +1582,63 @@ function CoachingStudioFormContent({
         onCancel={handleCancel}
         onSave={saveStudioSettings}
       >
-        <div className="wrapper-comp-settings is-active" id="settings-tab">
-          <div className="coaching-studio-shell">
-            <StudioValidationSummary
-              requestError={requestError}
-              validationWarnings={validationWarnings}
-            />
+        <TabContainer
+          id="coaching-studio-tabs"
+          activeKey={activeTab}
+          onSelect={(eventKey: string | null) => setActiveTab(eventKey || "settings")}
+          transition={false}
+        >
+          <StudioHeader
+            activeTab={activeTab}
+            onTitleChange={(value: string) => formik.setFieldValue("display_name", value)}
+            showJsonTab={jsonEditingEnabled}
+            title={formik.values.display_name}
+            validationErrors={validationErrors}
+          />
+          <ModalDialog.Body>
+            <TabContent>
+              <TabPane eventKey="settings">
+                <div className="wrapper-comp-settings is-active" id="settings-tab">
+                  <div className="coaching-studio-shell">
+                    <StudioValidationSummary
+                      requestError={requestError}
+                      validationWarnings={validationWarnings}
+                    />
 
-            <div className="coaching-studio-body">
-              <SectionNav
-                activeSection={activeSection}
-                onSectionChange={setActiveSection}
-                validationErrors={validationErrors}
-              />
-              <SectionPanel
-                activeSection={activeSection}
-                fieldMetadata={fieldMetadata}
-                lockMetadata={lockMetadata}
-                onChange={(fieldName, nextValue) => {
-                  formik.setFieldValue(fieldName, nextValue);
-                }}
-                validationErrors={validationErrors}
-                values={formik.values}
-              />
-            </div>
-          </div>
-        </div>
+                    <div className="coaching-studio-body">
+                      <SectionNav
+                        activeSection={activeSection}
+                        onSectionChange={setActiveSection}
+                        validationErrors={validationErrors}
+                      />
+                      <SectionPanel
+                        activeSection={activeSection}
+                        fieldMetadata={fieldMetadata}
+                        lockMetadata={lockMetadata}
+                        onChange={(fieldName, nextValue) => {
+                          formik.setFieldValue(fieldName, nextValue);
+                        }}
+                        validationErrors={validationErrors}
+                        values={formik.values}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </TabPane>
+              {jsonEditingEnabled && (
+                <TabPane eventKey="json">
+                  <JSONImporter
+                    liveData={buildSubmitPayload(formik.values)}
+                    exportFilename="coaching-data.json"
+                    runtime={runtime as XBlockRuntime}
+                    element={element as XBlockElementLike}
+                    schema={coachingSchema}
+                  />
+                </TabPane>
+              )}
+            </TabContent>
+          </ModalDialog.Body>
+        </TabContainer>
       </StudioEditorLayout>
     </div>
   );
@@ -1607,9 +1647,11 @@ function CoachingStudioFormContent({
 export default function CoachingStudioApp({
   payload,
   runtime,
+  element,
 }: {
   payload: CoachingStudioPayload;
   runtime?: XBlockRuntime;
+  element?: XBlockElementLike;
 }) {
   const initialValues = useMemo(
     () =>
@@ -1625,7 +1667,7 @@ export default function CoachingStudioApp({
       enableReinitialize
       onSubmit={() => {}}
     >
-      <CoachingStudioFormContent payload={payload} runtime={runtime} />
+      <CoachingStudioFormContent payload={payload} runtime={runtime} element={element} />
     </Formik>
   );
 }

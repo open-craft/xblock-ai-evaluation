@@ -3,32 +3,8 @@ import userEvent from "@testing-library/user-event";
 import * as Yup from "yup";
 
 import { render, screen, waitFor } from "../test/helpers";
+import { getFileInput, makeJsonFile, makeRuntime } from "../test/testUtils";
 import { JSONImporter } from "./JSONImporter";
-import { XBlockRuntime } from "./types";
-
-function makeRuntime(): XBlockRuntime & { notify: jest.Mock } {
-  return {
-    handlerUrl: jest.fn(
-      (_element, handler) => `/handler/${handler}`,
-    ),
-    notify: jest.fn(),
-  } as unknown as XBlockRuntime & { notify: jest.Mock };
-}
-
-function makeFile(contents: string, name = "component.json") {
-  const file = new File([contents], name, { type: "application/json" });
-  // jsdom's File does not implement .text(), which the component uses.
-  Object.defineProperty(file, "text", {
-    value: () => Promise.resolve(contents),
-  });
-  return file;
-}
-
-function getFileInput(container: HTMLElement) {
-  const input = container.querySelector<HTMLInputElement>('input[type="file"]');
-  expect(input).not.toBeNull();
-  return input as HTMLInputElement;
-}
 
 function mockFetchResponse(body: unknown, ok = true) {
   const mockFetch = jest.fn().mockResolvedValue({
@@ -39,6 +15,21 @@ function mockFetchResponse(body: unknown, ok = true) {
   });
   global.fetch = mockFetch;
   return mockFetch;
+}
+
+function renderImporter(
+  overrides: Partial<React.ComponentProps<typeof JSONImporter>> = {},
+) {
+  return render(
+    <JSONImporter
+      exportFilename="test-data.json"
+      liveData={{}}
+      runtime={makeRuntime()}
+      element={document.createElement("div")}
+      schema={Yup.object()}
+      {...overrides}
+    />,
+  );
 }
 
 describe("JSONImporter", () => {
@@ -59,31 +50,16 @@ describe("JSONImporter", () => {
   });
 
   it("renders the export download button", () => {
-    const runtime = makeRuntime();
-
-    render(
-      <JSONImporter
-        liveData={{ display_name: "Example" }}
-        runtime={runtime}
-        element={document.createElement("div")}
-      />,
-    );
+    renderImporter({ liveData: { display_name: "Example" } });
 
     expect(screen.getByRole("button", { name: "Download JSON" })).toBeInTheDocument();
   });
 
   it("exports the live editor data as a JSON download", async () => {
     const user = userEvent.setup();
-    const runtime = makeRuntime();
     const liveData = { display_name: "Example", max_responses: 3 };
 
-    render(
-      <JSONImporter
-        liveData={liveData}
-        runtime={runtime}
-        element={document.createElement("div")}
-      />,
-    );
+    renderImporter({ liveData });
 
     await user.click(screen.getByRole("button", { name: "Download JSON" }));
 
@@ -105,16 +81,10 @@ describe("JSONImporter", () => {
       validation_warnings: [],
       meta: {},
     });
-    const { container } = render(
-      <JSONImporter
-        liveData={{}}
-        runtime={runtime}
-        element={document.createElement("div")}
-      />,
-    );
+    const { container } = renderImporter({ runtime });
     const data = { display_name: "Imported" };
 
-    await userEvent.upload(getFileInput(container), makeFile(JSON.stringify(data)));
+    await userEvent.upload(getFileInput(container), makeJsonFile(JSON.stringify(data)));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -133,18 +103,11 @@ describe("JSONImporter", () => {
       max_responses: Yup.number().typeError("Input should be a valid integer").required(),
       question: Yup.string().required("Question is mandatory"),
     });
-    const { container } = render(
-      <JSONImporter
-        liveData={{}}
-        runtime={runtime}
-        element={document.createElement("div")}
-        schema={schema}
-      />,
-    );
+    const { container } = renderImporter({ runtime, schema });
 
     await userEvent.upload(
       getFileInput(container),
-      makeFile(JSON.stringify({ max_responses: "nope" })),
+      makeJsonFile(JSON.stringify({ max_responses: "nope" })),
     );
 
     expect(await screen.findByText("JSON validation failed!")).toBeInTheDocument();
@@ -164,18 +127,11 @@ describe("JSONImporter", () => {
       "Root validation failed",
       () => false,
     );
-    const { container } = render(
-      <JSONImporter
-        liveData={{}}
-        runtime={runtime}
-        element={document.createElement("div")}
-        schema={schema}
-      />,
-    );
+    const { container } = renderImporter({ runtime, schema });
 
     await userEvent.upload(
       getFileInput(container),
-      makeFile(JSON.stringify({ test: "data" })),
+      makeJsonFile(JSON.stringify({ test: "data" })),
     );
 
     expect(await screen.findByText("JSON validation failed!")).toBeInTheDocument();
@@ -194,17 +150,10 @@ describe("JSONImporter", () => {
     const schema = Yup.object({
       display_name: Yup.string().required(),
     });
-    const { container } = render(
-      <JSONImporter
-        liveData={{}}
-        runtime={runtime}
-        element={document.createElement("div")}
-        schema={schema}
-      />,
-    );
+    const { container } = renderImporter({ runtime, schema });
     const data = { display_name: "Imported" };
 
-    await userEvent.upload(getFileInput(container), makeFile(JSON.stringify(data)));
+    await userEvent.upload(getFileInput(container), makeJsonFile(JSON.stringify(data)));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
@@ -216,7 +165,77 @@ describe("JSONImporter", () => {
     expect(runtime.notify).toHaveBeenCalledWith("save", { state: "end" });
   });
 
-  it("shows validation errors returned by the save handler when no schema is provided", async () => {
+  it.each([null, false, 0, 42])(
+    "rejects %p for a Yup.string().ensure() field instead of casting it",
+    async (value) => {
+      const runtime = makeRuntime();
+      const fetch = mockFetchResponse({});
+      const schema = Yup.object({
+        display_name: Yup.string().ensure(),
+        model: Yup.string().ensure().required("Model field is mandatory"),
+      });
+      const { container } = renderImporter({ runtime, schema });
+
+      await userEvent.upload(
+        getFileInput(container),
+        makeJsonFile(JSON.stringify({ display_name: value, model: "gpt-4o" })),
+      );
+
+      expect(await screen.findByText("JSON validation failed!")).toBeInTheDocument();
+      expect(screen.getByText("display_name")).toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(runtime.notify).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects null for a boolean field", async () => {
+    const runtime = makeRuntime();
+    const fetch = mockFetchResponse({});
+    const schema = Yup.object({
+      allow_reset: Yup.boolean()
+        .transform((_value: unknown, original: unknown) => Boolean(original))
+        .default(false),
+    });
+    const { container } = renderImporter({ runtime, schema });
+
+    await userEvent.upload(
+      getFileInput(container),
+      makeJsonFile(JSON.stringify({ allow_reset: null })),
+    );
+
+    expect(await screen.findByText("JSON validation failed!")).toBeInTheDocument();
+    expect(screen.getByText("allow_reset")).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("still allows omitted optional string fields", async () => {
+    const runtime = makeRuntime();
+    const fetch = mockFetchResponse({
+      success: true,
+      validation_errors: {},
+      validation_warnings: [],
+      meta: {},
+    });
+    const schema = Yup.object({
+      display_name: Yup.string().ensure(),
+      model: Yup.string().ensure().required("Model field is mandatory"),
+    });
+    const { container } = renderImporter({ runtime, schema });
+
+    await userEvent.upload(
+      getFileInput(container),
+      makeJsonFile(JSON.stringify({ model: "gpt-4o" })),
+    );
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/handler/studio_submit",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+  });
+
+  it("shows validation errors returned by the save handler", async () => {
     const runtime = makeRuntime();
     mockFetchResponse({
       success: false,
@@ -226,17 +245,11 @@ describe("JSONImporter", () => {
       validation_warnings: [],
       meta: {},
     });
-    const { container } = render(
-      <JSONImporter
-        liveData={{}}
-        runtime={runtime}
-        element={document.createElement("div")}
-      />,
-    );
+    const { container } = renderImporter({ runtime });
 
     await userEvent.upload(
       getFileInput(container),
-      makeFile(JSON.stringify({ max_responses: "nope" })),
+      makeJsonFile(JSON.stringify({ max_responses: "nope" })),
     );
 
     expect(await screen.findByText("JSON validation failed!")).toBeInTheDocument();
@@ -247,15 +260,9 @@ describe("JSONImporter", () => {
   it("rejects invalid JSON without posting it", async () => {
     const runtime = makeRuntime();
     const fetch = mockFetchResponse({});
-    const { container } = render(
-      <JSONImporter
-        liveData={{}}
-        runtime={runtime}
-        element={document.createElement("div")}
-      />,
-    );
+    const { container } = renderImporter({ runtime });
 
-    await userEvent.upload(getFileInput(container), makeFile("{ not valid json"));
+    await userEvent.upload(getFileInput(container), makeJsonFile("{ not valid json"));
 
     const messages = await screen.findAllByText("Invalid JSON.");
     expect(messages.length).toBeGreaterThan(0);
