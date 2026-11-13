@@ -1,8 +1,9 @@
 import React from "react";
-import { render, screen, waitFor } from "../test/helpers";
 import userEvent from "@testing-library/user-event";
 import CoachingStudioApp from "./CoachingStudioApp";
 import { CoachingStudioMeta, CoachingStudioPayload, CoachingStudioState } from "./types";
+import { render, screen, waitFor, within } from "../test/helpers";
+import { getFileInput, makeJsonFile, makeRuntime, mockSuccessfulSave } from "../test/testUtils";
 
 function makePayload(overrides?: Partial<CoachingStudioPayload>): CoachingStudioPayload {
   return {
@@ -32,6 +33,36 @@ function makePayload(overrides?: Partial<CoachingStudioPayload>): CoachingStudio
 
 function getSectionButton(name: RegExp) {
   return screen.getByRole("button", { name });
+}
+
+function makeJsonPayload(
+  overrides?: Partial<CoachingStudioPayload>,
+): CoachingStudioPayload {
+  return makePayload({
+    ...overrides,
+    meta: {
+      ...makePayload().meta,
+      ...overrides?.meta,
+      json_editing_enabled: true,
+    },
+  });
+}
+
+function renderJsonEditor(
+  overrides: { payload?: Partial<CoachingStudioPayload> } = {},
+) {
+  return render(
+    <CoachingStudioApp
+      payload={makeJsonPayload(overrides.payload)}
+      runtime={makeRuntime()}
+      element={document.createElement("div")}
+    />,
+  );
+}
+
+function getValidationAlert(): HTMLElement {
+  const heading = screen.getByText("JSON validation failed!");
+  return (heading.closest(".alert") || heading.parentElement!) as HTMLElement;
 }
 
 describe("CoachingStudioApp attachment URL fields", () => {
@@ -108,17 +139,6 @@ describe("CoachingStudioApp attachment URL fields", () => {
     expect(body.evaluator_attachment_urls).toEqual(["http://example.com/e.txt"]);
   });
 });
-
-function mockSuccessfulSave() {
-  const fetchMock = jest.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    statusText: "OK",
-    text: async () => JSON.stringify({ success: true, validation_errors: {}, validation_warnings: [], meta: {} }),
-  });
-  global.fetch = fetchMock as unknown as typeof global.fetch;
-  return fetchMock;
-}
 
 function makeUploadPayload(
   stateOverrides: Partial<CoachingStudioState> = {},
@@ -235,5 +255,102 @@ describe("CoachingStudioApp learner upload fields", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).display_name)
       .toBe("Coaching activity");
+  });
+});
+
+describe("CoachingStudioApp JSON import/export", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  it("shows the JSON tab when JSON editing is enabled", () => {
+    renderJsonEditor();
+
+    expect(screen.getByRole("tab", { name: "JSON" })).toBeInTheDocument();
+  });
+
+  it("hides the JSON tab when JSON editing is disabled", () => {
+    render(
+      <CoachingStudioApp
+        payload={makePayload()}
+        runtime={makeRuntime()}
+        element={document.createElement("div")}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "JSON" })).not.toBeInTheDocument();
+  });
+
+  it("validates uploaded JSON using coachingSchema", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockSuccessfulSave();
+    const { container } = renderJsonEditor({
+      payload: {
+        meta: {
+          field_metadata: {},
+          learner_uploads_enabled: true,
+          max_file_uploads_ceiling: 5,
+        },
+      },
+    });
+
+    await user.click(screen.getByRole("tab", { name: "JSON" }));
+    await userEvent.upload(
+      getFileInput(container),
+      makeJsonFile(JSON.stringify({
+        model: "",
+        coach_allow_learner_uploads: true,
+        coach_max_file_uploads: 6,
+      })),
+    );
+
+    const alertBox = getValidationAlert();
+    expect(within(alertBox).getByText("model")).toBeInTheDocument();
+    expect(
+      within(alertBox).getByText(
+        "Model field is mandatory - please select one from the dropdown.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(alertBox).getByText("coach_max_file_uploads")).toBeInTheDocument();
+    expect(
+      within(alertBox).getByText("Max File Uploads must be an integer between 1 and 5."),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects nested non-string values", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockSuccessfulSave();
+    const { container } = renderJsonEditor();
+
+    await user.click(screen.getByRole("tab", { name: "JSON" }));
+    await userEvent.upload(
+      getFileInput(container),
+      makeJsonFile(JSON.stringify({
+        model: "gpt-4o-mini",
+        display_name: null,
+        allow_reset: null,
+        blacklist: ["AI assistant", null],
+        workspace_attachment_urls: [false],
+        scenario_data: {
+          case_details: null,
+          learning_objectives: [null],
+          evaluation_criteria: [{ name: null }],
+        },
+      })),
+    );
+
+    const alertBox = getValidationAlert();
+    expect(within(alertBox).getByText("display_name")).toBeInTheDocument();
+    expect(within(alertBox).getByText("allow_reset")).toBeInTheDocument();
+    expect(within(alertBox).getByText("blacklist[1]")).toBeInTheDocument();
+    expect(within(alertBox).getByText("workspace_attachment_urls[0]")).toBeInTheDocument();
+    expect(within(alertBox).getByText("scenario_data.case_details")).toBeInTheDocument();
+    expect(within(alertBox).getByText("scenario_data.learning_objectives[0]")).toBeInTheDocument();
+    expect(
+      within(alertBox).getByText("scenario_data.evaluation_criteria[0].name"),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

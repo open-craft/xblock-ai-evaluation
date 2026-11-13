@@ -3,13 +3,13 @@ import { useIntl } from "react-intl";
 import { Formik, useFormikContext } from "formik";
 import * as Yup from "yup";
 import {
-  Button, Form, Nav, TabContainer, TabContent, TabPane, ModalDialog,
+  Button, Form, TabContainer, TabContent, TabPane, ModalDialog,
 } from "@openedx/paragon";
 import { JSONImporter } from "../shared/JSONImporter";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioEditorLayout } from "../shared/StudioEditorLayout";
-import { StudioEditorTitle } from "../shared/StudioEditorTitle";
+import { StudioHeader } from "../shared/StudioHeader";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -400,54 +400,6 @@ function ShortAnswerSettingsForm({
 }
 
 
-interface HeaderProps {
-  title: string;
-  onTitleChange: (title: string) => void;
-  activeTab: string;
-  showJsonTab: boolean;
-  validationErrors: ValidationErrors;
-}
-
-function Header({ title, onTitleChange, activeTab, showJsonTab, validationErrors }: HeaderProps) {
-  return (
-    <ModalDialog.Header className="shadow-sm studio-header">
-      <div className="d-flex flex-row justify-content-between align-items-center w-100">
-        <StudioEditorTitle
-          displayName={title}
-          onDisplayNameChange={onTitleChange}
-          isInvalid={Boolean(validationErrors.display_name)}
-        />
-        {showJsonTab && (
-          <Nav
-            role="tablist"
-            variant="button-group"
-            activeKey={activeTab}
-            className="studio-header-tabs-nav pgn__tabs"
-            aria-label="Editor Sections"
-          >
-            <Nav.Link
-              as="button"
-              type="button"
-              eventKey="settings"
-              tabIndex={activeTab === "settings" ? 0 : -1}
-            >
-              Settings
-            </Nav.Link>
-            <Nav.Link
-              as="button"
-              type="button"
-              eventKey="json"
-              tabIndex={activeTab === "json" ? 0 : -1}
-            >
-              JSON
-            </Nav.Link>
-          </Nav>
-        )}
-      </div>
-    </ModalDialog.Header>
-  );
-}
-
 function ShortAnswerStudioFormContent({
   payload,
   runtime,
@@ -603,7 +555,7 @@ function ShortAnswerStudioFormContent({
           onSelect={(eventKey: string | null) => setActiveTab(eventKey || "settings")}
           transition={false}
         >
-          <Header
+          <StudioHeader
             title={formik.values.display_name}
             onTitleChange={(value: string) => formik.setFieldValue("display_name", value)}
             activeTab={activeTab}
@@ -639,6 +591,7 @@ function ShortAnswerStudioFormContent({
                     element={element as XBlockElementLike}
                     schema={shortAnswerSchema}
                     schemaContext={meta}
+                    exportFilename="short-answer-ai-block.json"
                   />
                 </TabPane>
               )}

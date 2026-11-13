@@ -650,6 +650,7 @@ def test_coach_block_studio_view(coach_block_data):
     assert frag.json_init_args["initial_state"]["scenario_data"] == coach_block_data["scenario_data"]
     assert frag.json_init_args["initial_state"]["max_attempts"] == coach_block_data["max_attempts"]
     assert frag.json_init_args["meta"]["lock_metadata"]["initial_model"] == SupportedModels.GPT4O.value
+    assert frag.json_init_args["meta"]["json_editing_enabled"] is False
     assert "scenario_data" in frag.json_init_args["meta"]["field_metadata"]
     assert frag.json_init_args["meta"]["field_metadata"]["model"]["choices"] == [
         {
