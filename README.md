@@ -145,6 +145,53 @@ Caution: the whole conversation is re-sent to the model on every exchange, so a 
 per-request token usage (and cost) as well as the size of the stored conversation history.
 Invalid or non-positive values are ignored with a logged warning, and the default of 1000 is used.
 
+### JSON import/export (Short Answer)
+
+The Short Answer Studio editor can expose a **JSON** tab that lets authors download the current
+component data, edit it externally, and upload it back. The tab also offers a JSON Schema download
+for validating the data with external tools. Uploaded data is validated with Pydantic before it is
+saved, and validation errors are shown in the editor.
+
+The feature is opt-in. Enable it in the `ai_eval` XBlock settings namespace:
+
+```python
+XBLOCK_SETTINGS = {
+    "ai_eval": {
+        "enable_json_editing": True,
+    }
+}
+```
+
+The Studio editor reads this setting, so add it to the CMS settings. In Tutor, you can do
+this with a plugin that patches `openedx-cms-common-settings`:
+
+```python
+from tutor import hooks
+
+hooks.Filters.ENV_PATCHES.add_item(
+    (
+        "openedx-cms-common-settings",
+        """
+XBLOCK_SETTINGS.setdefault("ai_eval", {})
+XBLOCK_SETTINGS["ai_eval"]["enable_json_editing"] = True
+""",
+    )
+)
+```
+
+When the setting is on, the Studio editor shows a **JSON** tab where authors can:
+
+- **Download component data**: save the block's current data as a JSON file. This includes
+  edits that are not saved yet.
+- **Download schema**: save the JSON Schema of the block's data. Use it to check JSON files
+  with other tools before uploading them.
+- **Upload a JSON file**: replace the block's data with the contents of the file. The file
+  is validated before it is saved. If it does not match, the editor lists the errors and
+  the fields they apply to, and nothing is saved.
+
+> **Note:** The setting only shows or hides the **JSON** tab. The XBlock's save handler
+> accepts the same data either way.
+
 ### Choosing which AI models are available
 
 When authoring an AI Eval XBlock, the author selects an AI model from a dropdown of built-in models.
