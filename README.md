@@ -145,12 +145,11 @@ Caution: the whole conversation is re-sent to the model on every exchange, so a 
 per-request token usage (and cost) as well as the size of the stored conversation history.
 Invalid or non-positive values are ignored with a logged warning, and the default of 1000 is used.
 
-### JSON import/export (Short Answer)
+### JSON import/export
 
-The Short Answer Studio editor can expose a **JSON** tab that lets authors download the current
-component data, edit it externally, and upload it back. The tab also offers a JSON Schema download
-for validating the data with external tools. Uploaded data is validated with Pydantic before it is
-saved, and validation errors are shown in the editor.
+The **Short Answer** and **Coaching** Studio editors can expose a **JSON** tab that lets authors 
+download the current component data, edit it externally, and upload it back. Uploaded data is 
+validated before it is saved, and validation errors are shown in the editor.
 
 The feature is opt-in. Enable it in the `ai_eval` XBlock settings namespace:
 
@@ -183,14 +182,10 @@ When the setting is on, the Studio editor shows a **JSON** tab where authors can
 
 - **Download component data**: save the block's current data as a JSON file. This includes
   edits that are not saved yet.
-- **Download schema**: save the JSON Schema of the block's data. Use it to check JSON files
-  with other tools before uploading them.
 - **Upload a JSON file**: replace the block's data with the contents of the file. The file
   is validated before it is saved. If it does not match, the editor lists the errors and
   the fields they apply to, and nothing is saved.
 
-> **Note:** The setting only shows or hides the **JSON** tab. The XBlock's save handler
-> accepts the same data either way.
 
 ### Choosing which AI models are available
 

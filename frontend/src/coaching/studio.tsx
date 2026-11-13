@@ -4,10 +4,11 @@ import { CoachingStudioPayload } from "./types";
 
 const initializer = makeXBlockInitializer(
   CoachingStudioApp,
-  (runtime, _element, data) => {
+  (runtime, element, data) => {
     return {
       payload: data as CoachingStudioPayload,
       runtime,
+      element,
     };
   },
 );
