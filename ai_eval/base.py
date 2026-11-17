@@ -330,9 +330,11 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         Read a raw `ai_eval` setting: site configuration first, then global Django settings.
 
         Single source for the site->global precedence shared by API keys, model
-        overrides, and the deprecated-model map.
+        overrides, and the deprecated-model map. Any value the site sets, even
+        ``False`` or an empty string, overrides the global one.
         """
-        if value := get_site_configuration_value(self.block_settings_key, key):
+        value = get_site_configuration_value(self.block_settings_key, key)
+        if value is not None:
             return value
         return self._get_settings().get(key)
 

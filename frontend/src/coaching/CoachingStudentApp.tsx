@@ -123,9 +123,11 @@ const ChatMessage = React.memo(function ChatMessage({ message }: { message: Pend
   const isUser = Boolean(message.is_user);
   const character = message.character;
   const className = `coach-message coach-message--pane-${pane} ${isUser ? "coach-message--user" : "coach-message--ai"}${message.pending ? " coach-message--pending" : ""}`;
+  const hasAttachments = Boolean(message.attachments?.length);
 
+  // With files, the bubble fills the column it shares with them.
   const bubble = (
-    <div className="coach-message__bubble">
+    <div className={`coach-message__bubble${hasAttachments ? " mw-100" : ""}`}>
       {!isUser && character.name ? (
         <div className="coach-message__meta">
           <span className="coach-message__name">{character.name}</span>
@@ -141,9 +143,9 @@ const ChatMessage = React.memo(function ChatMessage({ message }: { message: Pend
   return (
     <div className={className}>
       {!isUser ? <MessageAvatar character={character} /> : null}
-      {message.attachments?.length ? (
-        <div className="coach-message__attachments">
-          <AttachmentChips attachments={message.attachments} stacked={pane === "coach"} />
+      {hasAttachments ? (
+        <div className="coach-message__attachments d-flex flex-column align-items-end">
+          <AttachmentChips attachments={message.attachments ?? []} stacked={pane === "coach"} />
           {message.content ? bubble : null}
         </div>
       ) : bubble}
@@ -198,7 +200,10 @@ function ReportCard({
     <>
       <div ref={containerRef} />
       {submissionSection && report.final_submission_attachments.length > 0
-        ? createPortal(<AttachmentChips attachments={report.final_submission_attachments} />, submissionSection)
+        ? createPortal(
+          <AttachmentChips attachments={report.final_submission_attachments} className="mt-3" />,
+          submissionSection,
+        )
         : null}
     </>
   );
@@ -574,6 +579,8 @@ export default function CoachingStudentApp({
       return;
     }
 
+    // The evaluation doesn't use coach files, so it doesn't wait for one still uploading.
+    coachUploads.cancelUploads();
     setErrorData(null);  // clear the error data while we try a new action
     setEvaluationPending(true);
     setPaneBusy("workspace", true);
@@ -768,7 +775,7 @@ export default function CoachingStudentApp({
             className={
               "coach-input" +
               (workspaceInputVisible ? "" : " coach-input--hidden") +
-              (workspaceUploads.enabled ? " coach-input--with-uploads" : "")
+              (workspaceUploads.enabled ? " align-items-end p-2" : "")
             }
           >
             <label htmlFor="coach-workspace-input" className="sr-only">
@@ -784,7 +791,7 @@ export default function CoachingStudentApp({
               <textarea
                 id="coach-workspace-input"
                 ref={workspaceTextareaRef}
-                className="coach-input__textarea"
+                className={"coach-input__textarea" + (workspaceUploads.enabled ? " w-100" : "")}
                 disabled={!workspaceInputVisible || busyByPane.workspace || evaluationPending}
                 maxLength={1000}
                 placeholder={intl.formatMessage({
@@ -893,7 +900,7 @@ export default function CoachingStudentApp({
             className={
               "coach-input" +
               (coachInputVisible ? "" : " coach-input--hidden") +
-              (coachUploads.enabled ? " coach-input--with-uploads" : "")
+              (coachUploads.enabled ? " align-items-end p-2" : "")
             }
           >
             <label htmlFor="coach-side-input" className="sr-only">
@@ -910,7 +917,7 @@ export default function CoachingStudentApp({
               <textarea
                 id="coach-side-input"
                 ref={coachTextareaRef}
-                className="coach-input__textarea"
+                className={"coach-input__textarea" + (coachUploads.enabled ? " w-100" : "")}
                 disabled={!coachInputVisible || busyByPane.coach || evaluationPending}
                 maxLength={1000}
                 placeholder={intl.formatMessage({

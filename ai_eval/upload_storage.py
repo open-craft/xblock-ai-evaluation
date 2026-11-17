@@ -23,7 +23,6 @@ from django.core.files.storage import Storage, default_storage, storages
 from django.db import DatabaseError, transaction
 from django.db.models import QuerySet
 from django.utils import timezone
-from django.utils.text import get_valid_filename
 
 if TYPE_CHECKING:
     from .models import LearnerUpload
@@ -158,18 +157,20 @@ def save_upload(
     """
     Store the file and create its pending ``LearnerUpload`` row.
 
-    The storage path uses the anonymous user ID and a sanitized filename. The
-    original filename is kept in the row for display. The object is written
-    before the row is inserted, which relies on XBlock handler views not running
-    in a transaction (``@transaction.non_atomic_requests``), so the object is
-    deleted again if the insert fails.
+    The object is named after the upload ID and the extension, under the
+    anonymous user ID. The original filename is only kept in the row, for
+    display: a long non-ASCII name can exceed the storage's limit in bytes.
+
+    The object is written before the row is inserted, which relies on XBlock
+    handler views not running in a transaction
+    (``@transaction.non_atomic_requests``), so the object is deleted again if
+    the insert fails.
     """
     from .models import LearnerUpload  # pylint: disable=import-outside-toplevel
     upload_id = uuid.uuid4()
     storage = get_upload_storage()
-    requested_path = (
-        f"ai_eval/uploads/{course_key}/{usage_key}/{anonymous_user_id}/{upload_id}/{get_valid_filename(filename)}"
-    )
+    extension = os.path.splitext(filename)[1].lower()
+    requested_path = f"ai_eval/uploads/{course_key}/{usage_key}/{anonymous_user_id}/{upload_id}{extension}"
     # The storage may change the name (for example, to avoid overwriting), so keep the one it returns.
     storage_path = storage.save(requested_path, ContentFile(file_bytes))
     try:
@@ -230,13 +231,19 @@ def _delete_uploads(uploads: QuerySet) -> int:
     gone is harmless: reading it falls back to a note. Rows are deleted by primary
     key, so a row inserted after the paths were collected is never deleted
     without its object.
+
+    The matching rows stay locked until they're deleted, so a concurrent
+    ``mark_sent`` can't send a file while it's being deleted: either the delete
+    goes first and the send finds the upload gone, or the send goes first and a
+    queryset that only matches pending uploads no longer matches it.
     """
     from .models import LearnerUpload  # pylint: disable=import-outside-toplevel
-    storage_paths_by_pk = dict(uploads.values_list("pk", "storage_path"))
-    storage = get_upload_storage()
-    for storage_path in storage_paths_by_pk.values():
-        storage.delete(storage_path)
-    LearnerUpload.objects.filter(pk__in=storage_paths_by_pk).delete()
+    with transaction.atomic():
+        storage_paths_by_pk = dict(uploads.select_for_update().values_list("pk", "storage_path"))
+        storage = get_upload_storage()
+        for storage_path in storage_paths_by_pk.values():
+            storage.delete(storage_path)
+        LearnerUpload.objects.filter(pk__in=storage_paths_by_pk).delete()
     return len(storage_paths_by_pk)
 
 
@@ -248,7 +255,9 @@ def delete_pending_upload(user_id: int, usage_key: str, pane: str, upload_id: st
     """
     from .models import LearnerUpload  # pylint: disable=import-outside-toplevel
     [upload] = get_owned_uploads(user_id, usage_key, pane, [upload_id], state=LearnerUpload.State.PENDING)
-    _delete_uploads(LearnerUpload.objects.filter(pk=upload.pk))
+    # Checked again under the lock: the upload may have been sent since.
+    if not _delete_uploads(LearnerUpload.objects.filter(pk=upload.pk, state=LearnerUpload.State.PENDING)):
+        raise UploadNotFound()
 
 
 def delete_pending_uploads_in_block(user_id: int, usage_key: str, older_than: timedelta | None = None) -> int:
@@ -298,11 +307,16 @@ def read_upload_bytes(upload_id: str) -> bytes:
         upload = LearnerUpload.objects.get(upload_id=upload_id)
     except LearnerUpload.DoesNotExist as error:
         raise UploadNotFound() from error
+    storage = get_upload_storage()
     try:
-        with get_upload_storage().open(upload.storage_path, "rb") as stored_file:
+        with storage.open(upload.storage_path, "rb") as stored_file:
             return stored_file.read()
-    except FileNotFoundError as error:
-        raise UploadNotFound() from error
+    except Exception as error:
+        # Backends raise different errors for a missing object (Azure raises
+        # ``ResourceNotFoundError``), so ask the storage instead of matching them.
+        if not storage.exists(upload.storage_path):
+            raise UploadNotFound() from error
+        raise
 
 
 def retire_user_uploads(user_id: int) -> int:

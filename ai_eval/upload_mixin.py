@@ -462,7 +462,8 @@ class LearnerUploadMixin:
             "upload_id": str(upload.upload_id),
             "filename": upload.filename,
             "content_type": upload.content_type,
-            "remaining": limit - uploads_used - 1,
+            # Counted after saving: an upload that ran alongside this one may have saved first.
+            "remaining": self._remaining_uploads(pane),
         })
 
     def _upload_error_response(self, code: str) -> Response:

@@ -776,16 +776,6 @@ function GeneralSection({
   return (
     <div className="coaching-studio-section-stack">
       <SectionCard>
-        <TextInputField
-          fieldName="display_name"
-          metadata={fieldMetadata.display_name}
-          description="Name of the XBlock component in Studio."
-          value={values.display_name || ""}
-          errors={validationErrors.display_name}
-          onChange={(nextValue) => {
-            onChange("display_name", nextValue);
-          }}
-        />
         <SelectField
           fieldName="model"
           metadata={{

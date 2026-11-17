@@ -19,7 +19,7 @@ export const COACHING_STUDIO_SECTIONS: CoachingStudioSection[] = [
     id: "general",
     title: "General",
     description: "",
-    fieldNames: ["display_name", "model", "model_api_key", "model_api_url", "max_attempts", "allow_reset"],
+    fieldNames: ["model", "model_api_key", "model_api_url", "max_attempts", "allow_reset"],
   },
   {
     id: "taskDescription",

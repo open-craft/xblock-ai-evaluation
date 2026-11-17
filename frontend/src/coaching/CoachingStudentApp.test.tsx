@@ -1,5 +1,5 @@
 import React from "react";
-import { render, screen, waitFor } from "../test/helpers";
+import { act, render, screen, waitFor } from "../test/helpers";
 import userEvent from "@testing-library/user-event";
 import CoachingStudentApp from "./CoachingStudentApp";
 import { CoachingStudentPayload, CoachingUploads } from "./types";
@@ -341,6 +341,60 @@ describe("CoachingStudentApp", () => {
       expect(submitButton).toBeDisabled();
       finishUpload({ upload_id: "upload-1", filename: "report.pdf", content_type: "application/pdf", remaining: 2 });
       await waitFor(() => expect(submitButton).toBeEnabled());
+    });
+
+    describe("submitting while a coach file uploads", () => {
+      let finishUpload: (response: uploadApi.UploadFileResponse) => void;
+      let failUpload: (error: Error) => void;
+
+      async function submitWhileCoachFileUploads() {
+        mockUploadLearnerFile.mockReturnValue(new Promise((resolve, reject) => {
+          finishUpload = resolve;
+          failUpload = reject;
+        }));
+        mockRequestEvaluation.mockReturnValue(new Promise(() => {}));
+        const user = userEvent.setup();
+        const payload = makePayload();
+        payload.initial_state = {
+          ...payload.initial_state,
+          attempts: { attempts_remaining: 2, attempts_used: 1, can_retry: true, max_attempts: 3 },
+          uploads: UPLOADS_ENABLED,
+        };
+        render(<CoachingStudentApp payload={payload} />);
+        await user.upload(
+          screen.getAllByTestId("attachment-file-input")[1],
+          new File(["notes"], "notes.txt", { type: "text/plain" }),
+        );
+        expect(screen.getByText("notes.txt")).toBeInTheDocument();
+
+        const submitButton = screen.getByRole("button", { name: /submit for evaluation/i });
+        expect(submitButton).toBeEnabled();
+        await user.click(submitButton);
+        await user.click(screen.getByRole("button", { name: /submit for evaluation/i }));
+      }
+
+      it("cancels the upload, and deletes the file once it's uploaded", async () => {
+        mockDeleteLearnerUpload.mockResolvedValue({ remaining: 3 });
+
+        await submitWhileCoachFileUploads();
+
+        expect(mockRequestEvaluation).toHaveBeenCalled();
+        expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
+        finishUpload({ upload_id: "upload-1", filename: "notes.txt", content_type: "text/plain", remaining: 2 });
+        await waitFor(() => {
+          expect(mockDeleteLearnerUpload).toHaveBeenCalledWith("/handler/delete_upload", "coach", "upload-1");
+        });
+        expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
+      });
+
+      it("doesn't show an error if the cancelled upload fails", async () => {
+        await submitWhileCoachFileUploads();
+
+        await act(async () => failUpload(new Error("Network error")));
+
+        expect(screen.queryByText(/a network or server error occurred/i)).not.toBeInTheDocument();
+        expect(mockDeleteLearnerUpload).not.toHaveBeenCalled();
+      });
     });
 
     it("submit modal keeps the original copy when uploads are disabled", async () => {

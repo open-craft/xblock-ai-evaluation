@@ -84,13 +84,7 @@
   max-width: 80%;
 }
 
-.chat-message-container--with-attachments {
-  align-items: flex-end;
-  flex-direction: column;
-}
-
 .chat-message-container--with-attachments .attachment-chips {
-  justify-content: flex-end;
   max-width: 80%;
 }
 
@@ -387,15 +381,8 @@
 }
 
 .coach-message__attachments {
-  align-items: flex-end;
-  display: flex;
-  flex-direction: column;
   gap: 0.5rem;
   max-width: 75%;
-}
-
-.coach-message__attachments .coach-message__bubble {
-  max-width: 100%;
 }
 
 .coach-message--pending .attachment-chips {
@@ -449,15 +436,6 @@
 
 .coach-pane--coach .coach-input__textarea {
   color: #1f2933;
-}
-
-.coach-input--with-uploads {
-  align-items: flex-end;
-  padding: 0.5rem;
-}
-
-.coach-input--with-uploads .coach-input__textarea {
-  width: 100%;
 }
 
 .coach-button {
@@ -596,10 +574,6 @@
 .coach-report-submission__text {
   line-height: 1.7;
   margin: 0;
-}
-
-.coach-report-submission .attachment-chips {
-  margin-top: 1rem;
 }
 
 .coach-report-card {

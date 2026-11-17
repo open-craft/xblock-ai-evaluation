@@ -145,6 +145,22 @@ def test_upload_file_rejected_when_site_switch_off():
 
 
 @pytest.mark.django_db
+def test_upload_file_rejected_when_site_turns_off_global_switch():
+    """A site's ``LEARNER_UPLOADS_ENABLED: false`` wins over the global ``true``."""
+    block = make_shortanswer_block(settings=UPLOADS_ON)
+
+    with patch(
+        "ai_eval.base.get_site_configuration_value",
+        side_effect=lambda _settings_key, key: False if key == "LEARNER_UPLOADS_ENABLED" else None,
+    ):
+        response = block.upload_file(upload_request())
+
+    assert response.status_code == 403
+    assert response.json["code"] == "uploads_disabled"
+    assert not LearnerUpload.objects.exists()
+
+
+@pytest.mark.django_db
 def test_upload_file_rejected_when_author_toggle_off():
     block = make_shortanswer_block(allow_learner_uploads=False)
 
@@ -368,6 +384,23 @@ def test_upload_file_success_returns_metadata_and_remaining():
         call("ai_eval_upload_pane", "shortanswer"),
         call("ai_eval_upload_size", 11),
     ])
+
+
+@pytest.mark.django_db
+def test_upload_file_remaining_counts_uploads_saved_alongside():
+    """The remaining count includes an upload another request saved while this one was running."""
+    block = make_shortanswer_block()
+    validate_and_read = upload_storage.validate_and_read
+
+    def validate_while_another_upload_saves(*args):
+        save_block_upload(block, "shortanswer")
+        return validate_and_read(*args)
+
+    with patch("ai_eval.upload_storage.validate_and_read", side_effect=validate_while_another_upload_saves):
+        response = block.upload_file(upload_request())
+
+    assert response.status_code == 200
+    assert response.json["remaining"] == 1
 
 
 @pytest.mark.django_db

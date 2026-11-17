@@ -201,24 +201,12 @@ class CustomLLMService(LLMServiceBase):
     ):
         """
         Send completion request to custom LLM endpoint.
-        If thread_id is provided, include it and send only the latest user input.
-        If thread_id is None, send full context and return (text, None).
+
+        The whole conversation is sent as one prompt. ``thread_id`` isn't sent;
+        the ``conversation_id`` the endpoint returns, if any, is returned with
+        the text.
         """
         url = self.completions_url
-        # When reusing an existing thread, only send the latest user input and rely on
-        # the provider to apply prior context associated with the conversation_id.
-        if thread_id:
-            latest_user = None
-            for msg in reversed(messages):
-                if (msg.get('role') or '').lower() == 'user':
-                    latest_user = _message_text(msg)
-                    break
-            prompt = f"User: {latest_user}" if latest_user is not None else ""
-        else:
-            prompt = " ".join(
-                f"{msg.get('role', '').capitalize()}: {_message_text(msg)}"
-                for msg in messages
-            )
         # Adjust the payload structure based on custom API requirements
         prompt = " ".join(
             f"{msg.get('role', '').capitalize()}: {_message_text(msg)}"

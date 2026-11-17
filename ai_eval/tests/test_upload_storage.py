@@ -186,7 +186,7 @@ def test_save_upload_writes_object_and_pending_row():
         upload = save_test_upload(file_bytes=b"my notes")
 
     assert upload.storage_path == (
-        f"ai_eval/uploads/{COURSE_KEY}/{USAGE_KEY}/anonymous-learner/{upload_id}/notes.txt"
+        f"ai_eval/uploads/{COURSE_KEY}/{USAGE_KEY}/anonymous-learner/{upload_id}.txt"
     )
     assert upload.upload_id == upload_id
     assert upload.state == LearnerUpload.State.PENDING
@@ -196,19 +196,27 @@ def test_save_upload_writes_object_and_pending_row():
 
 
 @pytest.mark.django_db
-def test_save_upload_sanitizes_storage_name_keeps_display_name():
-    """The storage path uses a safe filename, while the row keeps the original for display."""
-    upload = save_test_upload(filename="My Essay (final).txt")
+def test_save_upload_names_object_by_upload_id_keeps_display_name():
+    """
+    The object is named after the upload ID, while the row keeps the original name for display.
 
-    assert upload.storage_path.endswith("/My_Essay_final.txt")
-    assert upload.filename == "My Essay (final).txt"
+    100 Chinese characters fit ``FILENAME_MAX_LENGTH`` but take 300 bytes, more
+    than a file system allows in a name.
+    """
+    filename = "报" * 100 + ".TXT"
+
+    upload = save_test_upload(filename=filename)
+
+    assert upload.storage_path.endswith(f"/{upload.upload_id}.txt")
+    assert upload.filename == filename
+    assert upload_storage.read_upload_bytes(str(upload.upload_id)) == b"my notes"
 
 
 @pytest.mark.django_db
 def test_save_upload_removes_object_if_row_insert_fails():
     """If the row can't be inserted, the stored object is deleted again."""
     upload_id = uuid.uuid4()
-    expected_path = f"ai_eval/uploads/{COURSE_KEY}/{USAGE_KEY}/anonymous-learner/{upload_id}/notes.txt"
+    expected_path = f"ai_eval/uploads/{COURSE_KEY}/{USAGE_KEY}/anonymous-learner/{upload_id}.txt"
 
     with (
         patch("ai_eval.upload_storage.uuid.uuid4", return_value=upload_id),
@@ -332,6 +340,23 @@ def test_delete_pending_upload_rejects_sent_upload():
 
 
 @pytest.mark.django_db
+def test_delete_pending_upload_leaves_upload_sent_after_check():
+    """An upload sent after it was found pending, but before it was locked for deleting, is left untouched."""
+    upload = save_test_upload()
+    found_while_pending = [upload]
+    upload_storage.mark_sent([str(upload.upload_id)])
+
+    with (
+        patch("ai_eval.upload_storage.get_owned_uploads", return_value=found_while_pending),
+        pytest.raises(UploadNotFound),
+    ):
+        upload_storage.delete_pending_upload(LEARNER_ID, USAGE_KEY, "shortanswer", str(upload.upload_id))
+
+    assert LearnerUpload.objects.filter(pk=upload.pk).exists()
+    assert default_storage.exists(upload.storage_path)
+
+
+@pytest.mark.django_db
 def test_delete_pending_uploads_in_block_leaves_sent_uploads():
     """Reset deletes every pending upload of the learner in this block, in all panes, and keeps sent ones."""
     save_test_upload(pane="workspace")
@@ -402,6 +427,25 @@ def test_read_upload_bytes_missing_object_raises():
     default_storage.delete(upload.storage_path)
 
     with pytest.raises(UploadNotFound):
+        upload_storage.read_upload_bytes(str(upload.upload_id))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("object_exists, expected_error", [
+    (False, UploadNotFound),
+    (True, RuntimeError),
+], ids=["object-missing", "object-present"])
+def test_read_upload_bytes_handles_backend_specific_errors(object_exists, expected_error):
+    """
+    A backend error for a missing object (like Azure's ``ResourceNotFoundError``)
+    raises ``UploadNotFound``. Any other read error propagates.
+    """
+    upload = save_test_upload()
+    storage = Mock()
+    storage.open.side_effect = RuntimeError("backend error")
+    storage.exists.return_value = object_exists
+
+    with patch("ai_eval.upload_storage.get_upload_storage", return_value=storage), pytest.raises(expected_error):
         upload_storage.read_upload_bytes(str(upload.upload_id))
 
 

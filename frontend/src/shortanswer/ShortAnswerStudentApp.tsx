@@ -96,8 +96,14 @@ function MessageList({
         }
 
         return (
-          <div className="chat-message-container chat-message-container--with-attachments" key={String(index)}>
-            <AttachmentChips attachments={message.attachments} className={message.content ? "mb-2" : "mb-4"} />
+          <div
+            className="chat-message-container chat-message-container--with-attachments flex-column align-items-end"
+            key={String(index)}
+          >
+            <AttachmentChips
+              attachments={message.attachments}
+              className={`justify-content-end ${message.content ? "mb-2" : "mb-4"}`}
+            />
             {message.content ? bubble : null}
           </div>
         );
