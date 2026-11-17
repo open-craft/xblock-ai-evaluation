@@ -2515,3 +2515,22 @@ def test_coach_index_dictionary(coach_block_data):
         SupportedModels.GPT4O.value,
     ):
         assert secret not in serialized
+
+
+@pytest.mark.parametrize(
+    "block_class, fixture_name, content_type",
+    [
+        (ShortAnswerAIEvalXBlock, "shortanswer_block_data", "AI Short-Answer"),
+        (CodingAIEvalXBlock, "coding_block_data", "AI Coding Evaluation"),
+        (CoachAIEvalXBlock, "coach_block_data", "AI Coach"),
+    ],
+)
+def test_student_view_data(block_class, fixture_name, content_type, request):
+    """Test that the index_dictionary alias works."""
+    block_data = request.getfixturevalue(fixture_name)
+    block = block_class(ToyRuntime(), DictFieldData(block_data), None)
+
+    result = block.student_view_data()
+
+    assert result["content_type"] == content_type
+    assert result == block.index_dictionary()

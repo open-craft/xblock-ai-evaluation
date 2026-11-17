@@ -232,6 +232,9 @@ class ShortAnswerAIEvalXBlock(AIEvalXBlock):
         xblock_body["content_type"] = "AI Short-Answer"
         return xblock_body
 
+    # Alias needed for client's "Data Bricks" indexer project.
+    student_view_data = index_dictionary
+
     def student_view(self, context=None):
         """
         The primary view of this block, shown to students

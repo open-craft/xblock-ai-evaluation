@@ -145,6 +145,9 @@ class CodingAIEvalXBlock(AIEvalXBlock):
         xblock_body["content_type"] = "AI Coding Evaluation"
         return xblock_body
 
+    # Alias needed for client's "Data Bricks" indexer project.
+    student_view_data = index_dictionary
+
     def student_view(self, context=None):
         """
         The primary view of the CodingAIEvalXBlock, shown to students
