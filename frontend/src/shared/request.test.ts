@@ -1,4 +1,4 @@
-import { getErrorMessage, postJson, RequestError } from "./request";
+import { getErrorMessage, postJson, putFile, RequestError } from "./request";
 
 describe("getErrorMessage", () => {
   it("returns RequestError message when available", () => {
@@ -121,5 +121,67 @@ describe("postJson", () => {
     expect(mockFetch).toHaveBeenCalledWith("/api/test", expect.objectContaining({
       body: JSON.stringify({}),
     }));
+  });
+});
+
+describe("putFile", () => {
+  const mockFetch = jest.fn();
+
+  beforeEach(() => {
+    global.fetch = mockFetch;
+  });
+
+  afterEach(() => {
+    mockFetch.mockReset();
+    Object.defineProperty(document, "cookie", {
+      value: "",
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  function mockResponse(body: unknown, status = 200) {
+    mockFetch.mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: status === 200 ? "OK" : "Error",
+      text: () => Promise.resolve(JSON.stringify(body)),
+    });
+  }
+
+  it("sends the file as a PUT body with the params in the query string, the headers and the CSRF token", async () => {
+    Object.defineProperty(document, "cookie", {
+      value: "csrftoken=abc123",
+      writable: true,
+      configurable: true,
+    });
+    mockResponse({ upload_id: "upload-1" });
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+
+    const result = await putFile(
+      "/handler/upload_file", file, { pane: "coach" }, { "X-Upload-Filename": "my%20notes.txt" },
+    );
+
+    expect(result).toEqual({ upload_id: "upload-1" });
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://localhost/handler/upload_file?pane=coach",
+      expect.objectContaining({
+        method: "PUT",
+        body: file,
+        headers: { "X-Upload-Filename": "my%20notes.txt", "X-CSRFToken": "abc123" },
+      }),
+    );
+  });
+
+  it("throws a RequestError carrying the error body", async () => {
+    mockResponse({ code: "file_too_large", error: "This file is too large." }, 413);
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+
+    const request = putFile("/handler/upload_file", file, { pane: "coach" });
+
+    await expect(request).rejects.toMatchObject({
+      status: 413,
+      payload: { code: "file_too_large", error: "This file is too large." },
+    });
   });
 });

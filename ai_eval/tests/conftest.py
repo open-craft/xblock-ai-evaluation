@@ -24,6 +24,27 @@ def default_model_site_config():
 
 
 @pytest.fixture(autouse=True)
+def default_block_site_config():
+    """
+    Block settings such as ``LEARNER_UPLOADS_ENABLED`` are read from site configuration
+    in ``ai_eval.base``. Default those reads to "unset", as above. Tests needing
+    specific values patch the same target or the block's settings bucket.
+    """
+    with patch("ai_eval.base.get_site_configuration_value", return_value=None):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def default_llm_service():
+    """
+    ``USE_CUSTOM_LLM_SERVICE`` is read from site configuration in ``ai_eval.llm``.
+    Default it to "unset", as above, so blocks use the default LLM service.
+    """
+    with patch("ai_eval.llm.get_site_configuration_value", return_value=None):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def use_utc_tz(settings):
     """Override the django timezone to be UTC.
 

@@ -117,17 +117,17 @@ def test_iter_coach_messages_preserves_coaching_export_order():
     }
 
     assert list(_iter_coach_messages(block, session)) == [
-        ("user", "workspace answer", ""),
-        ("llm (Patient)", "workspace reply", ""),
-        ("user", "coach question", ""),
-        ("llm (Coach)", "coach reply", ""),
-        ("llm (Evaluator)", "# Evaluation Report", ""),
+        ("user", "workspace answer", "", ""),
+        ("llm (Patient)", "workspace reply", "", ""),
+        ("user", "coach question", "", ""),
+        ("llm (Coach)", "coach reply", "", ""),
+        ("llm (Evaluator)", "# Evaluation Report", "", ""),
     ]
 
 
-def test_export_header_ends_with_timestamp():
-    """Timestamp is appended last so existing column positions are unchanged."""
-    assert _BASE_HEADER[-3:] == ("Source", "Message", "Timestamp")
+def test_export_header_ends_with_timestamp_and_attachments():
+    """New columns are appended last so existing column positions are unchanged."""
+    assert _BASE_HEADER[-4:] == ("Source", "Message", "Timestamp", "Attachments")
 
 
 def test_iter_coach_messages_includes_fragment_time():
@@ -156,11 +156,11 @@ def test_iter_coach_messages_includes_fragment_time():
     }
 
     assert list(_iter_coach_messages(block, session)) == [
-        ("user", "workspace answer", "2026-09-01T10:00:00+00:00"),
-        ("llm (Patient)", "workspace reply", "2026-09-01T10:00:00+00:00"),
-        ("user", "coach question", "2026-09-01T10:05:00+00:00"),
-        ("llm (Coach)", "coach reply", "2026-09-01T10:05:00+00:00"),
-        ("llm (Evaluator)", "# Evaluation Report", "2026-09-01T10:10:00+00:00"),
+        ("user", "workspace answer", "2026-09-01T10:00:00+00:00", ""),
+        ("llm (Patient)", "workspace reply", "2026-09-01T10:00:00+00:00", ""),
+        ("user", "coach question", "2026-09-01T10:05:00+00:00", ""),
+        ("llm (Coach)", "coach reply", "2026-09-01T10:05:00+00:00", ""),
+        ("llm (Evaluator)", "# Evaluation Report", "2026-09-01T10:10:00+00:00", ""),
     ]
 
 
@@ -174,9 +174,9 @@ def test_get_messages_shortanswer_includes_per_message_time():
     ]
 
     assert list(_get_messages(block, session)) == [
-        ("user", "old answer", ""),
-        ("user", "answer", "2026-09-01T10:00:00+00:00"),
-        ("llm", "feedback", "2026-09-01T10:00:07+00:00"),
+        ("user", "old answer", "", ""),
+        ("user", "answer", "2026-09-01T10:00:00+00:00", ""),
+        ("llm", "feedback", "2026-09-01T10:00:07+00:00", ""),
     ]
 
 
@@ -209,4 +209,56 @@ def test_iter_coach_messages_puts_untimed_fragments_first():
 
     assert [row[1] for row in _iter_coach_messages(block, session)] == [
         "old", "old reply", "old coach", "old coach reply", "new", "new reply",
+    ]
+
+
+NOTES_ATTACHMENT = {"upload_id": "1b9e", "filename": "notes.txt", "content_type": "text/plain"}
+REPORT_ATTACHMENT = {"upload_id": "2c0f", "filename": "report.pdf", "content_type": "application/pdf"}
+
+
+def test_csv_export_attachments_column_all_block_types():
+    """Learner rows list their attached filenames; every other row, and every Coding row, has an empty cell."""
+    shortanswer_session = [
+        {"source": "user", "content": "answer", "attachments": [NOTES_ATTACHMENT, REPORT_ATTACHMENT]},
+        {"source": "llm", "content": "feedback"},
+    ]
+    coding_session = {
+        coding_ai_eval.USER_RESPONSE: "print(1)",
+        coding_ai_eval.AI_EVALUATION: "Looks good",
+        coding_ai_eval.CODE_EXEC_RESULT: {"stdout": "1", "stderr": ""},
+    }
+    coach_session = {
+        "workspace_history": [{
+            "user_message": "answer", "character_message": "reply", "attachments": [NOTES_ATTACHMENT],
+        }],
+        "coach_history": [],
+        "evaluation_fragments": [],
+    }
+    coach_block = SimpleNamespace(character_1_role="Patient", character_2_role="Coach")
+
+    shortanswer_rows = list(_get_messages(Mock(spec=ShortAnswerAIEvalXBlock), shortanswer_session))
+    coding_rows = list(_get_messages(Mock(spec=CodingAIEvalXBlock), coding_session))
+    coach_rows = list(_iter_coach_messages(coach_block, coach_session))
+
+    assert [row[3] for row in shortanswer_rows] == ["notes.txt, report.pdf", ""]
+    assert [row[3] for row in coding_rows] == ["", "", ""]
+    assert [row[3] for row in coach_rows] == ["notes.txt", ""]
+
+
+def test_csv_export_includes_file_only_user_rows():
+    """A Coaching message with files but no text still gets a learner row."""
+    block = SimpleNamespace(character_1_role="Patient", character_2_role="Coach")
+    session = {
+        "workspace_history": [],
+        "coach_history": [
+            {"user_message": "", "character_message": "coach reply", "attachments": [REPORT_ATTACHMENT]},
+            {"user_message": "", "character_message": "legacy empty message"},
+        ],
+        "evaluation_fragments": [],
+    }
+
+    assert list(_iter_coach_messages(block, session)) == [
+        ("user", "", "", "report.pdf"),
+        ("llm (Coach)", "coach reply", "", ""),
+        ("llm (Coach)", "legacy empty message", "", ""),
     ]

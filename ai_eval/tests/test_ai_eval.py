@@ -17,7 +17,6 @@ import time_machine
 from django.core.cache import cache
 from xblock.exceptions import JsonHandlerError
 from xblock.field_data import DictFieldData
-from xblock.test.toy_runtime import ToyRuntime as _ToyRuntime
 
 from ai_eval import (
     CodingAIEvalXBlock,
@@ -31,28 +30,10 @@ from ai_eval.backends.factory import BackendFactory
 from ai_eval.backends.judge0 import Judge0Backend
 from ai_eval.backends.custom import CustomServiceBackend
 from ai_eval.utils import DEFAULT_HTTP_TIMEOUT, SUPPORTED_LANGUAGE_MAP, LanguageLabels
+from ai_eval.tests.xblock_fakes import ToyRuntime, learner_scope_ids
 
 
 DEFAULT_FROZEN_TIME = "2000-01-02T00:00:00+00:00"
-
-
-class FakeUser():
-    """A fake hardcoded user object for use with the local runtime."""
-    emails = ["testuser@example.com"]
-    full_name = "Test User"
-
-
-class FakeUserService:
-    """A fake user service for use with the local runtime."""
-    def get_current_user(self):
-        return FakeUser()
-
-
-class ToyRuntime(_ToyRuntime):  # pylint: disable=abstract-method
-    """A toy xblock runtime that adds a user service."""
-    def __init__(self, user_id=None):
-        super().__init__(user_id)
-        self._services["user"] = FakeUserService()
 
 
 def _mock_handler_url(_block, handler_name, suffix='', query='', thirdparty=False):
@@ -119,6 +100,7 @@ def _empty_coach_session():
         "attempts_used": 0,
         "finished": False,
         "final_submission": "",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "",
     }
 
@@ -347,7 +329,8 @@ def test_coding_block_studio_view(coding_block_data):
 @patch("ai_eval.base.get_site_configuration_value", Mock(return_value=None))
 def test_shortanswer_block_student_view(shortanswer_block_data):
     """Test the basic view loads for ShortAnswerAIEvalXBlock."""
-    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    scope_ids = learner_scope_ids("shortanswer")
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), scope_ids)
     with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
         frag = block.student_view()
     assert frag.js_init_fn == "ShortAnswerAIEvalXBlock"
@@ -357,9 +340,18 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
             "get_response": "/handler/get_response",
             "reset": "/handler/reset",
             "download_pdf": "/handler/download_pdf",
+            "upload_file": "/handler/upload_file",
+            "delete_upload": "/handler/delete_upload",
         },
         "initial_state": {
             "messages": shortanswer_block_data["sessions"][-1],
+            "uploads": {
+                "shortanswer": {"enabled": False},
+                "pdf_max_bytes": 4 * 1024 * 1024,
+                "pdf_max_pages": 10,
+                "text_max_bytes": 50 * 1024,
+                "accept": ".pdf,.txt,.md,.csv",
+            },
         },
         "meta": {
             "title": "",
@@ -384,16 +376,17 @@ def test_shortanswer_block_student_view(shortanswer_block_data):
     assert '<div data-ai-eval-react-root="true"></div>' in frag.content
 
 
+@pytest.mark.django_db
 def test_shortanswer_reset_allowed(shortanswer_block_data):
     """Test the reset function when allowed."""
     data = {
         **shortanswer_block_data,
         "allow_reset": True,
     }
-    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), learner_scope_ids("shortanswer"))
     # Pre-populate thread map to verify reset clears it
     block.thread_map = {"provider:model:tag": "abc123"}
-    block.reset.__wrapped__(block, data={})
+    assert block.reset.__wrapped__(block, data={}) == {"remaining": {}}
     assert block.sessions == [shortanswer_block_data["sessions"][0], []]
     assert not block.thread_map
 
@@ -413,7 +406,7 @@ def test_character_image(shortanswer_block_data):
         **shortanswer_block_data,
         "character_image": "/static/image.jpg",
     }
-    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(data), learner_scope_ids("shortanswer"))
     with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
         frag = block.student_view()
     assert frag.json_init_args["meta"]["character_image"] == "/static/image.jpg"
@@ -473,7 +466,8 @@ def test_learner_input_character_limit_site_config_precedence(shortanswer_block_
 
 def test_shortanswer_meta_character_limit_uses_setting(shortanswer_block_data):
     """The resolved limit is exposed to the frontend through the view meta payload."""
-    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), None)
+    scope_ids = learner_scope_ids("shortanswer")
+    block = ShortAnswerAIEvalXBlock(ToyRuntime(), DictFieldData(shortanswer_block_data), scope_ids)
     block._get_settings = Mock(return_value={"SHORTANSWER_CHARACTER_LIMIT": 2000})
     with patch("ai_eval.base.get_site_configuration_value", return_value=None), \
          patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
@@ -521,6 +515,8 @@ def test_shortanswer_block_studio_view(shortanswer_block_data):
 
     assert frag.js_init_fn == "ShortAnswerAIEvalXBlockStudio"
     assert '<div data-ai-eval-react-root="true"' in frag.content
+    # Studio hides its "Editing: ..." modal title for editors marked "editor-with-tabs".
+    assert "editor-with-tabs" in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",
@@ -542,7 +538,7 @@ def test_shortanswer_block_studio_view(shortanswer_block_data):
 
 def test_coach_block_student_view(coach_block_data):
     """Coaching student view should boot the React learner payload."""
-    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), None)
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(coach_block_data), learner_scope_ids("coach"))
 
     with patch.object(block.runtime, "handler_url", side_effect=_mock_handler_url):
         frag = block.student_view()
@@ -555,6 +551,8 @@ def test_coach_block_student_view(coach_block_data):
             "get_evaluator_response": "/handler/get_evaluator_response",
             "reset_all": "/handler/reset_all",
             "download_pdf": "/handler/download_pdf",
+            "upload_file": "/handler/upload_file",
+            "delete_upload": "/handler/delete_upload",
         },
         "initial_state": {
             "chat_histories": [[], []],
@@ -564,6 +562,14 @@ def test_coach_block_student_view(coach_block_data):
                 "attempts_used": 0,
                 "attempts_remaining": 3,
                 "can_retry": True,
+            },
+            "uploads": {
+                "workspace": {"enabled": False},
+                "coach": {"enabled": False},
+                "pdf_max_bytes": 4 * 1024 * 1024,
+                "pdf_max_pages": 10,
+                "text_max_bytes": 50 * 1024,
+                "accept": ".pdf,.txt,.md,.csv",
             },
         },
         "meta": {
@@ -635,6 +641,8 @@ def test_coach_block_studio_view(coach_block_data):
 
     assert frag.js_init_fn == "CoachAIEvalXBlockStudio"
     assert '<div data-ai-eval-react-root="true"' in frag.content
+    # Studio hides its "Editing: ..." modal title for editors marked "editor-with-tabs".
+    assert "editor-with-tabs" in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",
@@ -692,6 +700,7 @@ def test_coach_block_migrates_older_state_to_sessions(coach_block_data):
         "attempts_used": 1,
         "finished": True,
         "final_submission": "student answer",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "# Evaluation Report",
     }
 
@@ -743,6 +752,7 @@ def test_coach_get_character_response_uses_session_runtime_state(
                 "user_message": "second answer",
                 "character_message": "patient follow-up",
                 "time": DEFAULT_FROZEN_TIME,
+                "attachments": [],
             },
         ],
         "coach_history": [],
@@ -750,12 +760,14 @@ def test_coach_get_character_response_uses_session_runtime_state(
         "attempts_used": 2,
         "finished": False,
         "final_submission": "",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "",
     }]
     assert not block.workspace_history
     mock_get_llm.assert_called_once()
 
 
+@pytest.mark.django_db
 @time_machine.travel(DEFAULT_FROZEN_TIME, tick=False)
 @patch("ai_eval.coach.get_llm_service", return_value=Mock())
 @patch.object(CoachAIEvalXBlock, "_render_final_report", return_value="<article>report</article>")
@@ -777,7 +789,7 @@ def test_coach_get_evaluator_response_persists_active_session(
     block = CoachAIEvalXBlock(
         ToyRuntime(),
         DictFieldData({**coach_block_data, "sessions": [session]}),
-        None,
+        learner_scope_ids("coach"),
     )
 
     result = block.get_evaluator_response.__wrapped__(block, data={})
@@ -799,12 +811,14 @@ def test_coach_get_evaluator_response_persists_active_session(
         "attempts_used": 1,
         "finished": True,
         "final_submission": "final learner answer",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "# Evaluation Report",
     }]
     mock_get_llm.assert_called_once()
     mock_render_report.assert_called_once_with("final learner answer")
 
 
+@pytest.mark.django_db
 def test_coach_reset_all_appends_new_empty_session_for_meaningful_state(coach_block_data):
     """Reset should preserve prior Coaching history and start a new active session."""
     prior_session = {
@@ -818,12 +832,13 @@ def test_coach_reset_all_appends_new_empty_session_for_meaningful_state(coach_bl
         "attempts_used": 1,
         "finished": False,
         "final_submission": "",
+        "final_submission_attachments": [],
         "final_evaluation_markdown": "",
     }
     block = CoachAIEvalXBlock(
         ToyRuntime(),
         DictFieldData({**coach_block_data, "sessions": [prior_session]}),
-        None,
+        learner_scope_ids("coach"),
     )
     block.thread_map = {
         "provider:model:hash:character0": "thread-1",
@@ -842,17 +857,19 @@ def test_coach_reset_all_appends_new_empty_session_for_meaningful_state(coach_bl
             "can_retry": True,
         },
         "finished": False,
+        "remaining": {},
     }
     assert block.sessions == [prior_session, _empty_coach_session()]
     assert block.thread_map == {}
 
 
+@pytest.mark.django_db
 def test_coach_reset_all_avoids_duplicate_empty_sessions(coach_block_data):
     """Reset should reuse the existing empty active session."""
     block = CoachAIEvalXBlock(
         ToyRuntime(),
         DictFieldData({**coach_block_data, "sessions": [_empty_coach_session()]}),
-        None,
+        learner_scope_ids("coach"),
     )
     block.thread_map = {"provider:model:hash:character0": "thread-1"}
 
@@ -868,6 +885,22 @@ def test_coach_reset_all_avoids_duplicate_empty_sessions(coach_block_data):
     assert result["finished"] is False
     assert block.sessions == [_empty_coach_session()]
     assert block.thread_map == {}
+
+
+def test_coach_reset_all_forbidden(coach_block_data):
+    """Reset is refused when the author turned it off, even though the UI hides the button."""
+    block = CoachAIEvalXBlock(
+        ToyRuntime(),
+        DictFieldData({**coach_block_data, "allow_reset": False}),
+        learner_scope_ids("coach"),
+    )
+    sessions_before = block.sessions
+
+    with pytest.raises(JsonHandlerError) as error:
+        block.reset_all.__wrapped__(block, data={})
+
+    assert error.value.status_code == 403
+    assert block.sessions == sessions_before
 
 
 def test_coach_studio_submit_success(coach_block_data):
@@ -1069,6 +1102,10 @@ def test_coach_studio_submit_rejects_incomplete_payload(coach_block_data):
         "workspace_attachment_urls": ["Missing field in Studio payload."],
         "coach_attachment_urls": ["Missing field in Studio payload."],
         "evaluator_attachment_urls": ["Missing field in Studio payload."],
+        "workspace_allow_learner_uploads": ["Missing field in Studio payload."],
+        "workspace_max_file_uploads": ["Missing field in Studio payload."],
+        "coach_allow_learner_uploads": ["Missing field in Studio payload."],
+        "coach_max_file_uploads": ["Missing field in Studio payload."],
     }
 
 
@@ -1113,7 +1150,7 @@ def test_coach_messages_for_character_include_blacklist_instruction(coach_block_
         None,
     )
 
-    messages = list(block._messages_for_character(0, "second answer"))
+    messages = list(block._messages_for_character(0, "second answer", []))
 
     assert messages[0]["role"] == "system"
     assert (
@@ -1122,6 +1159,7 @@ def test_coach_messages_for_character_include_blacklist_instruction(coach_block_
     ) in messages[0]["content"]
 
 
+@pytest.mark.django_db
 @patch("ai_eval.coach.get_llm_service", return_value=Mock())
 @patch.object(CoachAIEvalXBlock, "_render_final_report", return_value="<article>report</article>")
 def test_coach_get_evaluator_response_includes_blacklist_instruction(
@@ -1139,7 +1177,7 @@ def test_coach_get_evaluator_response_includes_blacklist_instruction(
     block = CoachAIEvalXBlock(
         ToyRuntime(),
         DictFieldData({**coach_block_data, "sessions": [session], "blacklist": ["AI assistant"]}),
-        None,
+        learner_scope_ids("coach"),
     )
 
     captured_messages = {}
@@ -1229,6 +1267,8 @@ def test_shortanswer_studio_submit_success(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "/static/new-image.jpg",
                     "attachment_urls": ["http://example.com/1.txt"],
+                    "allow_learner_uploads": False,
+                    "max_file_uploads": 3,
                     "hide_question": False,
                     "pdf_download_allowed": False,
                     "pdf_download_description": "",
@@ -1271,6 +1311,8 @@ def test_shortanswer_studio_submit_validation_errors(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "",
                     "attachment_urls": ["http://example.com/bad.txt"],
+                    "allow_learner_uploads": False,
+                    "max_file_uploads": 3,
                     "hide_question": False,
                     "pdf_download_allowed": False,
                     "pdf_download_description": "",
@@ -1321,6 +1363,8 @@ def test_shortanswer_studio_submit_rejects_incomplete_payload(shortanswer_block_
         "pdf_download_allowed": ["Missing field in Studio payload."],
         "pdf_download_description": ["Missing field in Studio payload."],
         "pdf_download_title": ["Missing field in Studio payload."],
+        "allow_learner_uploads": ["Missing field in Studio payload."],
+        "max_file_uploads": ["Missing field in Studio payload."],
     }
 
 
@@ -1350,6 +1394,8 @@ def test_shortanswer_studio_submit_allows_warnings(shortanswer_block_data):
                     "allow_reset": True,
                     "character_image": "/static/new-image.jpg",
                     "attachment_urls": ["http://example.com/1.txt"],
+                    "allow_learner_uploads": False,
+                    "max_file_uploads": 3,
                     "hide_question": False,
                     "pdf_download_allowed": False,
                     "pdf_download_description": "",
@@ -1594,7 +1640,7 @@ def _coach_block_with_attachments(coach_block_data, **overrides):
         "evaluator_attachment_urls": ["http://example.com/eval.txt"],
         **overrides,
     }
-    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(data), None)
+    block = CoachAIEvalXBlock(ToyRuntime(), DictFieldData(data), learner_scope_ids("coach"))
     block._download_attachment = Mock(side_effect=lambda url, refresh=False: f"BODY[{url}]")
     return block
 
@@ -1624,17 +1670,18 @@ def test_coach_attachments_injected_per_audience(coach_block_data):
     """Each agent's prompt sees exactly the attachments its audience is allowed."""
     block = _coach_block_with_attachments(coach_block_data)
 
-    workspace_prompt = _system_prompt(block._messages_for_character(0, "hi"))
+    workspace_prompt = _system_prompt(block._messages_for_character(0, "hi", []))
     assert "<filename>workspace.txt</filename>" in workspace_prompt
     assert "coach.txt" not in workspace_prompt
     assert "eval.txt" not in workspace_prompt
 
-    coach_prompt = _system_prompt(block._messages_for_character(1, "hi"))
+    coach_prompt = _system_prompt(block._messages_for_character(1, "hi", []))
     assert "<filename>workspace.txt</filename>" in coach_prompt
     assert "<filename>coach.txt</filename>" in coach_prompt
     assert "eval.txt" not in coach_prompt
 
 
+@pytest.mark.django_db
 @patch("ai_eval.coach.get_llm_service", return_value=Mock())
 @patch.object(CoachAIEvalXBlock, "_render_final_report", return_value="<article>report</article>")
 def test_coach_evaluator_prompt_sees_all_attachments(

@@ -3,6 +3,7 @@ import {
   collectYupErrors,
   getSaveErrorMessage,
   hasStudioValidationIssues,
+  isIntegerBetween,
   isModelApiKeyLocked,
   normalizeStudioSaveResponse,
   normalizeValidationErrors,
@@ -157,6 +158,21 @@ describe("getSaveErrorMessage", () => {
 
   it("returns fallback for non-Error values", () => {
     expect(getSaveErrorMessage("string", "fallback")).toBe("fallback");
+  });
+});
+
+describe("isIntegerBetween", () => {
+  it("accepts whole numbers and their text within the range", () => {
+    expect(isIntegerBetween(1, 1, 10)).toBe(true);
+    expect(isIntegerBetween("10", 1, 10)).toBe(true);
+  });
+
+  it("rejects empty, fractional and out-of-range values", () => {
+    expect(isIntegerBetween("", 1, 10)).toBe(false);
+    expect(isIntegerBetween(null, 1, 10)).toBe(false);
+    expect(isIntegerBetween("2.5", 1, 10)).toBe(false);
+    expect(isIntegerBetween(0, 1, 10)).toBe(false);
+    expect(isIntegerBetween("11", 1, 10)).toBe(false);
   });
 });
 

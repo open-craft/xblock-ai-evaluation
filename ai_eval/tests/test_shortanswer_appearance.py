@@ -4,10 +4,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 from xblock.field_data import DictFieldData
-from xblock.test.toy_runtime import ToyRuntime
 
 from ai_eval import ShortAnswerAIEvalXBlock
 from ai_eval.supported_models import SupportedModels
+from ai_eval.tests.xblock_fakes import ToyRuntime, learner_scope_ids
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def block():
         "model": SupportedModels.GPT4O.value,
         "model_api_key": "test-key",
         "sessions": [[{"source": "user", "content": "An existing answer"}]],
-    }), None)
+    }), learner_scope_ids("shortanswer"))
     instance._get_attachments = Mock(return_value=[])
     service = Mock()
     service.get_available_models.return_value = [SupportedModels.GPT4O.value]
@@ -101,6 +101,7 @@ def test_omitting_background_rejects_and_preserves_stored_value(block):
     assert block.background_theme == "navy"
 
 
+@pytest.mark.django_db  # Reset deletes the learner's pending uploads.
 def test_reset_preserves_appearance_and_old_sessions(block):
     """The existing reset remains a session boundary, not a settings reset."""
     block.display_name = "Keep title"

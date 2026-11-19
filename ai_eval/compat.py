@@ -115,3 +115,30 @@ def get_pdf_location_nav(xblock: "XBlock") -> Location | None:
         unit_name=unit.display_name,
         unit_url=unit_url,
     )
+
+
+def set_custom_attribute(key: str, value: Any) -> None:
+    """Record a custom attribute on the current request's monitoring transaction (for example, in New Relic)."""
+    # pylint: disable=import-outside-toplevel
+    from edx_django_utils.monitoring import set_custom_attribute as set_monitoring_attribute
+
+    set_monitoring_attribute(key, value)
+
+
+def is_masquerading_as_specific_learner(course_key: "CourseKey") -> bool:
+    """
+    Whether the current request is from staff viewing the course as a specific learner ("View this course as").
+
+    The LMS then binds blocks to that learner but keeps the staff member's field changes out of the learner's
+    state. Returns False outside a request (for example, in a Celery task).
+    """
+    # pylint: disable=import-outside-toplevel
+    from crum import get_current_request
+
+    request = get_current_request()
+    if request is None:
+        return False
+    # pylint: disable=import-error
+    from lms.djangoapps.courseware.masquerade import is_masquerading_as_specific_student  # pragma: no cover
+
+    return is_masquerading_as_specific_student(request.user, course_key)  # pragma: no cover

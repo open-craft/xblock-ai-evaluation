@@ -2,7 +2,7 @@ import React from "react";
 import { render, screen, waitFor } from "../test/helpers";
 import userEvent from "@testing-library/user-event";
 import CoachingStudioApp from "./CoachingStudioApp";
-import { CoachingStudioPayload } from "./types";
+import { CoachingStudioMeta, CoachingStudioPayload, CoachingStudioState } from "./types";
 
 function makePayload(overrides?: Partial<CoachingStudioPayload>): CoachingStudioPayload {
   return {
@@ -21,6 +21,8 @@ function makePayload(overrides?: Partial<CoachingStudioPayload>): CoachingStudio
     },
     meta: {
       field_metadata: {},
+      learner_uploads_enabled: false,
+      max_file_uploads_ceiling: 10,
     },
     mfe_config_api: "/mfe_config",
     style_urls: [],
@@ -104,5 +106,134 @@ describe("CoachingStudioApp attachment URL fields", () => {
     expect(body.workspace_attachment_urls).toEqual(["http://example.com/w.txt"]);
     expect(body.coach_attachment_urls).toEqual(["http://example.com/c.txt"]);
     expect(body.evaluator_attachment_urls).toEqual(["http://example.com/e.txt"]);
+  });
+});
+
+function mockSuccessfulSave() {
+  const fetchMock = jest.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    text: async () => JSON.stringify({ success: true, validation_errors: {}, validation_warnings: [], meta: {} }),
+  });
+  global.fetch = fetchMock as unknown as typeof global.fetch;
+  return fetchMock;
+}
+
+function makeUploadPayload(
+  stateOverrides: Partial<CoachingStudioState> = {},
+  metaOverrides: Partial<CoachingStudioMeta> = {},
+): CoachingStudioPayload {
+  const payload = makePayload();
+  return {
+    ...payload,
+    initial_state: {
+      ...payload.initial_state,
+      workspace_allow_learner_uploads: false,
+      workspace_max_file_uploads: 3,
+      coach_allow_learner_uploads: false,
+      coach_max_file_uploads: 3,
+      ...stateOverrides,
+    },
+    meta: {
+      field_metadata: {
+        workspace_allow_learner_uploads: { display_name: "File Upload" },
+        workspace_max_file_uploads: { display_name: "Max File Uploads" },
+        coach_allow_learner_uploads: { display_name: "File Upload" },
+        coach_max_file_uploads: { display_name: "Max File Uploads" },
+      },
+      learner_uploads_enabled: true,
+      max_file_uploads_ceiling: 10,
+      ...metaOverrides,
+    },
+  };
+}
+
+describe("CoachingStudioApp learner upload fields", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it.each([
+    ["workspace", /workspace/i],
+    ["coach chat", /coach chat/i],
+  ])("shows File Upload on the %s tab, and Max File Uploads only while it's Yes", async (_tab, sectionName) => {
+    const user = userEvent.setup();
+    render(<CoachingStudioApp payload={makeUploadPayload()} />);
+
+    await user.click(getSectionButton(sectionName));
+
+    expect(screen.getByText("File Upload")).toBeInTheDocument();
+    expect(screen.queryByText("Max File Uploads")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: "Yes" }));
+
+    expect(screen.getByText("Max File Uploads")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("3")).toBeInTheDocument();
+  });
+
+  it("hides the upload fields while uploads are off site-wide", async () => {
+    const user = userEvent.setup();
+    render(<CoachingStudioApp payload={makeUploadPayload({}, { learner_uploads_enabled: false })} />);
+
+    await user.click(getSectionButton(/workspace/i));
+    expect(screen.queryByText("File Upload")).not.toBeInTheDocument();
+
+    await user.click(getSectionButton(/coach chat/i));
+    expect(screen.queryByText("File Upload")).not.toBeInTheDocument();
+  });
+
+  it("submits the upload fields of both panes", async () => {
+    const fetchMock = mockSuccessfulSave();
+    const user = userEvent.setup();
+    render(<CoachingStudioApp payload={makeUploadPayload({ coach_allow_learner_uploads: true })} />);
+
+    await user.click(getSectionButton(/workspace/i));
+    await user.click(screen.getByRole("radio", { name: "Yes" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toEqual(expect.objectContaining({
+      workspace_allow_learner_uploads: true,
+      workspace_max_file_uploads: 3,
+      coach_allow_learner_uploads: true,
+      coach_max_file_uploads: 3,
+    }));
+  });
+
+  it("rejects Max File Uploads above the ceiling and opens the tab with the error", async () => {
+    const fetchMock = mockSuccessfulSave();
+    const user = userEvent.setup();
+    render(
+      <CoachingStudioApp
+        payload={makeUploadPayload(
+          { coach_allow_learner_uploads: true, coach_max_file_uploads: 6 },
+          { max_file_uploads_ceiling: 5 },
+        )}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(await screen.findByText("Max File Uploads must be an integer between 1 and 5.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Coach Chat" })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the component name as an editable heading and saves the new name", async () => {
+    const fetchMock = mockSuccessfulSave();
+    const user = userEvent.setup();
+    render(<CoachingStudioApp payload={makeUploadPayload()} />);
+
+    expect(screen.getByRole("heading", { name: "Coaching" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit component name" }));
+    await user.type(screen.getByRole("textbox", { name: "Component name" }), " activity{Enter}");
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).display_name)
+      .toBe("Coaching activity");
   });
 });

@@ -1,3 +1,4 @@
+import { RemainingUploadsByPane } from "../shared/attachments";
 import { postJson } from "../shared/request";
 
 interface ShortAnswerResponse {
@@ -5,11 +6,15 @@ interface ShortAnswerResponse {
   [key: string]: unknown;
 }
 
-export async function sendAnswer(url: string, userInput: string) {
-  const response = await postJson<ShortAnswerResponse>(url, { user_input: userInput });
+type ResetResponse = {
+  remaining: RemainingUploadsByPane;
+};
+
+export async function sendAnswer(url: string, userInput: string, uploadIds: string[]) {
+  const response = await postJson<ShortAnswerResponse>(url, { user_input: userInput, upload_ids: uploadIds });
   return response.response || "";
 }
 
 export async function resetChat(url: string) {
-  return postJson(url, {});
+  return postJson<ResetResponse>(url, {});
 }

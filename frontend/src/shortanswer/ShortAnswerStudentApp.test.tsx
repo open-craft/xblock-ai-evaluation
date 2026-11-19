@@ -2,14 +2,29 @@ import React from "react";
 import { render, screen, waitFor } from "../test/helpers";
 import userEvent from "@testing-library/user-event";
 import ShortAnswerStudentApp from "./ShortAnswerStudentApp";
-import { ShortAnswerStudentPayload } from "./types";
+import { ShortAnswerStudentPayload, ShortAnswerUploads } from "./types";
 import * as api from "./api";
 import { BACKGROUND_OPTIONS, getBackgroundOption } from "./appearance";
+import * as uploadApi from "../shared/api";
+import { RequestError } from "../shared/request";
 
 jest.mock("./api");
+jest.mock("../shared/api");
 
 const mockSendAnswer = api.sendAnswer as jest.MockedFunction<typeof api.sendAnswer>;
 const mockResetChat = api.resetChat as jest.MockedFunction<typeof api.resetChat>;
+const mockUploadLearnerFile = uploadApi.uploadLearnerFile as jest.MockedFunction<typeof uploadApi.uploadLearnerFile>;
+const mockDeleteLearnerUpload = uploadApi.deleteLearnerUpload as jest.MockedFunction<
+  typeof uploadApi.deleteLearnerUpload
+>;
+
+const UPLOADS_DISABLED: ShortAnswerUploads = {
+  shortanswer: { enabled: false },
+  pdf_max_bytes: 4194304,
+  pdf_max_pages: 10,
+  text_max_bytes: 51200,
+  accept: ".pdf,.txt,.md,.csv",
+};
 
 function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswerStudentPayload {
   return {
@@ -18,9 +33,12 @@ function makePayload(overrides?: Partial<ShortAnswerStudentPayload>): ShortAnswe
       get_response: "/handler/get_response",
       reset: "/handler/reset",
       download_pdf: "/handler/download_pdf",
+      upload_file: "/handler/upload_file",
+      delete_upload: "/handler/delete_upload",
     },
     initial_state: {
       messages: null,
+      uploads: UPLOADS_DISABLED,
     },
     meta: {
       title: "",
@@ -59,6 +77,7 @@ describe("ShortAnswerStudentApp", () => {
             { source: "user", content: "four" },
             { source: "llm", content: "Correct!" },
           ],
+          uploads: UPLOADS_DISABLED,
         },
       });
       render(<ShortAnswerStudentApp payload={payload} />);
@@ -120,10 +139,10 @@ describe("ShortAnswerStudentApp", () => {
     });
 
     it("resets only the selected block when multiple blocks share a page", async () => {
-      mockResetChat.mockResolvedValue({});
+      mockResetChat.mockResolvedValue({ remaining: {} });
       const user = userEvent.setup();
-      const first = makePayload({ initial_state: { messages: [{ source: "user", content: "First answer" }] } });
-      const second = makePayload({ initial_state: { messages: [{ source: "user", content: "Second answer" }] } });
+      const first = makePayload({ initial_state: { messages: [{ source: "user", content: "First answer" }], uploads: UPLOADS_DISABLED } });
+      const second = makePayload({ initial_state: { messages: [{ source: "user", content: "Second answer" }], uploads: UPLOADS_DISABLED } });
       render(<><ShortAnswerStudentApp payload={first} /><ShortAnswerStudentApp payload={second} /></>);
       const headings = screen.getAllByRole("heading", { name: "AI Discussion" });
       expect(headings[0].id).not.toBe(headings[1].id);
@@ -161,6 +180,16 @@ describe("ShortAnswerStudentApp", () => {
       expect(submitButton).toBeEnabled();
     });
 
+    it("keeps submit disabled for whitespace-only text without files", async () => {
+      const user = userEvent.setup();
+
+      render(<ShortAnswerStudentApp payload={makePayload()} />);
+
+      await user.type(screen.getByRole("textbox"), "   ");
+
+      expect(screen.getByRole("button", { name: /submit/i })).toBeDisabled();
+    });
+
     it("sends user input on submit", async () => {
       mockSendAnswer.mockResolvedValue("Good answer!");
       const user = userEvent.setup();
@@ -174,7 +203,7 @@ describe("ShortAnswerStudentApp", () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(mockSendAnswer).toHaveBeenCalledWith("/handler/get_response", "my answer");
+        expect(mockSendAnswer).toHaveBeenCalledWith("/handler/get_response", "my answer", []);
       });
     });
 
@@ -214,7 +243,7 @@ describe("ShortAnswerStudentApp", () => {
   describe("reset", () => {
     it("shows the Figma restart confirmation copy", async () => {
       const user = userEvent.setup();
-      const payload = makePayload({ initial_state: { messages: [{ source: "user", content: "Keep this" }] } });
+      const payload = makePayload({ initial_state: { messages: [{ source: "user", content: "Keep this" }], uploads: UPLOADS_DISABLED } });
       render(<ShortAnswerStudentApp payload={payload} />);
       await user.click(screen.getByRole("button", { name: "Reset chat" }));
       expect(screen.getByRole("dialog")).toBeVisible();
@@ -226,7 +255,7 @@ describe("ShortAnswerStudentApp", () => {
 
     it("places reset in the header and cancellation keeps the conversation", async () => {
       const user = userEvent.setup();
-      const payload = makePayload({ initial_state: { messages: [{ source: "user", content: "Keep this" }] } });
+      const payload = makePayload({ initial_state: { messages: [{ source: "user", content: "Keep this" }], uploads: UPLOADS_DISABLED } });
       render(<ShortAnswerStudentApp payload={payload} />);
       const button = screen.getByRole("button", { name: "Reset chat" });
       expect(button.closest("header")).not.toBeNull();
@@ -242,7 +271,7 @@ describe("ShortAnswerStudentApp", () => {
       mockResetChat.mockRejectedValue(new Error("Reset failed"));
       const user = userEvent.setup();
       render(<ShortAnswerStudentApp payload={makePayload({
-        initial_state: { messages: [{ source: "user", content: "Keep this" }] },
+        initial_state: { messages: [{ source: "user", content: "Keep this" }], uploads: UPLOADS_DISABLED },
       })} />);
       await user.click(screen.getByRole("button", { name: "Reset chat" }));
       await user.click(screen.getByRole("button", { name: "Restart" }));
@@ -258,7 +287,7 @@ describe("ShortAnswerStudentApp", () => {
     });
 
     it("clears messages after reset", async () => {
-      mockResetChat.mockResolvedValue({});
+      mockResetChat.mockResolvedValue({ remaining: {} });
       const user = userEvent.setup();
 
       const payload = makePayload({
@@ -267,6 +296,7 @@ describe("ShortAnswerStudentApp", () => {
             { source: "user", content: "old message" },
             { source: "llm", content: "old reply" },
           ],
+          uploads: UPLOADS_DISABLED,
         },
       });
 
@@ -292,6 +322,7 @@ describe("ShortAnswerStudentApp", () => {
             { source: "user", content: "msg" },
             { source: "llm", content: "reply" },
           ],
+          uploads: UPLOADS_DISABLED,
         },
         meta: {
           title: "",
@@ -352,6 +383,7 @@ And this is paragraph two.`;
             { source: "user", content: "four" },
             { source: "llm", content: "Correct!" },
           ],
+          uploads: UPLOADS_DISABLED,
         },
       });
       payload.meta.question = `
@@ -383,7 +415,7 @@ And this is paragraph two.`;
     });
 
     it("question information expands after reset", async () => {
-      mockResetChat.mockResolvedValue({});
+      mockResetChat.mockResolvedValue({ remaining: {} });
       const user = userEvent.setup();
 
       const payload = makePayload({
@@ -392,6 +424,7 @@ And this is paragraph two.`;
             { source: "user", content: "old message" },
             { source: "llm", content: "old reply" },
           ],
+          uploads: UPLOADS_DISABLED,
         },
       });
       payload.meta.question = `
@@ -452,6 +485,184 @@ And this is paragraph two.`;
       expect(screen.queryByText(/error code 418/i)).toBeNull();
 
 
+    });
+  });
+
+  describe("file uploads", () => {
+    const UPLOADS_ENABLED: ShortAnswerUploads = {
+      ...UPLOADS_DISABLED,
+      shortanswer: { enabled: true, limit: 3, remaining: 3 },
+    };
+
+    it("renders chips on sent messages", () => {
+      const payload = makePayload({
+        initial_state: {
+          messages: [
+            {
+              source: "user",
+              content: "see attached",
+              attachments: [{ upload_id: "upload-1", filename: "report.pdf", content_type: "application/pdf" }],
+            },
+            { source: "llm", content: "Thanks!" },
+            {
+              source: "user",
+              content: "",
+              attachments: [{ upload_id: "upload-2", filename: "data.csv", content_type: "text/csv" }],
+            },
+          ],
+          uploads: UPLOADS_DISABLED,
+        },
+      });
+
+      render(<ShortAnswerStudentApp payload={payload} />);
+
+      expect(screen.getByText("report.pdf")).toBeInTheDocument();
+      expect(screen.getByText("PDF")).toBeInTheDocument();
+      expect(screen.getByText("see attached")).toBeInTheDocument();
+      expect(screen.getByText("data.csv")).toBeInTheDocument();
+      expect(screen.getAllByRole("list", { name: "Attached files" })).toHaveLength(2);
+    });
+
+    it("sends a file-only message with its upload IDs", async () => {
+      mockUploadLearnerFile.mockResolvedValue({
+        upload_id: "upload-1", filename: "report.pdf", content_type: "application/pdf", remaining: 2,
+      });
+      mockSendAnswer.mockResolvedValue("Nice report.");
+      const user = userEvent.setup();
+      render(<ShortAnswerStudentApp payload={makePayload({
+        initial_state: { messages: null, uploads: UPLOADS_ENABLED },
+      })} />);
+
+      await user.upload(
+        screen.getByTestId("attachment-file-input"),
+        new File(["%PDF-"], "report.pdf", { type: "application/pdf" }),
+      );
+      const submitButton = screen.getByRole("button", { name: /submit/i });
+      await waitFor(() => expect(submitButton).toBeEnabled());
+      await user.click(submitButton);
+
+      expect(mockSendAnswer).toHaveBeenCalledWith("/handler/get_response", "", ["upload-1"]);
+      expect(await screen.findByText("Nice report.")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove report.pdf" })).not.toBeInTheDocument();
+      expect(screen.getByText("report.pdf")).toBeInTheDocument();
+    });
+
+    it("keeps files uploaded while a message was sending when the send fails", async () => {
+      mockUploadLearnerFile
+        .mockResolvedValueOnce({
+          upload_id: "upload-1", filename: "first.pdf", content_type: "application/pdf", remaining: 2,
+        })
+        .mockResolvedValueOnce({
+          upload_id: "upload-2", filename: "second.pdf", content_type: "application/pdf", remaining: 1,
+        });
+      let failSend: (error: Error) => void = () => {};
+      mockSendAnswer.mockReturnValue(new Promise((_resolve, reject) => {
+        failSend = reject;
+      }));
+      const user = userEvent.setup();
+      render(<ShortAnswerStudentApp payload={makePayload({
+        initial_state: { messages: null, uploads: UPLOADS_ENABLED },
+      })} />);
+      const fileInput = screen.getByTestId("attachment-file-input");
+
+      await user.upload(fileInput, new File(["%PDF-"], "first.pdf", { type: "application/pdf" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /submit/i })).toBeEnabled());
+      await user.click(screen.getByRole("button", { name: /submit/i }));
+      await user.upload(fileInput, new File(["%PDF-"], "second.pdf", { type: "application/pdf" }));
+      await screen.findByRole("button", { name: "Remove second.pdf" });
+      failSend(new Error("LLM unavailable"));
+
+      expect(await screen.findByRole("button", { name: "Remove first.pdf" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove second.pdf" })).toBeInTheDocument();
+    });
+
+    it("keeps chips after failed send", async () => {
+      mockUploadLearnerFile.mockResolvedValue({
+        upload_id: "upload-1", filename: "report.pdf", content_type: "application/pdf", remaining: 2,
+      });
+      mockSendAnswer.mockRejectedValue(new Error("LLM unavailable"));
+      const user = userEvent.setup();
+      render(<ShortAnswerStudentApp payload={makePayload({
+        initial_state: { messages: null, uploads: UPLOADS_ENABLED },
+      })} />);
+
+      await user.upload(
+        screen.getByTestId("attachment-file-input"),
+        new File(["%PDF-"], "report.pdf", { type: "application/pdf" }),
+      );
+      await user.type(screen.getByRole("textbox"), "my answer");
+      await waitFor(() => expect(screen.getByRole("button", { name: /submit/i })).toBeEnabled());
+      await user.click(screen.getByRole("button", { name: /submit/i }));
+
+      expect(await screen.findByText(/llm unavailable/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove report.pdf" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /submit/i })).toBeEnabled();
+    });
+
+    it("disables uploading and removing files while the chat resets", async () => {
+      mockUploadLearnerFile.mockResolvedValue({
+        upload_id: "upload-1", filename: "report.pdf", content_type: "application/pdf", remaining: 2,
+      });
+      let finishReset: (response: Awaited<ReturnType<typeof api.resetChat>>) => void = () => {};
+      mockResetChat.mockReturnValue(new Promise((resolve) => {
+        finishReset = resolve;
+      }));
+      const user = userEvent.setup();
+      render(<ShortAnswerStudentApp payload={makePayload({
+        initial_state: {
+          messages: [
+            { source: "user", content: "old message" },
+            { source: "llm", content: "old reply" },
+          ],
+          uploads: UPLOADS_ENABLED,
+        },
+      })} />);
+
+      await user.upload(
+        screen.getByTestId("attachment-file-input"),
+        new File(["%PDF-"], "report.pdf", { type: "application/pdf" }),
+      );
+      await screen.findByRole("button", { name: "Remove report.pdf" });
+      await user.click(screen.getByRole("button", { name: /reset chat/i }));
+      await user.click(screen.getByRole("button", { name: "Restart" }));
+
+      expect(screen.getByRole("button", { name: "Upload file: 2 remaining" })).toBeDisabled();
+      expect(screen.getByText("report.pdf")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove report.pdf" })).not.toBeInTheDocument();
+
+      finishReset({ remaining: { shortanswer: 3 } });
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Upload file: 3 remaining" })).toBeEnabled());
+      expect(screen.queryByText("report.pdf")).not.toBeInTheDocument();
+    });
+
+    it("drops chips when the send is rejected because the uploads are gone", async () => {
+      mockUploadLearnerFile.mockResolvedValue({
+        upload_id: "upload-1", filename: "report.pdf", content_type: "application/pdf", remaining: 2,
+      });
+      mockSendAnswer.mockRejectedValue(
+        new RequestError("Invalid upload.", 400, { code: "invalid_upload", error: "Invalid upload." }),
+      );
+      mockDeleteLearnerUpload.mockRejectedValue(
+        new RequestError("Invalid upload.", 400, { code: "invalid_upload", error: "Invalid upload." }),
+      );
+      const user = userEvent.setup();
+      render(<ShortAnswerStudentApp payload={makePayload({
+        initial_state: { messages: null, uploads: UPLOADS_ENABLED },
+      })} />);
+
+      await user.upload(
+        screen.getByTestId("attachment-file-input"),
+        new File(["%PDF-"], "report.pdf", { type: "application/pdf" }),
+      );
+      await user.type(screen.getByRole("textbox"), "my answer");
+      await waitFor(() => expect(screen.getByRole("button", { name: /submit/i })).toBeEnabled());
+      await user.click(screen.getByRole("button", { name: /submit/i }));
+
+      expect(await screen.findByText(/invalid upload/i)).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove report.pdf" })).not.toBeInTheDocument();
+      expect(mockDeleteLearnerUpload).toHaveBeenCalledWith("/handler/delete_upload", "shortanswer", "upload-1");
+      expect(screen.getByRole("textbox")).toHaveValue("my answer");
     });
   });
 });

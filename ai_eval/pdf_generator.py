@@ -74,6 +74,8 @@ class CoachedMessage(BaseModel):
     # (perhaps they could default to the course start date in future?).
     time: datetime | None
     content: Annotated[str, AfterValidator(markdown_to_safe_html)]
+    # Filenames of the files the learner attached to this message.
+    attachments: list[str] = []
 
 
 class CoachedSection(BaseModel):
@@ -89,6 +91,8 @@ class CoachedData(BaseModel):
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     final_submission: Annotated[str, AfterValidator(markdown_to_safe_html)]
+    # Filenames of the files that were evaluated with the final submission.
+    final_submission_attachments: list[str] = []
     final_evaluation: Annotated[str, AfterValidator(markdown_to_safe_html)]
     evaluator_name: str
     # This is a sectioned list of messages.
@@ -112,6 +116,8 @@ class ShortAnswerMessage(BaseModel):
     # Use an optional field here to avoid breaking changes.
     time: datetime | None
     content: Annotated[str, AfterValidator(markdown_to_safe_html)]
+    # Filenames of the files the learner attached to this message.
+    attachments: list[str] = []
 
 
 class ShortAnswerData(BaseModel):

@@ -12,6 +12,9 @@
             <div class="content">
                 {{ message.content | safe }}
             </div>
+            {% if message.attachments %}
+                <div class="attachments">Attached: {{ message.attachments | join(", ") }}</div>
+            {% endif %}
         </div>
     {% endfor %}
 {% endblock %}
