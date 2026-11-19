@@ -44,7 +44,8 @@ export function useAttachmentUploads({ pane, paneState, fileLimits, handlerUrls 
   const [lastUploadedFilename, setLastUploadedFilename] = useState<string | null>(null);
   const nextAttachmentKey = useRef(0);
   const nextAlertKey = useRef(0);
-  // Keys of the files still uploading. Cancelling an upload removes its key, so it knows its chip is gone.
+  // Keys of the files still uploading. Clearing the composer removes them, so an upload that finishes later knows its
+  // chip is gone.
   const uploadingKeys = useRef(new Set<number>());
 
   const uploading = composerAttachments.some((attachment) => attachment.upload === null);
@@ -68,14 +69,14 @@ export function useAttachmentUploads({ pane, paneState, fileLimits, handlerUrls 
     return { key: nextAttachmentKey.current, filename, upload };
   }
 
-  /** Stop tracking a finished upload. Returns false if it was cancelled while it uploaded. */
+  /** Stop tracking a finished upload. Returns false if the composer was cleared while it uploaded. */
   function finishUploading(key: number) {
     return uploadingKeys.current.delete(key);
   }
 
   /**
-   * Upload one file and fill in its chip. If the upload was cancelled, the file is deleted instead, and a failure
-   * isn't shown: there's no chip left for either.
+   * Upload one file and fill in its chip. If the composer was cleared while it uploaded, the file is deleted instead,
+   * and a failure isn't shown: there's no chip left for either.
    */
   async function uploadAttachment(key: number, file: File) {
     try {
@@ -121,12 +122,6 @@ export function useAttachmentUploads({ pane, paneState, fileLimits, handlerUrls 
       uploadingKeys.current.add(attachment.key);
       uploadAttachment(attachment.key, files[index]);
     });
-  }
-
-  /** Cancel the files still uploading: their chips go now, and each file is deleted when its upload finishes. */
-  function cancelUploads() {
-    uploadingKeys.current.clear();
-    setComposerAttachments((current) => current.filter((attachment) => attachment.upload !== null));
   }
 
   /** Delete an uploaded file. Its chip goes at once, so it can't be removed twice or sent, and returns on failure. */
@@ -198,7 +193,6 @@ export function useAttachmentUploads({ pane, paneState, fileLimits, handlerUrls 
     lastUploadedFilename,
     fileLimits,
     uploadFiles,
-    cancelUploads,
     removeAttachment,
     clearAttachments,
     handleFailedSend,

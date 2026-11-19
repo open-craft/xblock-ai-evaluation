@@ -579,8 +579,6 @@ export default function CoachingStudentApp({
       return;
     }
 
-    // The evaluation doesn't use coach files, so it doesn't wait for one still uploading.
-    coachUploads.cancelUploads();
     setErrorData(null);  // clear the error data while we try a new action
     setEvaluationPending(true);
     setPaneBusy("workspace", true);

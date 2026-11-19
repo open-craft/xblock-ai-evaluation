@@ -344,15 +344,26 @@ describe("CoachingStudentApp", () => {
     });
 
     describe("submitting while a coach file uploads", () => {
+      const uploadResponse: uploadApi.UploadFileResponse = {
+        upload_id: "upload-1",
+        filename: "notes.txt",
+        content_type: "text/plain",
+        remaining: 2,
+      };
       let finishUpload: (response: uploadApi.UploadFileResponse) => void;
       let failUpload: (error: Error) => void;
+      let finishEvaluation: (response: api.CharacterResponse) => void;
+      let failEvaluation: (error: Error) => void;
 
       async function submitWhileCoachFileUploads() {
         mockUploadLearnerFile.mockReturnValue(new Promise((resolve, reject) => {
           finishUpload = resolve;
           failUpload = reject;
         }));
-        mockRequestEvaluation.mockReturnValue(new Promise(() => {}));
+        mockRequestEvaluation.mockReturnValue(new Promise((resolve, reject) => {
+          finishEvaluation = resolve;
+          failEvaluation = reject;
+        }));
         const user = userEvent.setup();
         const payload = makePayload();
         payload.initial_state = {
@@ -373,26 +384,45 @@ describe("CoachingStudentApp", () => {
         await user.click(screen.getByRole("button", { name: /submit for evaluation/i }));
       }
 
-      it("cancels the upload, and deletes the file once it's uploaded", async () => {
-        mockDeleteLearnerUpload.mockResolvedValue({ remaining: 3 });
-
+      it("keeps the upload while the evaluation runs", async () => {
         await submitWhileCoachFileUploads();
 
         expect(mockRequestEvaluation).toHaveBeenCalled();
+        expect(screen.getByText("notes.txt")).toBeInTheDocument();
+      });
+
+      it("deletes the file once it's uploaded if the evaluation finishes first", async () => {
+        mockDeleteLearnerUpload.mockResolvedValue({ remaining: 3 });
+        await submitWhileCoachFileUploads();
+
+        await act(async () => finishEvaluation({ finished: true, report_html: "<p>Report</p>" }));
         expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
-        finishUpload({ upload_id: "upload-1", filename: "notes.txt", content_type: "text/plain", remaining: 2 });
+        finishUpload(uploadResponse);
+
         await waitFor(() => {
           expect(mockDeleteLearnerUpload).toHaveBeenCalledWith("/handler/delete_upload", "coach", "upload-1");
         });
         expect(screen.queryByText("notes.txt")).not.toBeInTheDocument();
       });
 
-      it("doesn't show an error if the cancelled upload fails", async () => {
+      it("doesn't show an error if the upload fails after the evaluation finishes", async () => {
         await submitWhileCoachFileUploads();
 
+        await act(async () => finishEvaluation({ finished: true, report_html: "<p>Report</p>" }));
         await act(async () => failUpload(new Error("Network error")));
 
         expect(screen.queryByText(/a network or server error occurred/i)).not.toBeInTheDocument();
+        expect(mockDeleteLearnerUpload).not.toHaveBeenCalled();
+      });
+
+      it("keeps the uploaded file if the evaluation fails", async () => {
+        await submitWhileCoachFileUploads();
+
+        await act(async () => failEvaluation(new Error("Server error")));
+        await act(async () => finishUpload(uploadResponse));
+
+        expect(screen.getByText(/"Error: Server error"/)).toBeInTheDocument();
+        expect(screen.getByText("notes.txt")).toBeInTheDocument();
         expect(mockDeleteLearnerUpload).not.toHaveBeenCalled();
       });
     });
