@@ -634,7 +634,7 @@ def test_coach_block_studio_view(coach_block_data):
                 frag = block.studio_view()
 
     assert frag.js_init_fn == "CoachAIEvalXBlockStudio"
-    assert '<div data-ai-eval-react-root="true"' in frag.content
+    assert '<div data-ai-eval-react-root="true" class="editor-with-buttons editor-with-tabs is-active"' in frag.content
     assert frag.json_init_args["view"] == "studio"
     assert frag.json_init_args["handler_urls"] == {
         "studio_submit": "/handler/studio_submit",
@@ -642,6 +642,7 @@ def test_coach_block_studio_view(coach_block_data):
     assert frag.json_init_args["initial_state"]["scenario_data"] == coach_block_data["scenario_data"]
     assert frag.json_init_args["initial_state"]["max_attempts"] == coach_block_data["max_attempts"]
     assert frag.json_init_args["meta"]["lock_metadata"]["initial_model"] == SupportedModels.GPT4O.value
+    assert frag.json_init_args["meta"]["json_editing_enabled"] is False
     assert "scenario_data" in frag.json_init_args["meta"]["field_metadata"]
     assert frag.json_init_args["meta"]["field_metadata"]["model"]["choices"] == [
         {

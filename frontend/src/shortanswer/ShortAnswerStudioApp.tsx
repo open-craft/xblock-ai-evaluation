@@ -3,13 +3,13 @@ import { useIntl } from "react-intl";
 import { Formik, useFormikContext } from "formik";
 import * as Yup from "yup";
 import {
-  Button, Form, Nav, TabContainer, TabContent, TabPane, ModalDialog, IconButton
+  Button, Form, TabContainer, TabContent, TabPane, ModalDialog
 } from "@openedx/paragon";
-import { EditOutline } from "@openedx/paragon/icons";
 import { JSONImporter } from "../shared/JSONImporter";
 import { RequestError } from "../shared/request";
 import { FieldErrors, FieldHelp } from "../shared/StudioFormFields";
 import { StudioEditorLayout } from "../shared/StudioEditorLayout";
+import { StudioHeader } from "../shared/StudioHeader";
 import { StudioValidationSummary } from "../shared/StudioValidationSummary";
 import {
   collectYupErrors,
@@ -384,88 +384,6 @@ function ShortAnswerSettingsForm({
 }
 
 
-interface HeaderProps {
-  title: string;
-  onTitleChange: (title: string) => void;
-  activeTab: string;
-  showJsonTab: boolean;
-  validationErrors: ValidationErrors;
-}
-
-function Header({ title, onTitleChange, activeTab, showJsonTab, validationErrors }: HeaderProps) {
-  const [isEditingName, setIsEditingName] = useState(false);
-
-  return (
-    <ModalDialog.Header className="shadow-sm studio-header">
-      <div className="d-flex flex-row justify-content-between">
-        {isEditingName ? (
-          <Form.Group
-            controlId="xb-field-edit-display_name"
-            isInvalid={Boolean(validationErrors.display_name)}
-            className="title-edit-group"
-          >
-            <Form.Control
-              type="text"
-              name="studio-title"
-              aria-label="Display name"
-              autoFocus
-              value={title}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => onTitleChange(event.target.value)}
-              onBlur={() => setIsEditingName(false)}
-              onKeyDown={(e: React.KeyboardEvent) => {
-                if (e.key === 'Enter' || e.key === 'Escape') {
-                  setIsEditingName(false);
-                  e.preventDefault();
-                }
-              }}
-            />
-          </Form.Group>
-        ) : (
-          <h3 className="h3 col pl-0">
-            <div className="d-flex flex-row align-items-center mt-1">
-              Editing: {title}
-              <IconButton
-                alt="Edit display name"
-                className="studio-header-title-edit"
-                size="sm"
-                src={EditOutline}
-                onClick={() => setIsEditingName(true)}
-              />
-            </div>
-          </h3>
-        )}
-        {showJsonTab && (
-          <Nav
-            role="tablist"
-            variant="button-group"
-            activeKey={activeTab}
-            className="studio-header-tabs-nav pgn__tabs"
-            aria-label="Editor Sections"
-          >
-            <Nav.Link
-              as="button"
-              type="button"
-              eventKey="settings"
-              tabIndex={activeTab === "settings" ? 0 : -1}
-            >
-              Settings
-            </Nav.Link>
-            <Nav.Link
-              as="button"
-              type="button"
-              eventKey="json"
-              tabIndex={activeTab === "json" ? 0 : -1}
-            >
-              JSON
-            </Nav.Link>
-          </Nav>
-        )}
-
-      </div>
-    </ModalDialog.Header>
-  );
-}
-
 function ShortAnswerStudioFormContent({
   payload,
   runtime,
@@ -620,7 +538,7 @@ function ShortAnswerStudioFormContent({
           onSelect={(eventKey: string | null) => setActiveTab(eventKey || "settings")}
           transition={false}
         >
-          <Header
+          <StudioHeader
             title={formik.values.display_name}
             onTitleChange={(value: string) => formik.setFieldValue('display_name', value)}
             activeTab={activeTab}
@@ -654,6 +572,7 @@ function ShortAnswerStudioFormContent({
                     runtime={runtime as XBlockRuntime}
                     element={element as XBlockElementLike}
                     schema={shortAnswerSchema}
+                    exportFilename="short-answer-ai-block.json"
                   />
                 </TabPane>
               )}

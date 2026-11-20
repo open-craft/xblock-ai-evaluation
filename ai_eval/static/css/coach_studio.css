@@ -27,7 +27,18 @@
     background: var(--pgn-color-coaching-panel-bg, #ffffff);
     z-index: 1;
     border-top: 1px solid var(--pgn-color-coaching-border, #cbcbcb);
-    padding: 1rem 0 0;
+    padding: 1rem 7px 7px;
+}
+
+.coaching-react-studio .title-edit-group {
+    display: flex;
+    padding: 0;
+    flex-grow: 1;
+}
+
+.coaching-react-studio .studio-header {
+    padding: 0.5rem 3rem 0.5rem 1rem;
+    z-index: 3;
 }
 
 .coaching-react-studio .coaching-studio-shell {

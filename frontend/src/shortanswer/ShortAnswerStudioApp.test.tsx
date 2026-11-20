@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import ShortAnswerStudioApp from "./ShortAnswerStudioApp";
 import { ShortAnswerStudioPayload } from "./types";
 import { BACKGROUND_OPTIONS } from "./appearance";
-import { XBlockRuntime } from "../shared/types";
+import { getFileInput, makeJsonFile, makeRuntime, mockSuccessfulSave } from "../test/testUtils";
 
 function makePayload(): ShortAnswerStudioPayload {
   return {
@@ -32,13 +32,6 @@ function makePayload(): ShortAnswerStudioPayload {
   };
 }
 
-function makeRuntime() {
-  return {
-    handlerUrl: jest.fn(),
-    notify: jest.fn(),
-  } as unknown as XBlockRuntime & { notify: jest.Mock };
-}
-
 function renderEditor(ui: React.ReactElement) {
   return render(
     <div className="edit-xblock-modal">
@@ -55,12 +48,7 @@ const originalFetch = global.fetch;
 let fetchMock: jest.Mock;
 
 beforeEach(() => {
-  fetchMock = jest.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    text: async () => JSON.stringify({ success: true, validation_errors: {}, validation_warnings: [] }),
-  });
-  global.fetch = fetchMock;
+  fetchMock = mockSuccessfulSave();
 });
 
 afterEach(() => {
@@ -159,9 +147,6 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
 
   it("shows the JSON tab when JSON editing is enabled", () => {
     const runtime = makeRuntime();
-    runtime.handlerUrl = jest.fn(
-      (_element, handler) => `/handler/${handler}`,
-    ) as unknown as XBlockRuntime["handlerUrl"];
 
     const payload = makePayload();
     payload.meta.json_editing_enabled = true;
@@ -194,9 +179,6 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
   it("validates uploaded JSON using shortAnswerSchema", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
-    runtime.handlerUrl = jest.fn(
-      (_element, handler) => `/handler/${handler}`,
-    ) as unknown as XBlockRuntime["handlerUrl"];
 
     const payload = makePayload();
     payload.meta.json_editing_enabled = true;
@@ -213,17 +195,10 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
 
     expect(screen.getByText("Import")).toBeInTheDocument();
 
-    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
-    expect(input).not.toBeNull();
-
-    const file = new File([JSON.stringify({ max_responses: 50, model: "" })], "test.json", {
-      type: "application/json",
-    });
-    Object.defineProperty(file, "text", {
-      value: () => Promise.resolve(JSON.stringify({ max_responses: 50, model: "" })),
-    });
-
-    await userEvent.upload(input, file);
+    await userEvent.upload(
+      getFileInput(container),
+      makeJsonFile(JSON.stringify({ max_responses: 50, model: "" }), "test.json"),
+    );
 
     const heading = await screen.findByText("JSON validation failed!");
     expect(heading).toBeInTheDocument();
@@ -237,9 +212,6 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
   it("wires the tablist to the tab panes with ARIA attributes", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
-    runtime.handlerUrl = jest.fn(
-      (_element, handler) => `/handler/${handler}`,
-    ) as unknown as XBlockRuntime["handlerUrl"];
 
     const payload = makePayload();
     payload.meta.json_editing_enabled = true;
