@@ -4,10 +4,11 @@ import { ShortAnswerStudioPayload } from "./types";
 
 const initializer = makeXBlockInitializer(
   ShortAnswerStudioApp,
-  (runtime, _element, data) => {
+  (runtime, element, data) => {
     return {
       payload: data as ShortAnswerStudioPayload,
       runtime,
+      element,
     };
   },
 );

@@ -5,9 +5,7 @@ import CoachingStudioApp from "../coaching/CoachingStudioApp";
 import { CoachingStudioPayload } from "../coaching/types";
 import CodingStudioApp from "../coding/CodingStudioApp";
 import { CodingStudioPayload } from "../coding/types";
-import ShortAnswerStudioApp from "../shortanswer/ShortAnswerStudioApp";
-import { ShortAnswerStudioPayload } from "../shortanswer/types";
-import { render, screen, waitFor } from "../test/helpers";
+import { render, screen } from "../test/helpers";
 import { XBlockRuntime } from "./types";
 import { StudioEditorLayout } from "./StudioEditorLayout";
 
@@ -74,16 +72,10 @@ describe("StudioEditorLayout", () => {
 
 // --- Editor integration helpers ---
 
-function renderEditor(ui: React.ReactElement, { includeLegacyActions = false } = {}) {
+function renderEditor(ui: React.ReactElement) {
   return render(
     <div className="edit-xblock-modal">
       <div className="editor-body">{ui}</div>
-      {includeLegacyActions && (
-        <ul className="modal-actions">
-          <li><a className="action-save" href="#">Legacy Save</a></li>
-          <li><a className="action-cancel" href="#">Legacy Cancel</a></li>
-        </ul>
-      )}
     </div>,
   );
 }
@@ -94,53 +86,6 @@ function makeRuntime() {
     notify: jest.fn(),
   } as unknown as XBlockRuntime & { notify: jest.Mock };
 }
-
-function mockSuccessfulSave() {
-  const mockFetch = jest.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    statusText: "OK",
-    text: () => Promise.resolve(JSON.stringify({
-      success: true,
-      validation_errors: {},
-      validation_warnings: [],
-      meta: {},
-    })),
-  });
-  global.fetch = mockFetch;
-  return mockFetch;
-}
-
-const shortAnswerPayload: ShortAnswerStudioPayload = {
-  view: "studio",
-  handler_urls: { studio_submit: "/shortanswer/studio_submit" },
-  initial_state: {
-    allow_reset: true,
-    attachment_urls: [],
-    character_image: "",
-    display_name: "Short answer with AI Evaluation",
-    evaluation_prompt: "Evaluate the answer.",
-    max_responses: 3,
-    model: "gpt-4o-mini",
-    model_api_key: "",
-    model_api_url: "",
-    question: "What is 2 + 2?",
-    show_display_name: false,
-  },
-  meta: {
-    field_metadata: {
-      model: {
-        display_name: "AI model",
-        choices: [{ value: "gpt-4o-mini", display_name: "gpt-4o-mini" }],
-      },
-      show_display_name: {
-        display_name: "Show Display Name",
-      },
-    },
-  },
-  mfe_config_api: "/mfe_config",
-  style_urls: [],
-};
 
 const codingPayload: CodingStudioPayload = {
   view: "studio",
@@ -215,39 +160,9 @@ const coachingPayload: CoachingStudioPayload = {
 };
 
 describe("StudioEditorLayout — editor integration", () => {
-  let originalFetch: typeof global.fetch;
-
-  beforeAll(() => {
-    originalFetch = global.fetch;
-  });
-
-  afterAll(() => {
-    global.fetch = originalFetch;
-  });
-
   afterEach(() => {
     document.body.innerHTML = "";
     jest.restoreAllMocks();
-  });
-
-  it("saves Short Answer through the React layout", async () => {
-    const user = userEvent.setup();
-    const runtime = makeRuntime();
-    const fetch = mockSuccessfulSave();
-
-    renderEditor(<ShortAnswerStudioApp payload={shortAnswerPayload} runtime={runtime} />, {
-      includeLegacyActions: true,
-    });
-
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    await waitFor(() => {
-      expect(runtime.notify).toHaveBeenCalledWith("save", { state: "end" });
-    });
-    expect(fetch).toHaveBeenCalledWith(
-      "/shortanswer/studio_submit",
-      expect.objectContaining({ method: "POST" }),
-    );
   });
 
   it("cancels Coding through the React layout", async () => {

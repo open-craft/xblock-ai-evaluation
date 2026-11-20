@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import ShortAnswerStudioApp from "./ShortAnswerStudioApp";
 import { ShortAnswerStudioPayload } from "./types";
 import { BACKGROUND_OPTIONS } from "./appearance";
+import { XBlockRuntime } from "../shared/types";
 
 function makePayload(): ShortAnswerStudioPayload {
   return {
@@ -31,6 +32,25 @@ function makePayload(): ShortAnswerStudioPayload {
   };
 }
 
+function makeRuntime() {
+  return {
+    handlerUrl: jest.fn(),
+    notify: jest.fn(),
+  } as unknown as XBlockRuntime & { notify: jest.Mock };
+}
+
+function renderEditor(ui: React.ReactElement) {
+  return render(
+    <div className="edit-xblock-modal">
+      <div className="editor-body">{ui}</div>
+      <ul className="modal-actions">
+        <li><a className="action-save" href="#">Legacy Save</a></li>
+        <li><a className="action-cancel" href="#">Legacy Cancel</a></li>
+      </ul>
+    </div>,
+  );
+}
+
 const originalFetch = global.fetch;
 let fetchMock: jest.Mock;
 
@@ -50,7 +70,7 @@ afterEach(() => {
 it("initializes a default background without changing the display-name controls", () => {
   render(<ShortAnswerStudioApp payload={makePayload()} />);
   expect(screen.getByRole("radio", { name: "Use course default" })).toBeChecked();
-  expect(screen.getByLabelText("Display Name")).toHaveValue("Existing display name");
+  expect(screen.getByText("Editing: Existing display name")).toBeInTheDocument();
   expect(screen.getByRole("checkbox", { name: "Show Display Name" })).toBeChecked();
   expect(screen.getByRole("group", { name: "Container background" })).toBeInTheDocument();
   expect(within(screen.getByRole("group", { name: "Container background" })).getAllByRole("radio")).toHaveLength(5);
@@ -60,8 +80,9 @@ it.each(BACKGROUND_OPTIONS)("saves the $value thumbnail key and the display name
   const user = userEvent.setup();
   const notify = jest.fn();
   render(<ShortAnswerStudioApp payload={makePayload()} runtime={{ notify, handlerUrl: jest.fn() }} />);
-  await user.clear(screen.getByLabelText("Display Name"));
-  await user.type(screen.getByLabelText("Display Name"), "My reflection");
+  await user.click(screen.getByRole("button", { name: "Edit display name" }));
+  await user.clear(screen.getByLabelText("Display name"));
+  await user.type(screen.getByLabelText("Display name"), "My reflection{enter}");
   await user.click(screen.getByRole("radio", { name: option.label.defaultMessage }));
   expect(screen.getByRole("radio", { name: option.label.defaultMessage })).toBeChecked();
   await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -116,4 +137,138 @@ it("shows a server background-validation error and leaves the editor open", asyn
   await user.click(screen.getByRole("button", { name: /^save$/i }));
   expect(await screen.findByText("Select a valid course theme background.")).toBeVisible();
   expect(notify).not.toHaveBeenCalledWith("save", { state: "end" });
+});
+
+describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
+  it("saves through the React layout", async () => {
+    const user = userEvent.setup();
+    const runtime = makeRuntime();
+
+    renderEditor(<ShortAnswerStudioApp payload={makePayload()} runtime={runtime} />);
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(runtime.notify).toHaveBeenCalledWith("save", { state: "end" });
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/handler/studio_submit",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("shows the JSON tab when JSON editing is enabled", () => {
+    const runtime = makeRuntime();
+    runtime.handlerUrl = jest.fn(
+      (_element, handler) => `/handler/${handler}`,
+    ) as unknown as XBlockRuntime["handlerUrl"];
+
+    const payload = makePayload();
+    payload.meta.json_editing_enabled = true;
+
+    renderEditor(
+      <ShortAnswerStudioApp
+        payload={payload}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    expect(screen.getByText("JSON")).toBeInTheDocument();
+  });
+
+  it("hides the JSON tab when JSON editing is disabled", () => {
+    const runtime = makeRuntime();
+
+    renderEditor(
+      <ShortAnswerStudioApp
+        payload={makePayload()}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    expect(screen.queryByText("JSON")).not.toBeInTheDocument();
+  });
+
+  it("validates uploaded JSON using shortAnswerSchema", async () => {
+    const user = userEvent.setup();
+    const runtime = makeRuntime();
+    runtime.handlerUrl = jest.fn(
+      (_element, handler) => `/handler/${handler}`,
+    ) as unknown as XBlockRuntime["handlerUrl"];
+
+    const payload = makePayload();
+    payload.meta.json_editing_enabled = true;
+
+    const { container } = renderEditor(
+      <ShortAnswerStudioApp
+        payload={payload}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    await user.click(screen.getByText("JSON"));
+
+    expect(screen.getByText("Import")).toBeInTheDocument();
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    expect(input).not.toBeNull();
+
+    const file = new File([JSON.stringify({ max_responses: 50, model: "" })], "test.json", {
+      type: "application/json",
+    });
+    Object.defineProperty(file, "text", {
+      value: () => Promise.resolve(JSON.stringify({ max_responses: 50, model: "" })),
+    });
+
+    await userEvent.upload(input, file);
+
+    const heading = await screen.findByText("JSON validation failed!");
+    expect(heading).toBeInTheDocument();
+    const alertBox = heading.closest(".alert") || heading.parentElement!;
+    expect(within(alertBox as HTMLElement).getByText("max_responses")).toBeInTheDocument();
+    expect(
+      within(alertBox as HTMLElement).getByText("max responses must be an integer between 1 and 30"),
+    ).toBeInTheDocument();
+  });
+
+  it("wires the tablist to the tab panes with ARIA attributes", async () => {
+    const user = userEvent.setup();
+    const runtime = makeRuntime();
+    runtime.handlerUrl = jest.fn(
+      (_element, handler) => `/handler/${handler}`,
+    ) as unknown as XBlockRuntime["handlerUrl"];
+
+    const payload = makePayload();
+    payload.meta.json_editing_enabled = true;
+
+    renderEditor(
+      <ShortAnswerStudioApp
+        payload={payload}
+        runtime={runtime}
+        element={document.createElement("div")}
+      />,
+    );
+
+    const settingsTab = screen.getByRole("tab", { name: "Settings" });
+    const jsonTab = screen.getByRole("tab", { name: "JSON" });
+    const settingsPanel = document.getElementById(
+      settingsTab.getAttribute("aria-controls")!,
+    )!;
+    const jsonPanel = document.getElementById(jsonTab.getAttribute("aria-controls")!)!;
+
+    expect(settingsPanel).toHaveAttribute("role", "tabpanel");
+    expect(settingsPanel).toHaveAttribute("aria-labelledby", settingsTab.id);
+    expect(settingsPanel).toHaveAttribute("aria-hidden", "false");
+    expect(jsonPanel).toHaveAttribute("aria-labelledby", jsonTab.id);
+    expect(jsonPanel).toHaveAttribute("aria-hidden", "true");
+
+    await user.click(jsonTab);
+
+    expect(jsonTab).toHaveAttribute("aria-selected", "true");
+    expect(jsonPanel).toHaveAttribute("aria-hidden", "false");
+    expect(settingsPanel).toHaveAttribute("aria-hidden", "true");
+  });
 });

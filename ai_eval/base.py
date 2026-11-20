@@ -198,6 +198,11 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
 
         return {}
 
+    @property
+    def json_editing_enabled(self) -> bool:
+        """Flag that indicates if the JSON import/export feature is enabled."""
+        return bool(self._get_settings().get("enable_json_editing", False))
+
     def resource_string(self, path):
         """Handy helper for getting resources from our kit."""
         return files("ai_eval").joinpath(path).read_text(encoding="utf8")
@@ -548,6 +553,7 @@ class AIEvalXBlock(StudioEditableXBlockMixin, XBlock):
         return {
             "field_metadata": self._studio_field_metadata(),
             "lock_metadata": self._studio_lock_metadata(),
+            "json_editing_enabled": self.json_editing_enabled,
         }
 
     # Studio validation helpers
