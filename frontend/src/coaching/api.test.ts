@@ -13,14 +13,15 @@ describe("sendChatMessage", () => {
     mockPostJson.mockReset();
   });
 
-  it("posts character_index and user_input to the given URL", async () => {
+  it("posts character_index, user_input and upload_ids to the given URL", async () => {
     mockPostJson.mockResolvedValue({ message: { content: "reply" } });
 
-    await sendChatMessage("/handler/get_character_response", 0, "hello");
+    await sendChatMessage("/handler/get_character_response", 0, "hello", ["upload-1"]);
 
     expect(mockPostJson).toHaveBeenCalledWith("/handler/get_character_response", {
       character_index: 0,
       user_input: "hello",
+      upload_ids: ["upload-1"],
     });
   });
 
@@ -42,7 +43,7 @@ describe("sendChatMessage", () => {
     };
     mockPostJson.mockResolvedValue(mockResponse);
 
-    const result = await sendChatMessage("/handler/get_character_response", 0, "input");
+    const result = await sendChatMessage("/handler/get_character_response", 0, "input", []);
     expect(result).toEqual(mockResponse);
   });
 });
@@ -94,7 +95,7 @@ describe("resetAll", () => {
     expect(mockPostJson).toHaveBeenCalledWith("/handler/reset_all", {});
   });
 
-  it("returns CharacterResponse with chat_histories", async () => {
+  it("returns chat_histories and remaining uploads", async () => {
     const mockResponse = {
       chat_histories: [[], []],
       attempts: {
@@ -104,6 +105,7 @@ describe("resetAll", () => {
         max_attempts: 3,
       },
       finished: false,
+      remaining: { workspace: 3 },
     };
     mockPostJson.mockResolvedValue(mockResponse);
 

@@ -196,6 +196,11 @@ main {
         }
     }
 
+    .attachments {
+        font-size: calc(var(--font-size-base) * 0.8);
+        font-style: italic;
+    }
+
     .coached-workspace, .shortanswer-llm {
         background-color: var(--color-workspace-bg);
         color: var(--color-workspace-fg);

@@ -67,25 +67,12 @@ function getCookie(name: string) {
   return null;
 }
 
-export async function postJson<TResponse extends UnknownRecord = UnknownRecord>(
-  url: string,
-  payload: unknown = {},
-): Promise<TResponse> {
+function csrfHeaders(): Record<string, string> {
   const csrfToken = getCookie("csrftoken");
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  return csrfToken ? { "X-CSRFToken": csrfToken } : {};
+}
 
-  if (csrfToken) {
-    headers["X-CSRFToken"] = csrfToken;
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    credentials: "same-origin",
-    headers,
-    body: JSON.stringify(payload),
-  });
+async function readResponse<TResponse>(response: Response): Promise<TResponse> {
   const body = await parseResponseBody(response);
 
   if (!response.ok) {
@@ -93,6 +80,47 @@ export async function postJson<TResponse extends UnknownRecord = UnknownRecord>(
   }
 
   return body as TResponse;
+}
+
+export async function postJson<TResponse extends UnknownRecord = UnknownRecord>(
+  url: string,
+  payload: unknown = {},
+): Promise<TResponse> {
+  const response = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      ...csrfHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  return readResponse<TResponse>(response);
+}
+
+/**
+ * Send a file as the raw body of a PUT request, with `params` in the query string and any extra `headers`. The
+ * browser sets the Content-Type from the file. On an error status it throws a RequestError carrying the JSON error
+ * body.
+ */
+export async function putFile<TResponse>(
+  url: string,
+  file: File,
+  params: Record<string, string>,
+  headers: Record<string, string> = {},
+): Promise<TResponse> {
+  const requestUrl = new URL(url, window.location.href);
+  Object.keys(params).forEach((name) => {
+    requestUrl.searchParams.set(name, params[name]);
+  });
+
+  const response = await fetch(requestUrl.toString(), {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: { ...headers, ...csrfHeaders() },
+    body: file,
+  });
+  return readResponse<TResponse>(response);
 }
 
 export function getErrorMessage(error: unknown, fallbackMessage: string): string {

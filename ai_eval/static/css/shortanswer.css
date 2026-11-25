@@ -310,3 +310,13 @@
     padding-inline-start: 16px;
   }
 }
+
+.shortanswer-react-app .chat-input-wrapper--with-uploads textarea {
+  padding: 0 var(--shortanswer-spacing-sm);
+}
+
+.shortanswer-react-app .chat-input-wrapper--with-uploads .chat-send-button {
+  bottom: var(--shortanswer-spacing-sm);
+  top: auto;
+  transform: none;
+}

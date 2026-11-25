@@ -6,6 +6,7 @@ import {
   ModalPopup,
 } from "@openedx/paragon";
 import { useIntl } from "react-intl";
+import { useFocusWithoutScroll } from "./useFocusWithoutScroll";
 
 interface ConfirmResetModalProps {
   onConfirm: () => void;
@@ -55,6 +56,7 @@ export const ConfirmResetModal = ({
   });
 
   const labelId = useId();
+  const cancelButtonRef = useFocusWithoutScroll<HTMLButtonElement>(isOpen);
 
   if (!isOpen) {
     return null;
@@ -82,7 +84,7 @@ export const ConfirmResetModal = ({
           <p>{bodyText}</p>
 
           <ActionRow>
-            <ModalCloseButton onClick={onCancel} variant="tertiary">
+            <ModalCloseButton ref={cancelButtonRef} onClick={onCancel} variant="tertiary">
               {cancelText}
             </ModalCloseButton>
             <Button onClick={onConfirm} variant={confirmVariant}>

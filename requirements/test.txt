@@ -79,6 +79,7 @@ certifi==2026.6.17
 cffi==2.0.0
     # via
     #   -r requirements/base.txt
+    #   pynacl
     #   weasyprint
 charset-normalizer==3.4.7
     # via
@@ -92,6 +93,7 @@ click==8.4.1
     #   click-plugins
     #   click-repl
     #   cookiecutter
+    #   edx-django-utils
     #   huggingface-hub
     #   litellm
     #   typer
@@ -125,7 +127,10 @@ distro==1.9.0
     #   -c https://raw.githubusercontent.com/edx/edx-lint/master/edx_lint/files/common_constraints.txt
     #   -r requirements/base.txt
     #   django-appconf
+    #   django-crum
     #   django-statici18n
+    #   django-waffle
+    #   edx-django-utils
     #   edx-i18n-tools
     #   openedx-django-pyfs
     #   xblock-sdk
@@ -133,8 +138,14 @@ django-appconf==1.2.0
     # via
     #   -r requirements/base.txt
     #   django-statici18n
+django-crum==0.7.9
+    # via edx-django-utils
 django-statici18n==2.7.1
     # via -r requirements/base.txt
+django-waffle==5.0.0
+    # via edx-django-utils
+edx-django-utils==8.1.0
+    # via -r requirements/test.in
 edx-i18n-tools==2.0.0
     # via -r requirements/test.in
 fastuuid==0.14.0
@@ -310,6 +321,8 @@ propcache==0.5.2
     #   -r requirements/base.txt
     #   aiohttp
     #   yarl
+psutil==7.2.2
+    # via edx-django-utils
 pycparser==3.0
     # via
     #   -r requirements/base.txt
@@ -332,6 +345,10 @@ pygments==2.20.0
     #   -r requirements/base.txt
     #   pytest
     #   rich
+pynacl==1.6.2
+    # via edx-django-utils
+pypdf==6.21.2
+    # via -r requirements/base.txt
 pyphen==0.17.2
     # via
     #   -r requirements/base.txt
@@ -423,6 +440,8 @@ sqlparse==0.5.5
     # via
     #   -r requirements/base.txt
     #   django
+stevedore==5.8.0
+    # via edx-django-utils
 text-unidecode==1.3
     # via python-slugify
 tiktoken==0.13.0

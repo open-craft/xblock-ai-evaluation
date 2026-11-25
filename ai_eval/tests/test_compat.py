@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from django.test import override_settings
 
-from ai_eval.compat import get_site_configuration_value
+from ai_eval.compat import get_site_configuration_value, is_masquerading_as_specific_learner
 
 
 @pytest.mark.parametrize(
@@ -60,3 +60,8 @@ def test_get_site_configuration_value_in_cms(
     mock_get_current_site_configuration_value.assert_called_once_with("LMS_BASE", settings_lms_base)
     mock_get_site_configuration_value.assert_called_once_with(cms_site_configuration_value, block_settings_key, {})
     assert result == expected_key
+
+
+def test_is_masquerading_as_specific_learner_false_outside_a_request():
+    """Without a current request (for example, in a Celery task) there is no masquerade to check."""
+    assert not is_masquerading_as_specific_learner(course_key=None)

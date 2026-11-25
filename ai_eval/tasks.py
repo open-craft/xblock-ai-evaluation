@@ -16,6 +16,7 @@ from . import (
     CoachAIEvalXBlock,
     ShortAnswerAIEvalXBlock,
 )
+from .upload_mixin import attachment_filenames
 
 logger = get_task_logger(__name__)
 
@@ -34,6 +35,7 @@ _BASE_HEADER = (
     "Source",
     "Message",
     "Timestamp",
+    "Attachments",
 )
 
 _BLOCK_CATEGORIES = [
@@ -147,17 +149,23 @@ def _extract_all_data(course_id):
             yield from _extract_data(block)
 
 
+def _attachments_cell(message):
+    """Return the Attachments cell of a message row: the attached filenames, comma-separated."""
+    return ", ".join(attachment_filenames(message))
+
+
 def _get_messages(block, session):
     """
-    Extract (source, content, time) tuples for one conversation session of a supported XBlock.
+    Extract (source, content, time, attachments) tuples for one conversation session of a supported XBlock.
 
     `time` is the stored ISO timestamp, or "" for older data recorded before timestamps existed.
+    `attachments` lists the filenames the learner attached; Coding has no attachments.
     """
     if isinstance(block, CodingAIEvalXBlock):
         time_str = session.get(coding_ai_eval.TIME, "")
-        yield ("user", session[coding_ai_eval.USER_RESPONSE], time_str)
-        yield ("ai_evaluation", session[coding_ai_eval.AI_EVALUATION], time_str)
-        yield ("code_exec_result", session[coding_ai_eval.CODE_EXEC_RESULT], time_str)
+        yield ("user", session[coding_ai_eval.USER_RESPONSE], time_str, "")
+        yield ("ai_evaluation", session[coding_ai_eval.AI_EVALUATION], time_str, "")
+        yield ("code_exec_result", session[coding_ai_eval.CODE_EXEC_RESULT], time_str, "")
     else:
         for message in session:
             if isinstance(block, ShortAnswerAIEvalXBlock):
@@ -166,7 +174,7 @@ def _get_messages(block, session):
                 time_str = message.get("time", "")
             else:
                 continue
-            yield (source, content, time_str)
+            yield (source, content, time_str, _attachments_cell(message))
 
 
 def _get_user_state_value(field_data_cache, block, user, field_name, default=None):
@@ -202,7 +210,7 @@ def _fragment_sort_key(fragment):
 
 def _iter_coach_messages(block, session):
     """
-    Yield (source, content, time) tuples for one CoachAIEvalXBlock session.
+    Yield (source, content, time, attachments) tuples for one CoachAIEvalXBlock session.
 
     Workspace and coach fragments are interleaved in timestamp order, followed by evaluation
     fragments. Each fragment holds one learner message and its reply under a single timestamp,
@@ -218,13 +226,14 @@ def _iter_coach_messages(block, session):
     )
     for fragment, assistant_role in chat_fragments:
         time_str = fragment.get("time", "")
-        if fragment["user_message"].strip():
-            yield ("user", fragment["user_message"], time_str)
+        attachments_cell = _attachments_cell(fragment)
+        if fragment["user_message"].strip() or attachments_cell:
+            yield ("user", fragment["user_message"], time_str, attachments_cell)
         if fragment["character_message"].strip():
-            yield (f"llm ({assistant_role})", fragment["character_message"], time_str)
+            yield (f"llm ({assistant_role})", fragment["character_message"], time_str, "")
     for fragment in session["evaluation_fragments"]:
         if fragment["character_message"].strip():
-            yield ("llm (Evaluator)", fragment["character_message"], fragment.get("time", ""))
+            yield ("llm (Evaluator)", fragment["character_message"], fragment.get("time", ""), "")
 
 
 def _get_coach_export_sessions(field_data_cache, block, user):
@@ -290,7 +299,7 @@ def _extract_data(block):
                 _get_coach_export_sessions(data, block, user),
                 start=1,
             ):
-                for source, content, time_str in _iter_coach_messages(block, session):
+                for message_row in _iter_coach_messages(block, session):
                     yield (
                         section_name,
                         subsection_name,
@@ -300,9 +309,7 @@ def _extract_data(block):
                         user.username,
                         user.email or "",
                         idx,
-                        source,
-                        content,
-                        time_str,
+                        *message_row,
                     )
         else:
             try:
@@ -316,7 +323,7 @@ def _extract_data(block):
                 continue
 
             for idx, session in enumerate(sessions, start=1):
-                for source, content, time_str in _get_messages(block, session):
+                for message_row in _get_messages(block, session):
                     yield (
                         section_name,
                         subsection_name,
@@ -326,9 +333,7 @@ def _extract_data(block):
                         user.username,
                         user.email or "",
                         idx,
-                        source,
-                        content,
-                        time_str,
+                        *message_row,
                     )
 
 
