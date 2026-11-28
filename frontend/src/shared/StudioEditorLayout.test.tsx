@@ -6,7 +6,7 @@ import { CoachingStudioPayload } from "../coaching/types";
 import CodingStudioApp from "../coding/CodingStudioApp";
 import { CodingStudioPayload } from "../coding/types";
 import { render, screen } from "../test/helpers";
-import { XBlockRuntime } from "./types";
+import { makeRuntime } from "../test/testUtils";
 import { StudioEditorLayout } from "./StudioEditorLayout";
 
 function renderInsideStudioModal(
@@ -78,13 +78,6 @@ function renderEditor(ui: React.ReactElement) {
       <div className="editor-body">{ui}</div>
     </div>,
   );
-}
-
-function makeRuntime() {
-  return {
-    handlerUrl: jest.fn(),
-    notify: jest.fn(),
-  } as unknown as XBlockRuntime & { notify: jest.Mock };
 }
 
 const codingPayload: CodingStudioPayload = {

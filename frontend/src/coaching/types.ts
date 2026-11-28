@@ -134,6 +134,7 @@ export interface CoachingStudioHandlerUrls {
 
 export interface CoachingStudioMeta extends LearnerUploadStudioMeta {
   field_metadata?: Record<string, StudioFieldMetadata>;
+  json_editing_enabled?: boolean;
   lock_metadata?: CoachingStudioLockMetadata;
 }
 

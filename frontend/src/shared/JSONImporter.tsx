@@ -18,7 +18,8 @@ interface JSONImporterProps {
   liveData: unknown;
   runtime: XBlockRuntime;
   element: XBlockElementLike;
-  schema?: Yup.Schema<any>;
+  exportFilename: string;
+  schema: Yup.Schema<any>;
   schemaContext?: unknown;
 }
 
@@ -78,6 +79,7 @@ function getRequestUploadError(error: unknown): UploadError {
  *
  */
 export function JSONImporter({
+  exportFilename,
   liveData,
   runtime,
   element,
@@ -102,7 +104,10 @@ export function JSONImporter({
     }
 
     try {
-      await schema?.validate(parsed, { abortEarly: false, context: schemaContext });
+      // Imported JSON must match the authored types exactly. Yup's default
+      // casting would silently turn null/false/0 into strings for
+      // `Yup.string().ensure()` fields, letting bad data through.
+      await schema.validate(parsed, { abortEarly: false, strict: true, context: schemaContext });
     } catch (error) {
       const yupErrors = error instanceof Yup.ValidationError ? collectYupErrors(error) : {};
       setUploadError(
@@ -162,12 +167,12 @@ export function JSONImporter({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "shortanswer-data.json";
+    link.download = exportFilename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     setTimeout(() => URL.revokeObjectURL(url), 100);
-  }, [liveData]);
+  }, [exportFilename, liveData]);
 
   return (
     <>

@@ -5,7 +5,7 @@ import { render, screen, waitFor, within } from "../test/helpers";
 import ShortAnswerStudioApp from "./ShortAnswerStudioApp";
 import { ShortAnswerStudioMeta, ShortAnswerStudioPayload, ShortAnswerStudioState } from "./types";
 import { BACKGROUND_OPTIONS } from "./appearance";
-import { XBlockRuntime } from "../shared/types";
+import { getFileInput, makeJsonFile, makeRuntime, mockSuccessfulSave } from "../test/testUtils";
 
 const INITIAL_STATE: ShortAnswerStudioState = {
   allow_reset: false,
@@ -67,17 +67,6 @@ function makePayload(
     mfe_config_api: "/mfe_config",
     style_urls: [],
   };
-}
-
-function mockSuccessfulSave() {
-  const fetchMock = jest.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    statusText: "OK",
-    text: async () => JSON.stringify({ success: true, validation_errors: {}, validation_warnings: [], meta: {} }),
-  });
-  global.fetch = fetchMock as unknown as typeof global.fetch;
-  return fetchMock;
 }
 
 function submittedBody(fetchMock: jest.Mock) {
@@ -259,12 +248,7 @@ describe("ShortAnswerStudioApp background", () => {
   let fetchMock: jest.Mock;
 
   beforeEach(() => {
-    fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify({ success: true, validation_errors: {}, validation_warnings: [] }),
-    });
-    global.fetch = fetchMock;
+    fetchMock = mockSuccessfulSave();
   });
 
   afterEach(() => {
@@ -344,12 +328,6 @@ describe("ShortAnswerStudioApp background", () => {
     expect(notify).not.toHaveBeenCalledWith("save", { state: "end" });
   });
 });
-function makeRuntime() {
-  return {
-    handlerUrl: jest.fn(),
-    notify: jest.fn(),
-  } as unknown as XBlockRuntime & { notify: jest.Mock };
-}
 
 function renderEditor(ui: React.ReactElement) {
   return render(
@@ -394,9 +372,6 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
 
   it("shows the JSON tab when JSON editing is enabled", () => {
     const runtime = makeRuntime();
-    runtime.handlerUrl = jest.fn(
-      (_element, handler) => `/handler/${handler}`,
-    ) as unknown as XBlockRuntime["handlerUrl"];
 
     const payload = makePayload({}, { json_editing_enabled: true });
 
@@ -428,9 +403,6 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
   it("validates uploaded JSON using shortAnswerSchema", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
-    runtime.handlerUrl = jest.fn(
-      (_element, handler) => `/handler/${handler}`,
-    ) as unknown as XBlockRuntime["handlerUrl"];
 
     const payload = makePayload({}, { json_editing_enabled: true, max_file_uploads_ceiling: 4 });
 
@@ -446,23 +418,18 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
 
     expect(screen.getByText("Import")).toBeInTheDocument();
 
-    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
-    expect(input).not.toBeNull();
-
-    const rawJson = JSON.stringify({
-      max_responses: 50,
-      model: "",
-      allow_learner_uploads: true,
-      max_file_uploads: 5,
-    });
-    const file = new File([rawJson], "test.json", {
-      type: "application/json",
-    });
-    Object.defineProperty(file, "text", {
-      value: () => Promise.resolve(rawJson),
-    });
-
-    await userEvent.upload(input, file);
+    await userEvent.upload(
+      getFileInput(container),
+      makeJsonFile(
+        JSON.stringify({
+          max_responses: 50,
+          model: "",
+          allow_learner_uploads: true,
+          max_file_uploads: 5,
+        }),
+        "test.json",
+      ),
+    );
 
     const heading = await screen.findByText("JSON validation failed!");
     expect(heading).toBeInTheDocument();
@@ -480,9 +447,6 @@ describe("ShortAnswerStudioApp — StudioEditorLayout integration", () => {
   it("wires the tablist to the tab panes with ARIA attributes", async () => {
     const user = userEvent.setup();
     const runtime = makeRuntime();
-    runtime.handlerUrl = jest.fn(
-      (_element, handler) => `/handler/${handler}`,
-    ) as unknown as XBlockRuntime["handlerUrl"];
 
     const payload = makePayload({}, { json_editing_enabled: true });
 
