@@ -6,6 +6,7 @@ import { Edit } from "@openedx/paragon/icons";
 interface StudioEditorTitleProps {
   displayName: string;
   onDisplayNameChange: (nextDisplayName: string) => void;
+  isInvalid?: boolean;
 }
 
 /**
@@ -13,7 +14,7 @@ interface StudioEditorTitleProps {
  * The name is saved with the rest of the form. Enter or leaving the input keeps the new name; Escape restores
  * the name it had before editing.
  */
-export function StudioEditorTitle({ displayName, onDisplayNameChange }: StudioEditorTitleProps) {
+export function StudioEditorTitle({ displayName, onDisplayNameChange, isInvalid }: StudioEditorTitleProps) {
   const intl = useIntl();
   const [nameBeforeEditing, setNameBeforeEditing] = useState<string | null>(null);
   const editLabel = intl.formatMessage({
@@ -41,6 +42,7 @@ export function StudioEditorTitle({ displayName, onDisplayNameChange }: StudioEd
     <div className="ai-eval-studio-title">
       <Form.Control
         className="ai-eval-studio-title__input"
+        isInvalid={isInvalid}
         aria-label={intl.formatMessage({
           id: "studio.editorTitle.componentName",
           defaultMessage: "Component name",

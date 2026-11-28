@@ -84,7 +84,6 @@
     column-gap: 10rem;
     display: grid;
     grid-template-columns: 220px minmax(300px, 600px);
-    margin: 3rem 0;
     padding: 0 0 0 5rem;
 }
 
@@ -219,7 +218,7 @@
 /* Native radios keep thumbnail selection keyboard-accessible without a custom widget. */
 .shortanswer-react-studio .shortanswer-background-picker {
     border: 0;
-    margin: 3rem 0;
+    margin-bottom: 2rem;
     padding: 0 0 0 5rem;
     min-width: 0;
 }
@@ -292,4 +291,26 @@
         grid-template-columns: 1fr;
         column-gap: 0;
     }
+}
+
+/* The overal modal padding is removed to accomodate a custom Modal Header.
+ * This adds back the padding for the footer so action buttons don't stick
+ * to the border.
+*/
+.shortanswer-react-studio .ai-eval-studio-actions {
+    padding-bottom: 7px;
+    padding-right: 7px;
+}
+
+.shortanswer-react-studio .studio-header {
+    padding: 0.5rem 3rem 0.5rem 1rem;
+    z-index: 3;
+}
+
+.shortanswer-react-studio .studio-header .ai-eval-studio-title {
+    border-bottom: none;
+    flex: 1 1 auto;
+    margin-bottom: 0;
+    min-height: 0;
+    padding-bottom: 0;
 }
